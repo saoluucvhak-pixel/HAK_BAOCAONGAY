@@ -1,0 +1,9 @@
+node_modules/
+desktop-app/release/
+app/dist/.vite/
+app/test-results/
+*.tmp*
+.tmp*
+*.part
+*.exe
+*.blockmap

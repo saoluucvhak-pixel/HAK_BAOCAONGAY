@@ -1,0 +1,49 @@
+{
+  "name": "baocaongay-desktop",
+  "version": "1.0.0",
+  "description": "Ứng dụng desktop Báo cáo ngày - HAK Group (chọn/đổi công ty ngay trong app)",
+  "main": "main.js",
+  "author": "HAK Group",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64",
+    "release": "node scripts/release.mjs"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.hakgroup.baocaongay",
+    "productName": "Báo cáo ngày",
+    "publish": null,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Báo cáo ngày"
+    }
+  }
+}

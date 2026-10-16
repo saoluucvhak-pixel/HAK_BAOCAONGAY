@@ -1,0 +1,190 @@
+/* ==========================================================================
+   Giao diện theo style.css HAK (brand teal #0e7c86) — chỉ đổi màu/hình khối,
+   giữ nguyên toàn bộ tên class/id cũ để không ảnh hưởng logic JS phía dưới.
+   ========================================================================== */
+:root{
+  --bg:#f3f6fa; --panel:#ffffff; --ink:#132433; --muted:#6b7a8c; --line:#e3e9f0;
+  --side:#0a1c30; --side-ink:#b8c7d9; --side-active:#14a3ad; --side-hover:rgba(255,255,255,.07);
+  --accent:#0e7c86; --accent-2:#14a3ad; --accent-soft:rgba(14,124,134,.12); --accent-ink:#ffffff;
+  --ok:#1a8a4a; --err:#e5484d; --warn:#b8860b;
+  --head:#f3f6fa; --hover:#f6fafb; --card1:#0e7c86; --card2:#1a8a4a; --card3:#b8860b; --card4:#e5484d;
+  --radius:14px; --shadow:0 1px 2px rgba(16,35,58,.05), 0 6px 18px rgba(16,35,58,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d151e; --panel:#15202c; --ink:#e7edf5; --muted:#8ea0b5; --line:#243244;
+    --side:#071019; --side-ink:#aeb9c9; --side-active:#21b5c0; --side-hover:rgba(255,255,255,.07);
+    --accent:#21b5c0; --accent-2:#3ddce6; --accent-soft:rgba(33,181,192,.16); --accent-ink:#062c30;
+    --ok:#3bc272; --err:#ff6b66; --warn:#e0ad3d;
+    --head:#1b232f; --hover:#1a2230; --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d151e; --panel:#15202c; --ink:#e7edf5; --muted:#8ea0b5; --line:#243244;
+  --side:#071019; --side-ink:#aeb9c9; --side-active:#21b5c0; --side-hover:rgba(255,255,255,.07);
+  --accent:#21b5c0; --accent-2:#3ddce6; --accent-soft:rgba(33,181,192,.16); --accent-ink:#062c30;
+  --ok:#3bc272; --err:#ff6b66; --warn:#e0ad3d;
+  --head:#1b232f; --hover:#1a2230; --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+button,select,input{font:inherit}
+a{color:var(--accent)}
+
+.app{display:flex;min-height:100vh}
+
+/* ---------- Sidebar ---------- */
+.side{width:260px;flex:0 0 260px;background:linear-gradient(180deg,#0f2740 0%,var(--side) 100%);color:var(--side-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;box-shadow:4px 0 24px rgba(0,0,0,.12)}
+.side .brand{padding:20px 20px 14px;font-weight:700;font-size:16px;letter-spacing:.02em;color:#fff;display:flex;flex-direction:column;gap:2px}
+.side .brand::before{content:"";display:block;width:42px;height:42px;border-radius:12px;margin-bottom:10px;background:linear-gradient(135deg,var(--accent-2),#0a5f68);box-shadow:0 4px 12px rgba(20,163,173,.4)}
+.side .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--side-ink);opacity:.75;margin-top:2px;letter-spacing:0}
+.side nav{flex:1;padding:8px 12px}
+.side .item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--side-ink);white-space:nowrap;font-size:13.5px;font-weight:500;margin-bottom:2px;transition:all .15s}
+.side .item:hover{background:var(--side-hover);color:#fff}
+.side .item.active{background:linear-gradient(90deg,rgba(20,163,173,.35),rgba(20,163,173,.12));color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--accent-2)}
+.side .item .ic{width:20px;text-align:center;font-size:14px}
+.side .foot{padding:14px 16px 18px;font-size:11px;color:var(--side-ink);opacity:.7;border-top:1px solid rgba(255,255,255,.08)}
+.side-toggle{display:none}
+
+/* ---------- Main ---------- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:5;background:color-mix(in srgb, var(--bg) 88%, transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 22px}
+.topbar .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.topbar .f{display:flex;flex-direction:column;gap:4px}
+.topbar label{font-size:11px;color:var(--muted)}
+.topbar input,.topbar select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:110px}
+.topbar input:focus,.topbar select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 .2rem var(--accent-soft)}
+.btn{padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap;font-weight:500;transition:all .15s}
+.btn:hover{background:var(--hover);border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+.btn.small{padding:5px 10px;font-size:12.5px}
+.meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:var(--muted);flex-wrap:wrap;gap:6px}
+.meta .status{display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;flex:none;box-shadow:0 0 0 3px rgba(26,138,74,.2)}
+.dot.busy{background:var(--warn);box-shadow:0 0 0 3px rgba(184,134,11,.2)}
+.dot.err{background:var(--err);box-shadow:0 0 0 3px rgba(229,72,77,.2)}
+.dot.warn{background:var(--warn);box-shadow:0 0 0 3px rgba(184,134,11,.35)}
+
+.content{flex:1;padding:22px 24px 40px}
+.section{display:none;animation:fadeIn .25s ease}
+.section.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.pageHead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.pageHead h1{font-size:1.15rem;margin:0;font-weight:700}
+.pageHead h2{font-size:16px;margin:0;color:var(--ink);font-weight:700}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- Tab con trong "Báo cáo tổng hợp" ---------- */
+.reportTabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px}
+.rtab{padding:8px 16px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:all .15s}
+.rtab:hover{background:var(--hover);color:var(--ink)}
+.rtab.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.reportPanel{display:none}
+.reportPanel.active{display:block}
+
+/* ---------- Dashboard cards ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px}
+.card .lbl{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.card .val{font-size:1.5rem;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--accent)}
+.card.c1 .val{color:var(--card1)} .card.c2 .val{color:var(--card2)} .card.c3 .val{color:var(--card3)} .card.c4 .val{color:var(--card4)}
+
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.chartBox{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+.chartBox h3{margin:0 0 10px;font-size:.78rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.chartBox canvas{max-height:260px}
+
+/* ---------- Table panel ---------- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+.tblTools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+.tblTools input[type=search]{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:200px}
+.tblTools select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.scrollWrap{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:10px}
+table.dataTbl{border-collapse:collapse;width:100%;font-size:12.8px}
+table.dataTbl th,table.dataTbl td{padding:.5rem .75rem;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}
+table.dataTbl th{position:sticky;top:0;background:var(--panel);cursor:pointer;user-select:none;z-index:1;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);box-shadow:0 1px 0 var(--line)}
+table.dataTbl td.num,table.dataTbl th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.dataTbl tbody tr:hover{background:var(--hover)}
+table.dataTbl tr.total td{font-weight:800;background:var(--head);position:sticky;bottom:0}
+.pager{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:var(--muted);font-size:12.5px;flex-wrap:wrap;gap:8px}
+
+/* ---------- Danh mục (editable) ---------- */
+.dmGrid{display:grid;grid-template-columns:1fr;gap:16px}
+@media (max-width:900px){.dmGrid{grid-template-columns:1fr}}
+.dmCard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+.dmCard h3{margin:0 0 10px;font-size:14px;font-weight:700}
+.dmCard table{width:100%;border-collapse:collapse;font-size:12.8px;table-layout:fixed}
+.dmCard th,.dmCard td{border-bottom:1px solid var(--line);padding:6px 8px;overflow:hidden}
+/* [SỬA] Trước đây không có table-layout:fixed + colgroup — với table auto layout, input
+   ngày/số (có kích thước tối thiểu do trình duyệt quy định) chiếm hết chỗ, đẩy 2 cột chữ
+   "Mã ĐL"/"Tên đại lý" (hoặc "Nguồn gốc") co lại chỉ còn vài px, chỉ hiện được 1 ký tự —
+   không phải mất dữ liệu, dữ liệu vẫn còn nguyên trong ô, chỉ là NHÌN không thấy để gõ/sửa.
+   Đã sửa: cố định tỉ lệ % từng cột qua <colgroup> trong index.html, đảm bảo cột chữ luôn đủ
+   rộng để đọc/gõ được, không phụ thuộc độ rộng cửa sổ hay mức zoom. */
+.dmCard input{width:100%;min-width:0;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);box-sizing:border-box}
+.dmCard input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 .2rem var(--accent-soft)}
+.dmCard .rmBtn{color:var(--err);cursor:pointer;border:none;background:none;font-size:15px}
+.cfgList{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.7}
+.cfgList code{background:var(--head);padding:1px 6px;border-radius:5px;word-break:break-all;color:var(--accent)}
+
+/* ---------- Đối chiếu ---------- */
+table.compareTbl{width:100%;border-collapse:collapse;font-size:13.5px}
+table.compareTbl th,table.compareTbl td{padding:10px 12px;border-bottom:1px dashed var(--line);text-align:right}
+table.compareTbl th:first-child,table.compareTbl td:first-child{text-align:left}
+table.compareTbl input{width:150px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);text-align:right}
+table.compareTbl input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 .2rem var(--accent-soft)}
+.diff-ok{color:var(--ok);font-weight:700}
+.diff-bad{color:var(--err);font-weight:700}
+
+.hidden{display:none !important}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+
+/* ---------- Bảng in theo mẫu Excel (chỉ hiện khi in / PDF) ---------- */
+.printSheet{display:none}
+.printSheet .psHead{font-size:15px;font-weight:800;color:#000}
+.printSheet .psTitle{font-size:14px;font-weight:800;text-transform:uppercase;margin-top:2px;color:#000}
+.printSheet .psDate{font-size:12px;margin:2px 0 10px;color:#000}
+.printSheet table.psTable{width:100%;border-collapse:collapse;font-size:11px;color:#000}
+.printSheet table.psTable th,.printSheet table.psTable td{border:1px solid #000;padding:3px 6px;text-align:left}
+.printSheet table.psTable th{background:#eee;font-weight:700}
+.printSheet table.psTable td.num,.printSheet table.psTable th.num{text-align:right}
+.printSheet table.psTable tfoot tr{font-weight:800}
+
+/* ---------- Modal nhập thông tin khai báo (mẫu WO) ---------- */
+.modalOverlay{display:none;position:fixed;inset:0;background:rgba(8,16,26,.55);backdrop-filter:blur(3px);z-index:100;align-items:center;justify-content:center;padding:20px}
+.modalOverlay.active{display:flex}
+.modalBox{background:var(--panel);color:var(--ink);border-radius:16px;padding:24px 26px;max-width:640px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.modalBox h3{margin:0 0 6px;font-size:16px;font-weight:700}
+.modalNote{font-size:12.5px;color:var(--muted);margin:0 0 14px}
+.modalGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.modalGrid .f{display:flex;flex-direction:column;gap:4px}
+.modalGrid .f.wide{grid-column:1 / -1}
+.modalGrid label{font-size:11.5px;color:var(--muted);font-weight:600}
+.modalGrid input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.modalGrid input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 .2rem var(--accent-soft)}
+.modalActions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+@media (max-width:560px){.modalGrid{grid-template-columns:1fr}}
+
+@media (max-width:880px){
+  .side{position:fixed;left:-270px;transition:left .2s;z-index:20;box-shadow:0 0 30px rgba(0,0,0,.4)}
+  .side.open{left:0}
+  .side-toggle{display:inline-flex;align-items:center;gap:6px}
+  .topbar .row{gap:8px}
+  .topbar input,.topbar select{min-width:96px}
+}
+
+/* ---------- In ---------- */
+@media print{
+  .side,.topbar,.tblTools,.pager,.tools,.side-toggle{display:none !important}
+  .content{padding:0}
+  .section{display:none !important}
+  .section.print-active{display:block !important}
+  .scrollWrap{max-height:none;overflow:visible;border:none}
+  body{background:#fff;color:#000}
+  .panel{border:none;padding:0;box-shadow:none}
+  body.printingSheet .content{display:none !important}
+  .printSheet.active{display:block !important}
+}

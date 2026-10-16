@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hệ thống báo cáo — Đại Hiệp</title>
+
+<!-- [SỬA — Phase 3.4] Thư viện xuất Excel/PDF/biểu đồ (ExcelJS, jsPDF, jspdf-autotable, Chart.js)
+     trước đây nạp qua <script src="cdn..."> ở đây — nếu mạng/máy chặn CDN thì mọi nút xuất
+     Excel/PDF/In đều lỗi "chưa tải được". Đã chuyển sang import qua npm, bundle thẳng vào
+     dist/index.html (xem src/legacy-app.js, src/components/dashboard.js) — không cần các thẻ
+     <script> này nữa, không phụ thuộc mạng để xuất báo cáo. XLSX (đọc file Excel "Sổ chi tiết
+     tiền vay") tương tự — đã nhúng thẳng vào Web Worker, xem src/services/excel-import-worker.js.
+     Chi tiết đầy đủ trong BUG_FIXED.md/CHANGELOG.md. -->
+
+<style>
+/* ==========================================================================
+   Giao diện theo style.css HAK (brand teal #0e7c86) — chỉ đổi màu/hình khối,
+   giữ nguyên toàn bộ tên class/id cũ để không ảnh hưởng logic JS phía dưới.
+   ========================================================================== */
+:root{
+  --bg:#f3f6fa; --panel:#ffffff; --ink:#132433; --muted:#6b7a8c; --line:#e3e9f0;
+  --side:#0a1c30; --side-ink:#b8c7d9; --side-active:#14a3ad; --side-hover:rgba(255,255,255,.07);
+  --accent:#0e7c86; --accent-2:#14a3ad; --accent-soft:rgba(14,124,134,.12); --accent-ink:#ffffff;
+  --ok:#1a8a4a; --err:#e5484d; --warn:#b8860b;
+  --head:#f3f6fa; --hover:#f6fafb; --card1:#0e7c86; --card2:#1a8a4a; --card3:#b8860b; --card4:#e5484d;
+  --radius:14px; --shadow:0 1px 2px rgba(16,35,58,.05), 0 6px 18px rgba(16,35,58,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d151e; --panel:#15202c; --ink:#e7edf5; --muted:#8ea0b5; --line:#243244;
+    --side:#071019; --side-ink:#aeb9c9; --side-active:#21b5c0; --side-hover:rgba(255,255,255,.07);
+    --accent:#21b5c0; --accent-2:#3ddce6; --accent-soft:rgba(33,181,192,.16); --accent-ink:#062c30;
+    --ok:#3bc272; --err:#ff6b66; --warn:#e0ad3d;
+    --head:#1b232f; --hover:#1a2230; --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d151e; --panel:#15202c; --ink:#e7edf5; --muted:#8ea0b5; --line:#243244;
+  --side:#071019; --side-ink:#aeb9c9; --side-active:#21b5c0; --side-hover:rgba(255,255,255,.07);
+  --accent:#21b5c0; --accent-2:#3ddce6; --accent-soft:rgba(33,181,192,.16); --accent-ink:#062c30;
+  --ok:#3bc272; --err:#ff6b66; --warn:#e0ad3d;
+  --head:#1b232f; --hover:#1a2230; --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+button,select,input{font:inherit}
+a{color:var(--accent)}
+
+.app{display:flex;min-height:100vh}
+
+/* ---------- Sidebar ---------- */
+.side{width:260px;flex:0 0 260px;background:linear-gradient(180deg,#0f2740 0%,var(--side) 100%);color:var(--side-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;box-shadow:4px 0 24px rgba(0,0,0,.12)}
+.side .brand{padding:20px 20px 14px;font-weight:700;font-size:16px;letter-spacing:.02em;color:#fff;display:flex;flex-direction:column;gap:2px}
+.side .brand::before{content:"";display:block;width:42px;height:42px;border-radius:12px;margin-bottom:10px;background:linear-gradient(135deg,var(--accent-2),#0a5f68);box-shadow:0 4px 12px rgba(20,163,173,.4)}
+.side .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--side-ink);opacity:.75;margin-top:2px;letter-spacing:0}
+.side nav{flex:1;padding:8px 12px}
+.side .item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--side-ink);white-space:nowrap;font-size:13.5px;font-weight:500;margin-bottom:2px;transition:all .15s}
+.side .item:hover{background:var(--side-hover);color:#fff}
+.side .item.active{background:linear-gradient(90deg,rgba(20,163,173,.35),rgba(20,163,173,.12));color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--accent-2)}
+.side .item .ic{width:20px;text-align:center;font-size:14px}
+.side .foot{padding:14px 16px 18px;font-size:11px;color:var(--side-ink);opacity:.7;border-top:1px solid rgba(255,255,255,.08)}
+.side-toggle{display:none}
+
+/* ---------- Main ---------- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:5;background:color-mix(in srgb, var(--bg) 88%, transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 22px}
+.topbar .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.topbar .f{display:flex;flex-direction:column;gap:4px}
+.topbar label{font-size:11px;color:var(--muted)}
+.topbar input,.topbar select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:110px}
+.topbar input:focus,.topbar select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 .2rem var(--accent-soft)}
+.btn{padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);cursor:pointer;white-space:nowrap;font-weight:500;transition:all .15s}
+.btn:hover{background:var(--hover);border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+.btn.small{padding:5px 10px;font-size:12.5px}
+.meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:var(--muted);flex-wrap:wrap;gap:6px}
+.meta .status{display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;flex:none;box-shadow:0 0 0 3px rgba(26,138,74,.2)}
+.dot.busy{background:var(--warn);box-shadow:0 0 0 3px rgba(184,134,11,.2)}
+.dot.err{background:var(--err);box-shadow:0 0 0 3px rgba(229,72,77,.2)}
+.dot.warn{background:var(--warn);box-shadow:0 0 0 3px rgba(184,134,11,.35)}
+
+.content{flex:1;padding:22px 24px 40px}
+.section{display:none;animation:fadeIn .25s ease}
+.section.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.pageHead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.pageHead h1{font-size:1.15rem;margin:0;font-weight:700}
+.pageHead h2{font-size:16px;margin:0;color:var(--ink);font-weight:700}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- Tab con trong "Báo cáo tổng hợp" ---------- */
+.reportTabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px}
+.rtab{padding:8px 16px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:all .15s}
+.rtab:hover{background:var(--hover);color:var(--ink)}
+.rtab.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.reportPanel{display:none}
+.reportPanel.active{display:block}
+
+/* ---------- Dashboard cards ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px}
+.card .lbl{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.card .val{font-size:1.5rem;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--accent)}
+.card.c1 .val{color:var(--card1)} .card.c2 .val{color:var(--card2)} .card.c3 .val{color:var(--card3)} .card.c4 .val{color:var(--card4)}
+
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.chartBox{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+.chartBox h3{margin:0 0 10px;font-size:.78rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.chartBox canvas{max-height:260px}
+
+/* ---------- Table panel ---------- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+.tblTools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+.tblTools input[type=search]{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:200px}
+.tblTools select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.scrollWrap{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:10px}
+table.dataTbl{border-collapse:collapse;width:100%;font-size:12.8px}
+table.dataTbl th,table.dataTbl td{padding:.5rem .75rem;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}
+table.dataTbl th{position:sticky;top:0;background:var(--panel);cursor:pointer;user-select:none;z-index:1;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);box-shadow:0 1px 0 var(--line)}
+table.dataTbl td.num,table.dataTbl th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.dataTbl tbody tr:hover{background:var(--hover)}
+table.dataTbl tr.total td{font-weight:800;background:var(--head);position:sticky;bottom:0}
+.pager{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:var(--muted);font-size:12.5px;flex-wrap:wrap;gap:8px}
+
+/* ---------- Danh mục (editable) ---------- */
+.dmGrid{display:grid;grid-template-columns:1fr;gap:16px}
+@media (max-width:900px){.dmGrid{grid-template-columns:1fr}}
+.dmCard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+.dmCard h3{margin:0 0 10px;font-size:14px;font-weight:700}
+.dmCard table{width:100%;border-collapse:collapse;font-size:12.8px;table-layout:fixed}
+.dmCard th,.dmCard td{border-bottom:1px solid var(--line);padding:6px 8px;overflow:hidden}
+.dmCard input{width:100%;min-width:0;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);box-sizing:border-box}
+.dmCard input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 .2rem var(--accent-soft)}
+.dmCard .rmBtn{color:var(--err);cursor:pointer;border:none;background:none;font-size:15px}
+/* [SỬA 2026-10-05] Ô số/tiền trong Danh mục quá hẹp (16–49px, số bị cắt "1(", "100") — nay mỗi bảng
+   chiếm cả bề rộng, ô số canh phải, bảng không bao giờ co dưới 940px (cửa sổ hẹp thì cuộn ngang). */
+.dmCard{overflow-x:auto}
+.dmCard table{min-width:940px}
+.dmCard input.numInput{text-align:right;font-variant-numeric:tabular-nums}
+.cfgList{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.7}
+.cfgList code{background:var(--head);padding:1px 6px;border-radius:5px;word-break:break-all;color:var(--accent)}
+
+.hidden{display:none !important}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+
+/* ---------- Bảng in theo mẫu Excel (chỉ hiện khi in / PDF) ---------- */
+.printSheet{display:none}
+.printSheet .psHead{font-size:15px;font-weight:800;color:#000}
+.printSheet .psTitle{font-size:14px;font-weight:800;text-transform:uppercase;margin-top:2px;color:#000}
+.printSheet .psDate{font-size:12px;margin:2px 0 10px;color:#000}
+.printSheet table.psTable{width:100%;border-collapse:collapse;font-size:11px;color:#000}
+.printSheet table.psTable th,.printSheet table.psTable td{border:1px solid #000;padding:3px 6px;text-align:left;white-space:nowrap}
+.printSheet table.psTable th{background:#eee;font-weight:700}
+.printSheet table.psTable td.num,.printSheet table.psTable th.num{text-align:right}
+.printSheet table.psTable tr.psTotalRow{font-weight:800}
+/* [BUGFIX 2026-09-23] Dòng Tổng cộng còn cần "page-break-inside:avoid" — nếu không, khi bảng bị
+   ngắt trang đúng ngay tại dòng này, trình duyệt có thể cắt dòng làm 2 nửa, vẽ viền dở dang. */
+.printSheet table.psTable tr.psTotalRow{page-break-inside:avoid}
+
+/* ---------- Modal nhập thông tin khai báo (mẫu WO) ---------- */
+.modalOverlay{display:none;position:fixed;inset:0;background:rgba(8,16,26,.55);backdrop-filter:blur(3px);z-index:100;align-items:center;justify-content:center;padding:20px}
+.modalOverlay.active{display:flex}
+.modalBox{background:var(--panel);color:var(--ink);border-radius:16px;padding:24px 26px;max-width:640px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.modalBox h3{margin:0 0 6px;font-size:16px;font-weight:700}
+.modalNote{font-size:12.5px;color:var(--muted);margin:0 0 14px}
+.modalGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.modalGrid .f{display:flex;flex-direction:column;gap:4px}
+.modalGrid .f.wide{grid-column:1 / -1}
+.modalGrid label{font-size:11.5px;color:var(--muted);font-weight:600}
+.modalGrid input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.modalGrid input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 .2rem var(--accent-soft)}
+.modalActions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+@media (max-width:560px){.modalGrid{grid-template-columns:1fr}}
+
+@media (max-width:880px){
+  .side{position:fixed;left:-270px;transition:left .2s;z-index:20;box-shadow:0 0 30px rgba(0,0,0,.4)}
+  .side.open{left:0}
+  .side-toggle{display:inline-flex;align-items:center;gap:6px}
+  .topbar .row{gap:8px}
+  .topbar input,.topbar select{min-width:96px}
+}
+
+/* ---------- In ---------- */
+@media print{
+  /* [BUGFIX 2026-09-23] Người dùng báo: file PDF (xuất qua nút "In" → "Lưu dưới dạng PDF") có
+     1 trang trắng ở đầu. Nguyên nhân: .app{min-height:100vh} vẫn giữ nguyên khi in — dù .side
+     và .content bên trong đều bị ẩn (display:none), CHÍNH .app vẫn buộc cao tối thiểu 1 màn hình
+     (1 trang giấy), tạo ra 1 khối trắng chiếm hết trang 1; #printSheet (nội dung thật cần in)
+     là phần tử SAU .app trong DOM nên bị đẩy hẳn xuống trang 2. Sửa bằng cách bỏ min-height đó
+     khi in — không ảnh hưởng gì trên màn hình (chỉ áp dụng trong @media print).  */
+  .app{min-height:0}
+  .side,.topbar,.tblTools,.pager,.tools,.side-toggle{display:none !important}
+  .content{padding:0}
+  .section{display:none !important}
+  .section.print-active{display:block !important}
+  .scrollWrap{max-height:none;overflow:visible;border:none}
+  body{background:#fff;color:#000}
+  .panel{border:none;padding:0;box-shadow:none}
+  body.printingSheet .content{display:none !important}
+  .printSheet.active{display:block !important}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="side" id="side">
+    <div class="brand">HỆ THỐNG BÁO CÁO<small id="brandCompanyName">Công ty TNHH SXTMDV Đại Hiệp</small></div>
+    <nav id="navList">
+      <div class="item active" data-target="dashboard"><span class="ic">&#9632;</span> Dashboard</div>
+      <div class="item" data-target="baocao"><span class="ic">&#9776;</span> Báo cáo tổng hợp</div>
+      <div class="item" data-target="lamsan"><span class="ic">&#127795;</span> Tổng hợp lâm sản</div>
+      <div class="item" data-target="nganhang"><span class="ic">&#127974;</span> Báo cáo ngân hàng</div>
+      <div class="item" data-target="danhmuc"><span class="ic">&#128203;</span> Danh mục</div>
+      <div class="item" data-target="cauhinh"><span class="ic">&#9881;</span> Cấu hình</div>
+    </nav>
+    <div class="foot">Dữ liệu đọc trực tiếp từ Google Sheet (CSV công khai). HTML chỉ đọc, không ghi ngược vào Sheet.</div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <div class="main">
+    <div class="topbar">
+      <div class="row">
+        <button class="btn side-toggle" id="sideToggle">&#9776; Menu</button>
+        <div class="f"><label>Từ ngày</label><input type="date" id="fFrom"></div>
+        <div class="f"><label>Đến ngày</label><input type="date" id="fTo"></div>
+        <div class="f"><label>Đại lý</label><select id="fDL"><option value="">Tất cả</option></select></div>
+        <div class="f"><label>Nguồn gốc</label><select id="fNG"><option value="">Tất cả</option></select></div>
+        <div class="f"><label>Khách hàng</label><select id="fKH"><option value="">Tất cả</option></select></div>
+        <div class="f"><label>Biển số</label><select id="fBS"><option value="">Tất cả</option></select></div>
+        <button class="btn primary" id="btnLapBC">LẬP BÁO CÁO</button>
+        <button class="btn" id="btnReload">&#128260; CẬP NHẬT DỮ LIỆU</button>
+      </div>
+      <div class="meta">
+        <span class="status"><span class="dot" id="statusDot"></span><span id="statusText">Chưa tải dữ liệu</span></span>
+        <span id="lastUpdated">Cập nhật lần cuối: —</span>
+      </div>
+    </div>
+
+    <div class="content" id="content">
+
+      <!-- Dashboard -->
+      <section class="section active" id="sec-dashboard">
+        <div class="pageHead"><h1>Dashboard</h1></div>
+        <div class="cards" id="dashCards"></div>
+        <div class="charts">
+          <div class="chartBox"><h3>Khối lượng nhập theo ngày (tấn)</h3><canvas id="chartKLNgay"></canvas></div>
+          <div class="chartBox"><h3>Giá trị nhập theo ngày (đ)</h3><canvas id="chartGTNgay"></canvas></div>
+          <div class="chartBox"><h3>Khối lượng nhập theo đại lý (tấn)</h3><canvas id="chartDL"></canvas></div>
+          <div class="chartBox"><h3>Khối lượng nhập theo nguồn gốc (tấn)</h3><canvas id="chartNG"></canvas></div>
+          <div class="chartBox"><h3>Nguyên liệu xuất theo Tàu (tấn) — toàn bộ, không theo khoảng ngày</h3><canvas id="chartTau"></canvas></div>
+        </div>
+      </section>
+
+      <!-- Các báo cáo dạng bảng (dùng chung khung renderTablePage) -->
+      <section class="section" id="sec-baocao">
+        <div class="pageHead">
+          <h1>Báo cáo tổng hợp</h1>
+          <div class="tools">
+            <button class="btn primary small" id="btnExportAllThang">&#128230; BÁO CÁO TỔNG HỢP THÁNG (Excel)</button>
+            <button class="btn primary small" id="btnExportAllNgay">&#128230; BÁO CÁO TỔNG HỢP NGÀY (Excel)</button>
+          </div>
+        </div>
+        <div class="reportTabs" id="reportTabsBar">
+          <button class="rtab active" data-rtab="nhapkeo">Nhập gỗ keo</button>
+          <button class="rtab" data-rtab="thanhtoan">Thanh toán</button>
+          <button class="rtab" data-rtab="congno">Công nợ</button>
+          <button class="rtab" data-rtab="xecho">Xe chờ &gt; 1 giờ</button>
+          <button class="rtab" data-rtab="tonghop">Nhập – Xuất – Thanh toán</button>
+          <button class="rtab" data-rtab="hotro">Hỗ trợ tài xế</button>
+          <button class="rtab" data-rtab="trogia">Trợ giá</button>
+          <button class="rtab" data-rtab="tonghoptro">Tổng hợp hỗ trợ</button>
+          <button class="rtab" data-rtab="hoahong">Hoa hồng đại lý</button>
+        </div>
+
+        <div class="reportPanel active" data-rpanel="nhapkeo"><div class="pageHead"><h2>Bảng kê nhập gỗ keo</h2><div class="tools" data-tools="nhapkeo"></div></div><div class="panel"><div class="tblTools" data-toolbar="nhapkeo"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-nhapkeo"></table></div><div class="pager" data-pager="nhapkeo"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="thanhtoan"><div class="pageHead"><h2>Bảng kê thanh toán gỗ keo</h2><div class="tools" data-tools="thanhtoan"></div></div><div class="panel"><div class="tblTools" data-toolbar="thanhtoan"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-thanhtoan"></table></div><div class="pager" data-pager="thanhtoan"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="congno"><div class="pageHead"><h2>Bảng kê công nợ</h2><div class="tools" data-tools="congno"></div></div><div class="panel"><div class="tblTools" data-toolbar="congno"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-congno"></table></div><div class="pager" data-pager="congno"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="xecho"><div class="pageHead"><h2>Xe chờ trên 1 giờ</h2><div class="tools" data-tools="xecho"></div></div><div class="panel"><div class="tblTools" data-toolbar="xecho"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-xecho"></table></div><div class="pager" data-pager="xecho"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="tonghop"><div class="pageHead"><h2>Tổng hợp nhập – xuất – thanh toán</h2><div class="tools" data-tools="tonghop"></div></div><div class="panel"><div class="tblTools" data-toolbar="tonghop"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-tonghop"></table></div><div class="pager" data-pager="tonghop"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="hotro"><div class="pageHead"><h2>Bảng kê tiền hỗ trợ tài xế (cuối tháng)</h2><div class="tools" data-tools="hotro"></div></div><div class="panel"><div class="tblTools" data-toolbar="hotro"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-hotro"></table></div><div class="pager" data-pager="hotro"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="trogia"><div class="pageHead"><h2>Bảng kê trợ giá (khi thanh toán)</h2><div class="tools" data-tools="trogia"></div></div><div class="panel"><div class="tblTools" data-toolbar="trogia"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-trogia"></table></div><div class="pager" data-pager="trogia"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="tonghoptro"><div class="pageHead"><h2>Tổng hợp thanh toán tiền hỗ trợ (theo biển số)</h2><div class="tools" data-tools="tonghoptro"></div></div><div class="panel"><div class="tblTools" data-toolbar="tonghoptro"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-tonghoptro"></table></div><div class="pager" data-pager="tonghoptro"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="hoahong"><div class="pageHead"><h2>Tổng hợp hoa hồng đại lý</h2><div class="tools" data-tools="hoahong"></div></div><div class="panel"><div class="tblTools" data-toolbar="hoahong"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-hoahong"></table></div><div class="pager" data-pager="hoahong"></div></div></div>
+      </section>
+
+      <!-- Tổng hợp lâm sản (Bảng kê lâm sản xuất khẩu) -->
+      <section class="section" id="sec-lamsan">
+        <div class="pageHead">
+          <h1>Tổng hợp lâm sản</h1>
+          <div class="tools">
+            <button class="btn small" id="btnExportAllLamSan">&#128230; XUẤT TẤT CẢ (Excel)</button>
+            <button class="btn small" id="btnTauModal">&#128674; Xuất theo Tàu</button>
+            <button class="btn primary small" id="btnWOModal">&#128196; Xuất mẫu WO (Thông tư 05/2018/TT-BCT)</button>
+          </div>
+        </div>
+        <div class="reportTabs" id="reportTabsBarLamSan">
+          <button class="rtab active" data-rtab="bklsct">BKLS xuất khẩu - Chi tiết</button>
+          <button class="rtab" data-rtab="bklsth">BKLS xuất khẩu - Tổng hợp</button>
+          <button class="rtab" data-rtab="tautonghop">Tổng hợp theo Tàu</button>
+        </div>
+
+        <div class="reportPanel active" data-rpanel="bklsct"><div class="pageHead"><h2>Bảng kê lâm sản xuất khẩu — Chi tiết</h2><div class="tools" data-tools="bklsct"></div></div><div class="panel"><div class="tblTools" data-toolbar="bklsct"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-bklsct"></table></div><div class="pager" data-pager="bklsct"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="bklsth"><div class="pageHead"><h2>Bảng kê lâm sản xuất khẩu — Tổng hợp</h2><div class="tools" data-tools="bklsth"></div></div><div class="panel"><div class="tblTools" data-toolbar="bklsth"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-bklsth"></table></div><div class="pager" data-pager="bklsth"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="tautonghop"><div class="pageHead"><h2>Tổng hợp nguyên liệu xuất theo Tàu</h2><div class="tools" data-tools="tautonghop"></div></div><div class="panel"><div style="color:var(--muted);margin:0 0 10px;font-size:13px">Gộp theo Tàu + Khách hàng — tính trên TOÀN BỘ hồ sơ đã gán tàu (không chỉ trong khoảng ngày đang lọc ở trên), vì 1 tàu thường nhận hàng dồn từ nhiều kỳ báo cáo.</div><div class="tblTools" data-toolbar="tautonghop"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-tautonghop"></table></div><div class="pager" data-pager="tautonghop"></div></div></div>
+      </section>
+
+      <!-- Báo cáo ngân hàng (dùng chung 1 tên công ty CONFIG.TEN_CONG_TY — Đại Hiệp — như mọi báo cáo khác) -->
+      <section class="section" id="sec-nganhang">
+        <div class="pageHead">
+          <h1>Báo cáo ngân hàng</h1>
+          <div class="tools">
+            <button class="btn small" id="btnExportAllNganHang">&#128230; XUẤT TẤT CẢ (Excel)</button>
+          </div>
+        </div>
+        <div class="reportTabs" id="reportTabsBarNganHang">
+          <button class="rtab active" data-rtab="tienvay">Sổ chi tiết tiền vay</button>
+          <button class="rtab" data-rtab="tndn">Bảng kê 02/TNDN</button>
+          <button class="rtab" data-rtab="pnk">Phiếu nhập kho</button>
+        </div>
+
+        <div class="reportPanel active" data-rpanel="tienvay"><div class="pageHead"><h2>Sổ chi tiết tiền vay</h2><div class="tools" data-tools="tienvay"></div></div><div class="panel"><div class="bankVayUpload" style="margin:0 0 10px;padding:10px 12px;border:1px dashed #c9c9c9;border-radius:8px;background:#fafafa;"><label style="font-weight:600;margin-right:8px;">Nguồn dữ liệu — tải file Excel Sổ chi tiết tiền vay:</label><input type="file" id="tienVayFileInput" accept=".xlsx,.xls"> <button class="btn small" id="btnTienVayTemplate" type="button">📥 Tải file mẫu</button><span id="tienVayFileStatus" style="margin-left:10px;color:#666;font-size:13px;">Chưa tải file — bảng dưới đây đang trống.</span><div style="margin-top:4px;color:#999;font-size:12px;">File cần đúng cấu trúc cột: Ngày chung, Ngày hạch toán, Ngày chứng từ, Tổng tiền vay, Ngày thanh toán, Số tấn, Tổng tiền chi, Họ tên Chủ rừng — không cần cấu hình gì thêm, chỉ tải lại khi có dữ liệu mới. File chỉ đọc ngay trên trình duyệt, không gửi lên đâu cả. Chưa có file đúng cấu trúc? Bấm "📥 Tải file mẫu" ở trên.</div></div><div class="tblTools" data-toolbar="tienvay"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-tienvay"></table></div><div class="pager" data-pager="tienvay"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="tndn"><div class="pageHead"><h2>Bảng kê thu mua hàng hóa, dịch vụ không có hóa đơn (Mẫu 02/TNDN)</h2><div class="tools" data-tools="tndn"><button class="btn primary small" id="btnTNDNModal">&#128196; Xuất mẫu 02/TNDN chính thức</button></div></div><div class="panel"><div class="tblTools" data-toolbar="tndn"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-tndn"></table></div><div class="pager" data-pager="tndn"></div></div></div>
+
+        <div class="reportPanel" data-rpanel="pnk"><div class="pageHead"><h2>Phiếu nhập kho (tổng hợp theo ngày)</h2><div class="tools" data-tools="pnk"><button class="btn primary small" id="btnPNKModal">&#128196; Xuất phiếu nhập kho (hàng loạt)</button></div></div><div class="panel"><div class="tblTools" data-toolbar="pnk"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-pnk"></table></div><div class="pager" data-pager="pnk"></div></div></div>
+      </section>
+
+      <!-- Danh mục & cấu hình -->
+      <section class="section" id="sec-danhmuc">
+        <div class="pageHead"><h1>Danh mục</h1><div class="tools"><button class="btn small" id="btnUndoDM" title="Hoàn tác (Ctrl+Z)">↩ Hoàn tác</button> <button class="btn small" id="btnRedoDM" title="Làm lại (Ctrl+Y)">↪ Làm lại</button></div></div>
+        <div class="dmGrid">
+          <div class="dmCard">
+            <h3>DM_DL — Danh mục đại lý</h3>
+            <table id="dmDLTable">
+              <colgroup><col style="width:8%"><col style="width:19%"><col style="width:12%"><col style="width:12%"><col style="width:13%"><col style="width:16%"><col style="width:16%"><col style="width:40px"></colgroup>
+              <thead><tr><th>Mã ĐL</th><th>Tên đại lý</th><th>SL Min</th><th>SL Max</th><th>Hoa hồng/tấn</th><th>Từ ngày</th><th>Đến ngày</th><th></th></tr></thead><tbody></tbody></table>
+            <button class="btn small" id="btnAddDL" style="margin-top:8px">+ Thêm đại lý</button>
+          </div>
+          <div class="dmCard">
+            <h3>DM_HT — Danh mục hỗ trợ theo nguồn gốc</h3>
+            <table id="dmHTTable">
+              <colgroup><col style="width:18%"><col style="width:18%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:40px"></colgroup>
+              <thead><tr><th>Nguồn gốc</th><th>Hỗ trợ/tấn</th><th>Hình thức</th><th>Từ ngày</th><th>Đến ngày</th><th></th></tr></thead><tbody></tbody></table>
+            <button class="btn small" id="btnAddHT" style="margin-top:8px">+ Thêm dòng</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="sec-cauhinh">
+        <div class="pageHead"><h1>Cấu hình</h1></div>
+        <div class="dmCard">
+          <h3>Sao lưu / Khôi phục dữ liệu đã lưu trên trình duyệt này</h3>
+          <div style="color:var(--muted);font-size:13px;margin-bottom:8px">Xuất toàn bộ dữ liệu bạn đã tự nhập (danh mục Đại lý/Hỗ trợ, thông tin ngân hàng/WO đã lưu) ra 1 file JSON để lưu trữ hoặc chuyển sang máy khác. Không bao gồm dữ liệu Google Sheet (luôn tải lại từ nguồn).</div>
+          <button class="btn small" id="btnBackupData">💾 Sao lưu dữ liệu</button>
+          <label class="btn small" for="btnRestoreDataInput" style="display:inline-block;cursor:pointer;margin-left:8px">📂 Khôi phục dữ liệu</label>
+          <input type="file" id="btnRestoreDataInput" accept=".json" style="display:none">
+          <span id="backupRestoreStatus" style="margin-left:10px;color:#666;font-size:13px;"></span>
+        </div>
+        <div class="dmCard" style="margin-top:16px">
+          <h3>Hướng dẫn sử dụng</h3>
+          <div style="font-size:13.5px;line-height:1.7;color:#333">
+            <p style="margin:0 0 8px"><b>1. Xem báo cáo:</b> vào tab "Báo cáo", chọn khoảng ngày (Từ ngày/Đến ngày) và các bộ lọc (Đại lý/Nguồn gốc/Khách hàng/Biển số) nếu cần, bấm <b>"LẬP BÁO CÁO"</b>. Bấm <b>"CẬP NHẬT DỮ LIỆU"</b> khi cần tải lại số liệu mới nhất từ Google Sheet.</p>
+            <p style="margin:0 0 8px"><b>2. Tìm kiếm trong bảng:</b> gõ vào ô tìm kiếm ở đầu mỗi bảng — gõ không dấu vẫn tìm ra tên có dấu (vd gõ "nguyen van a" ra "Nguyễn Văn A"). Bảng nhiều dòng tự chuyển sang cuộn mượt thay vì phân trang.</p>
+            <p style="margin:0 0 8px"><b>3. Xuất báo cáo:</b> mỗi bảng có nút xuất Excel/PDF/In riêng ở góc trên.</p>
+            <p style="margin:0 0 8px"><b>4. Danh mục Đại lý/Hỗ trợ:</b> sửa trực tiếp ở tab "Danh mục". Lỡ sửa nhầm thì bấm <b>"↩ Hoàn tác"</b> (hoặc Ctrl+Z), <b>"↪ Làm lại"</b> (Ctrl+Y) để quay lại.</p>
+            <p style="margin:0 0 8px"><b>5. Sao lưu/khôi phục dữ liệu:</b> dùng 2 nút ở thẻ phía trên — nên sao lưu định kỳ (vd cuối tháng) để phòng mất dữ liệu khi đổi máy hoặc xoá nhầm trình duyệt.</p>
+            <p style="margin:0 0 8px"><b>6. Đổi tên công ty / link Google Sheet (cho đơn vị khác trong HAK Group):</b> dùng file <code>config.html</code> đi kèm — mở file đó, điền tên công ty và link Google Sheet riêng, bấm tạo là ra 1 file báo cáo mới đã cấu hình sẵn, không cần sửa mã nguồn.</p>
+            <p style="margin:0">Nếu mở file báo cáo bằng double-click mà báo "Lỗi tải dữ liệu... Failed to fetch": mở bằng <code>start.bat</code> (Windows) hoặc <code>start.sh</code> (Mac/Linux) đi kèm thay vì double-click thẳng vào file HTML — xem chi tiết trong <code>README.md</code>.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- Trang in theo mẫu Excel (ẩn trên màn hình, chỉ hiện khi bấm In / xuất PDF) -->
+<div class="printSheet" id="printSheet"></div>
+
+<!-- Modal nhập thông tin khai báo cho mẫu "Bảng kê khai hàng hóa xuất khẩu đạt tiêu chí WO" (TT 05/2018/TT-BCT) -->
+<div class="modalOverlay" id="woModalOverlay">
+  <div class="modalBox">
+    <h3>Thông tin khai báo — Mẫu Bảng kê khai hàng hóa xuất khẩu tiêu chí "WO"</h3>
+    <p class="modalNote">Các thông tin này không có trong Google Sheet, nhập/kiểm tra lại mỗi lần xuất (hệ thống tự nhớ lần nhập gần nhất để bạn khỏi gõ lại).</p>
+    <div class="modalGrid">
+      <div class="f"><label>Mã số thuế</label><input type="text" id="woMaSoThue"></div>
+      <div class="f"><label>Tờ khai hải quan xuất khẩu số</label><input type="text" id="woToKhai"></div>
+      <div class="f wide"><label>Địa chỉ nơi tổ chức thu mua</label><input type="text" id="woDiaChiThuMua"></div>
+      <div class="f"><label>Người phụ trách thu mua</label><input type="text" id="woNguoiPhuTrach"></div>
+      <div class="f"><label>Số CCCD người phụ trách</label><input type="text" id="woCccdPhuTrach"></div>
+      <div class="f"><label>Tiêu chí áp dụng</label><input type="text" id="woTieuChi" value="WO"></div>
+      <div class="f"><label>Tên hàng hóa</label><input type="text" id="woTenHangHoa" value="Dăm gỗ keo"></div>
+      <div class="f"><label>Số lượng (Tấn khô)</label><input type="text" id="woSoLuongKho" placeholder="để trống nếu chưa quy đổi"></div>
+      <div class="f"><label>Trị giá (FOB, USD)</label><input type="text" id="woTriGiaFOB" placeholder="để trống nếu chưa có"></div>
+      <div class="f"><label>Nơi lập, ngày</label><input type="text" id="woNoiLap" value="Đà Nẵng"></div>
+    </div>
+    <div class="modalActions">
+      <button class="btn" id="btnWOCancel">Đóng</button>
+      <button class="btn" id="btnWOPdf">&#128196; Xuất PDF</button>
+      <button class="btn primary" id="btnWOExcel">&#128202; Xuất Excel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal chọn BKLS để gán/xuất theo Tàu — tính năng mới (Tàu/Khách hàng không có trong Google
+     Sheet, gán tay ở đây; xem services/tau-assignment.js). 1 lô đã gán Tàu bị khoá vĩnh viễn
+     với tàu đó (không gán sang tàu khác được), vẫn xuất lại được cho đúng tàu đó nhiều lần. -->
+<div class="modalOverlay" id="tauModalOverlay">
+  <div class="modalBox" style="max-width:820px">
+    <h3>Chọn BKLS để xuất/gán theo Tàu</h3>
+    <p class="modalNote">Danh sách dưới đây lấy đúng các dòng đang hiển thị ở bảng "BKLS xuất khẩu - Chi tiết" (theo khoảng ngày/bộ lọc/tìm kiếm hiện tại). Dòng đã gán cho 1 Tàu khác sẽ bị khoá (không chọn được nữa) — nhưng vẫn chọn lại được nếu bạn gõ ĐÚNG tên tàu đã gán cho nó.</p>
+    <div class="modalGrid">
+      <div class="f"><label>Tên tàu / chuyến</label><input type="text" id="tauTenTau" placeholder="VD: Tàu Bình Minh 68 - chuyến 09/2026"></div>
+      <div class="f"><label>Hoặc chọn Tàu đã có</label><select id="tauSelectExisting"><option value="">— gõ tên tàu mới ở trên —</option></select></div>
+      <div class="f wide"><label>Khách hàng</label><input type="text" id="tauKhachHang" placeholder="Tên khách hàng nhận lô hàng này"></div>
+    </div>
+    <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+      <label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="tauCheckAll"> Chọn tất cả dòng còn chọn được</label>
+      <span id="tauSelectedCount" style="font-size:12.5px;color:var(--muted)"></span>
+    </div>
+    <div id="tauRowList" style="max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px;font-size:13px"></div>
+    <div class="modalActions">
+      <button class="btn" id="btnTauCancel">Đóng</button>
+      <button class="btn" id="btnTauUnassign">Gỡ gán các dòng đã chọn</button>
+      <button class="btn primary" id="btnTauAssignConfirm">Gán Tàu cho các dòng đã chọn</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal nhập thông tin cho báo cáo ngân hàng (mẫu 02/TNDN chính thức & phiếu nhập kho hàng loạt) -->
+<div class="modalOverlay" id="bankModalOverlay">
+  <div class="modalBox">
+    <h3 id="bankModalTitle">Thông tin xuất báo cáo ngân hàng</h3>
+    <p class="modalNote">Các thông tin này không có trong Google Sheet, nhập/kiểm tra lại mỗi lần xuất (hệ thống tự nhớ lần nhập gần nhất để bạn khỏi gõ lại).</p>
+    <div class="modalGrid">
+      <div class="f"><label>Mã số thuế</label><input type="text" id="bankMST"></div>
+      <div class="f"><label>Số điện thoại</label><input type="text" id="bankSDT"></div>
+      <div class="f wide"><label>Địa chỉ (trụ sở)</label><input type="text" id="bankDiaChi"></div>
+      <div class="f wide bankInfoTNDNOnly"><label>Địa chỉ nơi tổ chức thu mua</label><input type="text" id="bankDiaChiThuMua"></div>
+      <div class="f wide bankInfoPNKOnly"><label>Nhập tại kho</label><input type="text" id="bankNhapTaiKho" placeholder="VD: Nhà máy dăm gỗ Công ty TNHH SXTMDV Đại Hiệp"></div>
+      <div class="f wide bankInfoPNKOnly"><label>Địa điểm</label><input type="text" id="bankDiaDiemPNK"></div>
+      <div class="f bankInfoPNKOnly"><label>Nợ (mã TK, có thể để trống)</label><input type="text" id="bankNo"></div>
+      <div class="f bankInfoPNKOnly"><label>Có (mã TK, có thể để trống)</label><input type="text" id="bankCo"></div>
+      <div class="f bankInfoPNKOnly"><label>Họ và tên người giao</label><input type="text" id="bankNguoiGiao"></div>
+      <div class="f bankInfoPNKOnly"><label>Người lập phiếu</label><input type="text" id="bankNguoiLap"></div>
+      <div class="f bankInfoPNKOnly"><label>Thủ kho</label><input type="text" id="bankThuKho"></div>
+      <div class="f bankInfoPNKOnly"><label>Giám đốc</label><input type="text" id="bankGiamDoc"></div>
+    </div>
+    <div class="modalActions">
+      <button class="btn" id="btnBankCancel">Đóng</button>
+      <button class="btn" id="btnBankPdf">&#128196; Xuất PDF</button>
+      <button class="btn primary" id="btnBankExcel">&#128202; Xuất Excel</button>
+    </div>
+  </div>
+</div>
+
+
+<script type="module" src="/src/legacy-app.js"></script>
+</body>
+</html>

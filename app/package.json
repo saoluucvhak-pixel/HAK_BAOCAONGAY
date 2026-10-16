@@ -1,0 +1,40 @@
+{
+  "name": "baocaongay-dh",
+  "version": "1.0.0",
+  "description": "He thong bao cao ngay - Cong ty TNHH SXTMDV Dai Hiep (HAK Group)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:ui": "node tests/ui-baseline.mjs",
+    "test:features": "node tests/test-new-features.mjs",
+    "test:tau": "node tests/test-tau-assignment.mjs",
+    "test:pdf-money-wrap": "node tests/test-pdf-money-wrap.mjs",
+    "test:print-blankpage": "node tests/test-print-blankpage.mjs",
+    "test:print-total-row": "node tests/test-print-total-row.mjs",
+    "test:pdf-custom-money-wrap": "node tests/test-pdf-custom-money-wrap.mjs",
+    "test:perf-equivalence": "node tests/test-perf-equivalence.mjs",
+    "test:error-handling": "node tests/test-error-handling.mjs",
+    "test:ng-codes": "node tests/test-ng-codes.mjs",
+    "test:offline": "node tests/test-offline-cache.mjs",
+    "test:dm-recalc": "node tests/test-dm-recalc.mjs",
+    "test:number-input": "node tests/test-number-input.mjs",
+    "test:export-golden": "node tests/test-export-golden.mjs",
+    "test:export-libs": "node tests/test-export-libs.mjs",
+    "test:config": "node tests/test-config-generator.mjs",
+    "build:config": "node scripts/build-config-html.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "vite-plugin-singlefile": "^2.0.3",
+    "playwright": "^1.47.0"
+  },
+  "dependencies": {
+    "exceljs": "4.4.0",
+    "jspdf": "2.5.1",
+    "jspdf-autotable": "3.8.1",
+    "chart.js": "4.4.1",
+    "xlsx": "0.18.5"
+  }
+}

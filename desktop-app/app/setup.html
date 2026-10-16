@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Cấu hình công ty — Báo cáo ngày</title>
+<style>
+  :root{--ink:#1a2233;--sub:#5b6577;--line:#e2e6ee;--accent:#1f6feb;--err:#c0392b;--ok:#1a8a4a;--panel:#fff;--bg:#f4f6fb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:640px;margin:0 auto;padding:32px 24px 60px}
+  h1{font-size:20px;margin:0 0 6px}
+  .sub{color:var(--sub);font-size:13.5px;line-height:1.5;margin:0 0 24px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(20,30,60,.06)}
+  .card h2{font-size:14px;margin:0 0 14px}
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 4px}
+  label:first-of-type{margin-top:0}
+  .hint{display:block;font-weight:400;color:var(--sub);font-size:12px;margin-top:2px}
+  input[type=text],input[type=url]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;background:#fff;color:var(--ink)}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,111,235,.15)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .req{color:var(--err)}
+  button{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:14.5px;font-weight:700;cursor:pointer;width:100%}
+  button:hover{filter:brightness(1.08)}
+  button:disabled{opacity:.6;cursor:default}
+  #msg{margin-top:14px;font-size:13.5px;min-height:18px}
+  #msg.err{color:var(--err)}
+  #msg.ok{color:var(--ok)}
+  .editNote{background:#eef4ff;border:1px solid #cfe0ff;border-radius:10px;padding:10px 14px;font-size:12.8px;color:#1a3a72;margin-bottom:16px;display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cấu hình cho công ty của bạn</h1>
+  <p class="sub">Điền 1 lần khi mở app lần đầu — những lần mở sau sẽ vào thẳng báo cáo, không hiện
+    lại màn hình này nữa (có thể đổi lại bất kỳ lúc nào qua menu "Báo cáo ngày → Đổi cấu hình
+    công ty..."). Dữ liệu chỉ lưu trên máy này, không gửi đi đâu cả.</p>
+  <div class="editNote" id="editNote">Đang sửa cấu hình hiện tại — các ô bên dưới đã điền sẵn giá trị đã lưu trước đó.</div>
+
+  <div class="card">
+    <h2>1. Thông tin công ty</h2>
+    <label>Tên công ty (in trên báo cáo/Excel/PDF) <span class="req">*</span>
+      <span class="hint">Ví dụ: CÔNG TY TNHH HOÀNG ANH KHÔI QUẢNG NAM</span>
+    </label>
+    <input type="text" id="fTenCty" placeholder="CÔNG TY TNHH SXTMDV ĐẠI HIỆP">
+    <div class="row2">
+      <div>
+        <label>Mã HS hàng hóa
+          <span class="hint">In trên báo cáo Xuất hàng/BKLS xuất khẩu</span>
+        </label>
+        <input type="text" id="fMaHS" placeholder="4401220090">
+      </div>
+      <div>
+        <label>Mã nhà máy
+          <span class="hint">In trên báo cáo BKLS xuất khẩu</span>
+        </label>
+        <input type="text" id="fNhaMay" placeholder="CNHAK">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Link Google Sheet (đã "Xuất bản lên web" dạng CSV)</h2>
+    <label>Phiếu cân <span class="req">*</span>
+      <span class="hint">Bắt buộc — nguồn dữ liệu chính, mọi báo cáo đều dựa vào đây</span>
+    </label>
+    <input type="url" id="fPhieuCan" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv">
+
+    <label>Đề nghị thanh toán (DNTT_CT) <span class="req">*</span>
+      <span class="hint">Bắt buộc — dùng cho báo cáo Thanh toán/Công nợ</span>
+    </label>
+    <input type="url" id="fDNTT" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
+
+    <label>HD_NCC (HDMB — Hợp đồng mua bán)
+      <span class="hint">Không bắt buộc — chỉ dùng cho báo cáo BKLS xuất khẩu, để trống nếu chưa có</span>
+    </label>
+    <input type="url" id="fHDNCC" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
+
+    <label>Hồ sơ keo (Hosokeo)
+      <span class="hint">Không bắt buộc — chỉ dùng cho báo cáo BKLS xuất khẩu, để trống nếu chưa có</span>
+    </label>
+    <input type="url" id="fHosokeo" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
+  </div>
+
+  <div class="card">
+    <h2>3. Thông tin dùng cho các biểu mẫu xuất báo cáo (không bắt buộc)</h2>
+    <div class="row2">
+      <div>
+        <label>Mã số thuế</label>
+        <input type="text" id="fMST" placeholder="0400...">
+      </div>
+      <div>
+        <label>Số điện thoại</label>
+        <input type="text" id="fSDT" placeholder="09...">
+      </div>
+    </div>
+    <label>Địa chỉ (trụ sở)</label>
+    <input type="text" id="fDiaChi" placeholder="...">
+    <label>Địa chỉ nơi tổ chức thu mua</label>
+    <input type="text" id="fDiaChiThuMua" placeholder="...">
+  </div>
+
+  <button id="btnSave">Lưu &amp; mở báo cáo</button>
+  <div id="msg"></div>
+</div>
+
+<script>
+(async function () {
+  var msg = document.getElementById('msg');
+  var btn = document.getElementById('btnSave');
+  var fields = ['fTenCty','fMaHS','fNhaMay','fPhieuCan','fDNTT','fHDNCC','fHosokeo','fMST','fSDT','fDiaChi','fDiaChiThuMua'];
+
+  // Nếu đã có cấu hình lưu trước (đang mở lại để SỬA), điền sẵn lại vào form.
+  var existing = await window.api.getConfig();
+  if (existing) {
+    document.getElementById('editNote').style.display = 'block';
+    fields.forEach(function (id) {
+      var key = id.slice(1); // fTenCty -> TenCty
+      if (existing[key] != null) document.getElementById(id).value = existing[key];
+    });
+  }
+
+  btn.addEventListener('click', async function () {
+    msg.className = ''; msg.textContent = '';
+    var data = {};
+    fields.forEach(function (id) { data[id.slice(1)] = document.getElementById(id).value.trim(); });
+
+    if (!data.TenCty) { msg.className = 'err'; msg.textContent = 'Cần nhập Tên công ty.'; return; }
+    if (!data.PhieuCan) { msg.className = 'err'; msg.textContent = 'Cần nhập link Google Sheet "Phiếu cân" (bắt buộc).'; return; }
+    if (!data.DNTT) { msg.className = 'err'; msg.textContent = 'Cần nhập link Google Sheet "Đề nghị thanh toán" (bắt buộc).'; return; }
+
+    btn.disabled = true; btn.textContent = 'Đang lưu...';
+    var result = await window.api.saveConfig(data);
+    if (!result.ok) {
+      msg.className = 'err'; msg.textContent = 'Lỗi: ' + result.error;
+      btn.disabled = false; btn.textContent = 'Lưu & mở báo cáo';
+      return;
+    }
+    msg.className = 'ok'; msg.textContent = 'Đã lưu — đang mở báo cáo...';
+    // main.js sẽ tự điều hướng cửa sổ sang báo cáo đã cấu hình sau khi lưu xong.
+  });
+})();
+</script>
+</body>
+</html>

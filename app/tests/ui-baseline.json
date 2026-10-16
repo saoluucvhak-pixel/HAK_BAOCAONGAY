@@ -1,0 +1,77 @@
+{
+  "generatedAt": "2026-09-22T15:05:13.363Z",
+  "pageErrors": [],
+  "snapshot": {
+    "nhapkeo": {
+      "found": true,
+      "rowCount": 40,
+      "countText": "40 dòng"
+    },
+    "xecho": {
+      "found": true,
+      "rowCount": 17,
+      "countText": "17 dòng"
+    },
+    "thanhtoan": {
+      "found": true,
+      "rowCount": 15,
+      "countText": "15 dòng"
+    },
+    "congno": {
+      "found": true,
+      "rowCount": 26,
+      "countText": "26 dòng"
+    },
+    "hotro": {
+      "found": true,
+      "rowCount": 1,
+      "countText": "0 dòng"
+    },
+    "trogia": {
+      "found": true,
+      "rowCount": 1,
+      "countText": "0 dòng"
+    },
+    "tonghoptro": {
+      "found": true,
+      "rowCount": 1,
+      "countText": "0 dòng"
+    },
+    "hoahong": {
+      "found": true,
+      "rowCount": 3,
+      "countText": "3 dòng"
+    },
+    "tonghop": {
+      "found": true,
+      "rowCount": 50,
+      "countText": "55 dòng"
+    },
+    "bklsct": {
+      "found": true,
+      "rowCount": 10,
+      "countText": "10 dòng"
+    },
+    "bklsth": {
+      "found": true,
+      "rowCount": 10,
+      "countText": "10 dòng"
+    },
+    "tienvay": {
+      "found": true,
+      "rowCount": 1,
+      "countText": "0 dòng"
+    },
+    "tndn": {
+      "found": true,
+      "rowCount": 15,
+      "countText": "15 dòng"
+    },
+    "pnk": {
+      "found": true,
+      "rowCount": 40,
+      "countText": "40 dòng"
+    }
+  },
+  "dashboardTextPresent": false
+}
