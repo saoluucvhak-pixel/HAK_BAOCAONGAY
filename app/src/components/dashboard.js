@@ -14,25 +14,28 @@
  * @module components/dashboard
  */
 import Chart from 'chart.js/auto';
-import { $, $$ } from '../utils/dom-utils.js';
+import { $ } from '../utils/dom-utils.js';
 import { fmtMoney, fmtKL, parseNum } from '../utils/number-utils.js';
 import { fmtDate, inDateRange, toKeyFromInput } from '../utils/date-utils.js';
 import { RESULTS } from '../legacy-app.js';
+import { fitCardsIn } from './card-fit.js';
 
 const CHARTS = {};
 
 export function renderDashboard(ctx, reportKey) {
   var r = RESULTS;
   var soXe = new Set(r.nhap.rows.map(function (x) { return x['Biển số 1']; }).filter(Boolean)).size;
+  // [CHUẨN HAK] Bảng/báo cáo không kèm "đ" (đơn vị ghi ở tiêu đề); thẻ KPI là con số đứng riêng nên
+  // ghi đơn vị ngay sau số, giống "tấn"/"xe" ở các thẻ khác.
   var cards = [
     ['TỔNG NHẬP', fmtKL(r.nhap.totalKL / 1000) + ' tấn', 'c1'],
-    ['GIÁ TRỊ NHẬP', fmtMoney(r.nhap.totalTien), 'c1'],
-    ['TỔNG THANH TOÁN', fmtMoney(r.tt.totalTien), 'c2'],
-    ['CÔNG NỢ', fmtMoney(r.congno.totalTien), 'c4'],
+    ['GIÁ TRỊ NHẬP', fmtMoney(r.nhap.totalTien) + ' đ', 'c1'],
+    ['TỔNG THANH TOÁN', fmtMoney(r.tt.totalTien) + ' đ', 'c2'],
+    ['CÔNG NỢ', fmtMoney(r.congno.totalTien) + ' đ', 'c4'],
     ['SỐ XE', soXe.toLocaleString('vi-VN') + ' xe', 'c2'],
     ['XE CHỜ > 1 GIỜ', r.xecho.length.toLocaleString('vi-VN') + ' xe', 'c3'],
-    ['HỖ TRỢ TÀI XẾ', fmtMoney(r.hotro.totalTien), 'c3'],
-    ['TRỢ GIÁ', fmtMoney(r.trogia.totalTien), 'c3'],
+    ['HỖ TRỢ TÀI XẾ', fmtMoney(r.hotro.totalTien) + ' đ', 'c3'],
+    ['TRỢ GIÁ', fmtMoney(r.trogia.totalTien) + ' đ', 'c3'],
     // [MỚI 2026-09-22] Theo dõi "bao nhiêu nguyên liệu phục vụ tàu nào" — r.tautonghop tính trên
     // TOÀN BỘ hồ sơ đã gán tàu (không giới hạn theo khoảng ngày đang lọc), xem runReport().
     ['SỐ TÀU ĐANG THEO DÕI', (r.tautonghop.rows.length).toLocaleString('vi-VN') + ' tàu', 'c4'],
@@ -80,18 +83,7 @@ export function renderDashboard(ctx, reportKey) {
  * hình/độ dài số tiền, không cần sửa lại mỗi khi số liệu thay đổi.
  */
 function fitCardValues() {
-  var MIN_PX = 15; // không co nhỏ hơn mức này để vẫn đọc được rõ
-  $$('.card .val', $('#dashCards')).forEach(function (el) {
-    el.style.whiteSpace = 'nowrap';
-    var size = 24; // khớp 1.5rem mặc định trong CSS (.card .val{font-size:1.5rem})
-    el.style.fontSize = size + 'px';
-    var guard = 0;
-    while (el.scrollWidth > el.clientWidth && size > MIN_PX && guard < 20) {
-      size -= 1;
-      el.style.fontSize = size + 'px';
-      guard++;
-    }
-  });
+  fitCardsIn($('#dashCards'));
 }
 
 export function drawChart(canvasId, type, labels, datasets) {

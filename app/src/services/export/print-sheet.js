@@ -7,11 +7,11 @@
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module services/export/print-sheet
  */
-import { fmtCell } from '../../components/report-table.js';
+import { alignClass, cellDisplay, fmtCell } from '../../components/report-table.js';
 import { REPORT_KEYS } from '../../constants/columns.js';
 import { TABLES } from '../../store/state.js';
 import { $, $$, esc } from '../../utils/dom-utils.js';
-import { companyNameFor, reportDateLabel, reportTitle } from './report-meta.js';
+import { companyNameFor, reportDateLabel, reportTitle, unitNote } from './report-meta.js';
 
 /* Xây khối HTML "trang in theo mẫu Excel": Tên công ty / Tiêu đề báo cáo / Ngày / bảng đủ dữ liệu (không phân trang) + dòng Tổng cộng */
 function buildPrintSheet(key){
@@ -20,13 +20,13 @@ function buildPrintSheet(key){
   var rows = st.view || st.rows || [];
   var cols = st.cols;
   var thead = '<tr>' + cols.map(function(c){
-    var numCls = (c[2]==='money'||c[2]==='kl'||c[2]==='int') ? ' class="num"' : '';
+    var numCls = alignClass(c[2]) ? ' class="'+alignClass(c[2]).trim()+'"' : '';
     return '<th'+numCls+'>'+esc(c[1])+'</th>';
   }).join('') + '</tr>';
   var tbody = rows.map(function(r){
-    return '<tr>' + cols.map(function(c){
-      var numCls = (c[2]==='money'||c[2]==='kl'||c[2]==='int') ? ' class="num"' : '';
-      return '<td'+numCls+'>'+fmtCell(r[c[0]], c[2])+'</td>';
+    return '<tr>' + cols.map(function(c, i){
+      var numCls = alignClass(c[2]) ? ' class="'+alignClass(c[2]).trim()+'"' : '';
+      return '<td'+numCls+'>'+cellDisplay(r, c, i)+'</td>';
     }).join('') + '</tr>';
   }).join('');
   // [BUGFIX 2026-09-23] Người dùng báo: bản in "BKLS..." nhiều trang bị "kẻ khung lở dở" và dòng
@@ -40,7 +40,7 @@ function buildPrintSheet(key){
   var totalRow = '';
   if (st.totals){
     totalRow = '<tr class="psTotalRow">' + cols.map(function(c,i){
-      var numCls = (c[2]==='money'||c[2]==='kl'||c[2]==='int') ? ' class="num"' : '';
+      var numCls = alignClass(c[2]) ? ' class="'+alignClass(c[2]).trim()+'"' : '';
       if (i===0) return '<td'+numCls+'>Tổng cộng</td>';
       if (st.totals.hasOwnProperty(c[0])) return '<td'+numCls+'>'+fmtCell(st.totals[c[0]], c[2])+'</td>';
       return '<td></td>';
@@ -49,7 +49,7 @@ function buildPrintSheet(key){
   return (
     '<div class="psHead">'+esc(companyNameFor(key))+'</div>' +
     '<div class="psTitle">'+esc(reportTitle(key))+'</div>' +
-    '<div class="psDate">'+esc(reportDateLabel())+'</div>' +
+    '<div class="psDate">'+esc(reportDateLabel() + unitNote(cols, reportDateLabel()))+'</div>' +
     '<table class="psTable"><thead>'+thead+'</thead><tbody>'+(tbody||'')+totalRow+'</tbody></table>'
   );
 }

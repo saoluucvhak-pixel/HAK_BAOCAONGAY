@@ -17,12 +17,23 @@ import { TABLES } from '../store/state.js';
 import { $, $$, esc } from '../utils/dom-utils.js';
 import { dateKey, fmtDate, fmtTime } from '../utils/date-utils.js';
 import { fmtMoney, fmtKL } from '../utils/number-utils.js';
+import { alignOf } from '../utils/hak-format.js';
 import { normalizeSearch } from '../utils/fuzzy-search.js';
 import { exportExcel } from '../services/export/excel-export.js';
 import { exportPDF } from '../services/export/pdf-export.js';
 import { printSection } from '../services/export/print-sheet.js';
 import { openBankInfoModal } from '../services/export/bank-forms.js';
 import { runExport } from '../services/export-runner.js';
+
+/**
+ * [CHUẨN HAK] Lớp CSS căn lề theo kiểu cột: số → phải (' num'), ngày/giờ → giữa (' ctr'), chữ → trái.
+ * Dùng chung cho bảng trên màn hình và bản in để 2 nơi luôn giống nhau.
+ * @param {string} type kiểu cột ('money' | 'kl' | 'int' | 'date' | ...)
+ */
+export function alignClass(type) {
+  var a = alignOf(type);
+  return a === 'right' ? ' num' : (a === 'center' ? ' ctr' : '');
+}
 
 export function fmtCell(val, type) {
   if (val == null || val === '') return '';
@@ -128,7 +139,7 @@ var VIRTUAL_OVERSCAN = 10; // số dòng vẽ thêm ở trên/dưới vùng nhì
 
 function theadHTML(st) {
   return '<thead><tr>' + st.cols.map(function (c, i) {
-    var numCls = (c[2] === 'money' || c[2] === 'kl' || c[2] === 'int') ? ' num' : '';
+    var numCls = alignClass(c[2]);
     var arrow = st.sortCol === i ? (st.sortDir > 0 ? ' ▲' : ' ▼') : '';
     return '<th class="' + numCls + '" data-ci="' + i + '">' + esc(c[1]) + arrow + '</th>';
   }).join('') + '</tr></thead>';
@@ -136,16 +147,25 @@ function theadHTML(st) {
 function tfootHTML(st) {
   if (!st.totals) return '';
   return '<tfoot><tr class="total">' + st.cols.map(function (c, i) {
-    var numCls = (c[2] === 'money' || c[2] === 'kl' || c[2] === 'int') ? ' num' : '';
+    var numCls = alignClass(c[2]);
     if (i === 0) return '<td class="' + numCls + '">Tổng cộng</td>';
     if (st.totals.hasOwnProperty(c[0])) return '<td class="' + numCls + '">' + fmtCell(st.totals[c[0]], c[2]) + '</td>';
     return '<td></td>';
   }).join('') + '</tr></tfoot>';
 }
+/**
+ * [2026-10-29] Ô hiển thị của 1 dòng — dòng đặc biệt có `_label` (vd "Số dư đầu kỳ" của Bảng kê chi tiết
+ * tiền vay) hiện nhãn ở CỘT ĐẦU dù cột đó là cột ngày. Dùng chung cho màn hình, In, PDF, Excel.
+ */
+export function cellDisplay(r, c, i) {
+  if (i === 0 && r && r._label) return esc(r._label);
+  return fmtCell(r[c[0]], c[2]);
+}
+
 function rowHTML(st, r) {
-  return '<tr>' + st.cols.map(function (c) {
-    var numCls = (c[2] === 'money' || c[2] === 'kl' || c[2] === 'int') ? ' num' : '';
-    return '<td class="' + numCls + '">' + fmtCell(r[c[0]], c[2]) + '</td>';
+  return '<tr' + (r._opening ? ' class="opening"' : '') + '>' + st.cols.map(function (c, i) {
+    var numCls = alignClass(c[2]);
+    return '<td class="' + numCls + '">' + cellDisplay(r, c, i) + '</td>';
   }).join('') + '</tr>';
 }
 function bindSortHeaders(table, st, key) {

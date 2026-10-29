@@ -14,6 +14,17 @@ Người dùng chọn thứ tự: làm **Offline trước**, đồng bộ Google
 - [x] **4.2** Tách `legacy-app.js` (~1.480 → ~310 dòng) thành `services/export/*` + `components/
       {dm-tables,tau-modal}`; không còn file > 800 dòng / hàm > 100 dòng; mở app nhanh gấp ~2,6 lần
       (nạp thư viện xuất file khi cần); lưới an toàn `test:export-golden` (36 file). CHANGELOG Phase 4.2.
+- [x] **Ngân hàng 4 tab + chuẩn HAK** (29/10/2026) — tab Cập nhật khoản vay (IndexedDB, nhập tay/Excel,
+      sửa/xoá/lưu, sao lưu), lũy kế từ đầu sổ, chuẩn định dạng + màu luxe toàn app. CHANGELOG Phase 4.4.
+- [ ] (Đề xuất tiếp) Màn hình "Cài đặt định dạng số" theo SYSTEM_PRECISION_SETTINGS của chuẩn (chọn số lẻ
+      cho tiền/khối lượng, ghi đè theo cột) — hiện dùng mặc định của chuẩn (tiền 0, khối lượng 2).
+- [x] Chọn giao diện 5 chủ đề × sáng/tối (29/10/2026, Phase 4.6).
+- [x] Bảng kê chi tiết tiền vay theo mẫu + tab Tổng hợp thanh toán + chọn phiếu nhập kho để in (Phase 4.7).
+- [x] Cập nhật khoản vay chỉ 3 cột TH_VAY; dữ liệu sổ phụ cũ tự chuyển, không mất (Phase 4.8).
+- [x] Sổ chi tiết tiền vay: số dư đầu kỳ nhập tay + thẻ số liệu tổng (Phase 4.9).
+- [x] Thẻ tổng tab Cập nhật khoản vay + Tổng hợp thanh toán; nút Lưu ra Excel (Phase 4.10).
+- [x] Lũy kế tiền vay chi tính trong khoảng thời gian báo cáo (mặc định), giữ lựa chọn Từ đầu sổ (Phase 4.11).
+- [ ] (Đề xuất tiếp) Biểu đồ Dashboard đổi màu theo chủ đề đang chọn (hiện giữ màu cũ để không đổi cách đọc biểu đồ).
 - [ ] **4.2b** (còn lại) Event Bus nhẹ + thông báo nổi (toast) + mức log AUDIT/SYNC — chưa làm vì chưa có
       chỗ dùng cụ thể đo được lợi ích; nên làm cùng 4.3 (khung module) khi bắt đầu thêm module mới.
 - [ ] (Cân nhắc, CHƯA làm) Vẽ biểu đồ Dashboard chỉ khi đang mở tab Dashboard: đo được tiết kiệm ~25%

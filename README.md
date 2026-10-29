@@ -12,7 +12,9 @@ app/                    Bản web (Vite → 1 file HTML chạy offline)
     services/           Đọc dữ liệu (data-service), tính báo cáo (report-service),
                         lưu offline (offline-cache), nạp thư viện xuất file khi cần (export-libs),
                         export/ (Excel, PDF, in, mẫu WO / ngân hàng)
-    components/         Bảng báo cáo, dashboard, so sánh, danh mục, gán Tàu, ô nhập số
+    components/         Bảng báo cáo, dashboard, so sánh, danh mục, gán Tàu, ô nhập số,
+                        loan-editor (tab Cập nhật khoản vay)
+    utils/hak-format.js Cầu nối tới chuẩn HAK (định dạng số/ngày, căn lề, Smart Filter)
     legacy-app.js       Khởi động + gắn sự kiện (294 dòng)
   tests/                Bộ kiểm thử Playwright/Node (xem README.md trong app)
   scripts/              build-config-html.mjs (tạo config.html)
@@ -25,6 +27,8 @@ desktop-app/            Vỏ Electron (Windows)
 
 ## Yêu cầu
 Node.js 18 trở lên (chỉ cần ở máy phát triển — người dùng cuối KHÔNG cần cài Node).
+`npm install` tải 3 gói chuẩn HAK trực tiếp từ GitHub (ghim theo commit trong `app/package.json`):
+HAK_ACCOUNTING_REPORT_STANDARD, HAK_SMART_FILTER, HAK-Enterprise-Design-System.
 
 ## Build bản web
 ```
@@ -52,6 +56,12 @@ npm run test:pdf-custom-money-wrap
 npm run test:print-blankpage
 npm run test:print-total-row
 npm run test:config
+npm run test:tienvay-import
+npm run test:khoanvay
+npm run test:khoanvay-model
+npm run test:hak-theme
+npm run test:theme-picker
+npm run test:dashboard-fit
 ```
 Lần đầu cần Chromium cho Playwright: `npx playwright install chromium`.
 Nếu cố ý thay đổi file xuất: `node tests/test-export-golden.mjs --update` (ghi lại mẫu chuẩn) — chỉ làm khi đã kiểm tra bằng mắt.

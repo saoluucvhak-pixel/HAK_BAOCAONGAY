@@ -176,6 +176,28 @@ src/
 Import vòng (`export/*`, `dm-tables`, `tau-modal` ↔ `legacy-app.js` cho `RESULTS`/`runReport`) an toàn
 vì chỉ dùng trong hàm xử lý sự kiện, không dùng lúc nạp module (giống các module tách ở Phase 2).
 
+## 5d. Báo cáo ngân hàng + chuẩn HAK (Phase 4.4 — 29/10/2026)
+
+```
+src/utils/hak-format.js          CẦU NỐI DUY NHẤT tới chuẩn HAK: @hak/accounting-report-standard (số, ngày,
+                                 căn lề, độ chính xác) + @hak/smart-filter (đọc ngày gõ tay, tìm không dấu).
+                                 number-utils.fmtMoney/fmtKL, report-table.alignClass, Excel/PDF đều đi qua đây.
+src/services/loan-model.js       hàm thuần: khoản vay 3 cột TH_VAY (Ngày hạch toán, Ngày chứng từ, Tổng tiền vay), kiểm tra dữ liệu,
+                                 parseImportRows (file 3 cột, hoặc nguyên sổ phụ VAY ⇒ lọc isTienVay: Diễn giải ∈ CONFIG.DIEN_GIAI_TIEN_VAY)
+src/services/loan-store.js       IndexedDB "baocaongay-khoanvay" — ghi theo giao dịch, có rev chống ghi đè, BÁO lỗi khi không ghi được
+src/components/tienvay-summary.js  đầu tab Sổ chi tiết tiền vay: số dư đầu kỳ nhập tay (kho meta) + thẻ số liệu tổng
+src/components/stat-cards.js     vẽ hàng thẻ số liệu tổng dùng chung (sổ tiền vay, khoản vay, tổng hợp thanh toán)
+src/components/card-fit.js       co chữ số trên thẻ cho vừa khung (Dashboard + thẻ sổ tiền vay)
+src/components/loan-editor.js    tab "Cập nhật khoản vay" (bảng, lọc Smart Filter, modal thêm/sửa, nhập Excel)
+src/services/excel-import-worker.js  đọc Excel trong Web Worker (đổi ngày theo lịch — BUG-TV02)
+```
+Luồng (đúng Power Query BKCT_TIENVAY của người dùng — CHANGELOG Phase 4.5):
+TH_VAY 3 cột (tab 1, IndexedDB) → `STATE.vayRecords` ─┐ Ngày chung = Ngày hạch toán (tải sổ phụ ⇒ lọc Diễn giải lúc nhập, Tổng tiền vay = Thu)
+DNTT_CT (Google Sheet, link cấu hình) → `STATE.dntt` ─┤ THTT_NH: Ngày chung = Ngày thanh toán, Số tấn, Tổng tiền chi = Thành tiền
+                                                    └→ `computeSoTienVay()` xếp theo Ngày chung, lũy kế từ đầu sổ → bảng/In/Excel/PDF. `loan-editor` KHÔNG import `legacy-app` (nhận hàm gọi lại
+`initLoanEditor(changed)`) để không thêm vòng phụ thuộc. 3 gói `@hak/*` cài từ GitHub, ghim theo commit
+trong package.json (npm install cần truy cập github.com).
+
 ## 6. Build & kiểm chứng
 
 ```bash

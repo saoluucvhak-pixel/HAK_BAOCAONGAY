@@ -21,3 +21,12 @@ export function reportDateLabel(){
   if (f && t) return 'Từ ngày ' + ddmmyyyy(f) + ' đến ngày ' + ddmmyyyy(t);
   return ddmmyyyy(t || f);
 }
+/**
+ * [CHUẨN HAK] Tiền hiển thị không kèm "đ" nên đơn vị phải ghi ở đầu báo cáo (REPORT_FORMAT_SPEC:
+ * "bảng dữ liệu với đơn vị tính"). Chỉ thêm khi báo cáo có cột tiền.
+ * @param {Array} cols cột báo cáo [[khoá, nhãn, kiểu], ...]
+ */
+export function unitNote(cols, label){
+  if (!(cols || []).some(function(c){ return c[2] === 'money'; })) return '';
+  return (label ? ' · ' : '') + 'Đơn vị tiền: đồng'; // không có nhãn ngày thì không để dấu " · " đứng đầu
+}

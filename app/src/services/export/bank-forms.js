@@ -9,11 +9,12 @@
  */
 import { CONFIG } from '../../config/config.js';
 import { BRAND, OUTER_BORDER_STYLE, THIN_BORDER } from '../../constants/brand.js';
+import { LOAN_FIELDS } from '../loan-model.js';
 import { libs } from '../export-libs.js';
 import { storageService } from '../storage-service.js';
 import { TABLES } from '../../store/state.js';
-import { dateKey, fmtDate, pad2 } from '../../utils/date-utils.js';
-import { $, $$, downloadBlob } from '../../utils/dom-utils.js';
+import { dateKey, fmtDate, pad2, toExcelDate } from '../../utils/date-utils.js';
+import { $, $$, downloadBlob, esc } from '../../utils/dom-utils.js';
 import { fmtKL, fmtMoney } from '../../utils/number-utils.js';
 import { RESULTS } from '../../legacy-app.js';
 import { ensurePdfFont, forcePdfMoneyColumnWidths } from './pdf-export.js';
@@ -76,7 +77,37 @@ export function openBankInfoModal(mode){
   $$('.bankInfoTNDNOnly').forEach(function(el){ el.style.display = (mode==='tndn') ? '' : 'none'; });
   $('#btnBankExcel').style.display = (mode==='pnk') ? 'none' : ''; // Phiếu nhập kho hàng loạt chỉ xuất PDF (mỗi ngày 1 trang), không có bản Excel
   fillBankInfoForm(loadBankInfo());
+  if (mode === 'pnk') renderPnkPick(RESULTS && RESULTS.pnk ? RESULTS.pnk.rows : []);
   $('#bankModalOverlay').classList.add('active');
+}
+
+/* [2026-10-29] Chọn phiếu nhập kho để in — người dùng: "Phiếu nhập kho cho chọn phiếu in hoặc chọn tất cả".
+   Mặc định chọn TẤT CẢ (như trước); bỏ chọn phiếu nào thì PDF không có trang đó. */
+function renderPnkPick(rows){
+  var list = $('#pnkPickList'); if (!list) return;
+  list.innerHTML = rows.map(function(r, i){
+    return '<label><input type="checkbox" class="pnkPickChk" data-idx="' + i + '" checked><span>' + esc(fmtDate(r['Ngày nhập kho'])) + '</span><span>' + esc(r['Số CT'] || '') +
+      '</span><span class="n">' + fmtKL(r['Khối lượng']) + ' tấn</span><span class="n">' + fmtMoney(r['Thành tiền']) + '</span></label>';
+  }).join('');
+  $('#pnkPickAll').checked = true;
+  updatePnkPickCount();
+  if (!list.dataset.bound){
+    list.dataset.bound = '1';
+    list.addEventListener('change', updatePnkPickCount);
+    $('#pnkPickAll').addEventListener('change', function(e){ $$('.pnkPickChk', list).forEach(function(c){ c.checked = e.target.checked; }); updatePnkPickCount(); });
+  }
+}
+function updatePnkPickCount(){
+  var all = $$('.pnkPickChk', $('#pnkPickList')), n = all.filter(function(c){ return c.checked; }).length;
+  $('#pnkPickCount').textContent = 'Đã chọn ' + n + ' / ' + all.length + ' phiếu';
+  $('#pnkPickAll').checked = n === all.length && n > 0;
+  $('#pnkPickAll').indeterminate = n > 0 && n < all.length;
+}
+/** Các phiếu đang được chọn trong modal (theo đúng thứ tự trong bảng). */
+export function selectedPnkRows(rows){
+  var chks = $$('.pnkPickChk', $('#pnkPickList'));
+  if (!chks.length) return rows; // chưa dựng danh sách (gọi trực tiếp) → giữ hành vi cũ: tất cả
+  return rows.filter(function(r, i){ var c = chks[i]; return c && c.checked; });
 }
 export function closeBankInfoModal(){ $('#bankModalOverlay').classList.remove('active'); }
 function bankModalNgayLabel(noiLap){
@@ -118,11 +149,12 @@ function buildTNDNWorksheet(workbook, rows, info, ngayMax){
   var startRow = 12;
   rows.forEach(function(r, idx){
     var rr = startRow + idx, isZebra = (idx % 2 === 1);
-    var vals = [ fmtDate(r['Ngày tháng năm mua hàng']), r['Tên người bán'], r['Địa chỉ'], r['Số CCCD'], r['Số Điện thoại'], r['Tên hàng hóa/dịch vụ'], r['Số lượng/trọng lượng'], r['Đơn giá'], r['Tổng giá thanh toán'], r['Ghi chú'] ];
+    var vals = [ toExcelDate(r['Ngày tháng năm mua hàng']), r['Tên người bán'], r['Địa chỉ'], r['Số CCCD'], r['Số Điện thoại'], r['Tên hàng hóa/dịch vụ'], r['Số lượng/trọng lượng'], r['Đơn giá'], r['Tổng giá thanh toán'], r['Ghi chú'] ];
     vals.forEach(function(v, i){
       var cell = ws.getCell(rr, i+1);
       cell.value = v; cell.border = THIN_BORDER; cell.alignment = { vertical:'middle', wrapText:(i===2) };
       if (isZebra) cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:BRAND.zebraFillARGB}, bgColor:{argb:BRAND.zebraFillARGB} };
+      if (i===0){ cell.numFmt='dd/mm/yyyy'; cell.alignment.horizontal='center'; } // [CHUẨN HAK] ngày thật, căn giữa
       if (i===6){ cell.numFmt='#,##0.00'; cell.alignment.horizontal='right'; }
       if (i===7||i===8){ cell.numFmt='#,##0'; cell.alignment.horizontal='right'; }
     });
@@ -163,23 +195,63 @@ function buildTNDNWorksheet(workbook, rows, info, ngayMax){
  * `excel-import-worker.js` đọc (dò dòng tiêu đề chứa "Tổng tiền vay" rồi đọc theo TÊN cột, xem
  * JSDoc file đó) — thứ tự khớp đúng dòng hướng dẫn hiển thị cạnh nút tải file thật.
  */
+/**
+ * [2026-10-29] File mẫu tab "Cập nhật khoản vay" — bảng TH_VAY 3 cột (Ngày hạch toán, Ngày chứng từ,
+ * Tổng tiền vay), sheet "TH_VAY". (Tải nguyên sổ phụ VAY vẫn nhận — app tự lọc dòng tiền vay.)
+ */
 export async function downloadTienVayTemplate(){
   var workbook = new libs.ExcelJS.Workbook();
-  var ws = workbook.addWorksheet('Sổ chi tiết tiền vay');
-  var cols = ['Ngày chung','Ngày hạch toán','Ngày chứng từ','Tổng tiền vay','Ngày thanh toán','Số tấn','Tổng tiền chi','Họ tên Chủ rừng'];
-  ws.addRow(cols);
+  var ws = workbook.addWorksheet('TH_VAY');
+  ws.addRow(LOAN_FIELDS.map(function(f){ return f[1]; }));
   var hRow = ws.getRow(1);
   hRow.font = { bold:true, color:{argb:'FFFFFFFF'} };
-  hRow.eachCell(function(c){ c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:BRAND.headerFillARGB} }; c.alignment = { horizontal:'center', vertical:'middle' }; c.border = THIN_BORDER; });
-  // 1 dòng ví dụ minh hoạ đúng kiểu dữ liệu từng cột — xoá dòng này trước khi điền dữ liệu thật.
-  var sample = ws.addRow(['9/1/2026','9/1/2026','PC0001',50000000,'','','','Nguyễn Văn A']);
-  sample.eachCell(function(c){ c.border = THIN_BORDER; });
-  ws.getColumn(1).width = 14; ws.getColumn(2).width = 14; ws.getColumn(3).width = 16; ws.getColumn(4).width = 16;
-  ws.getColumn(5).width = 14; ws.getColumn(6).width = 10; ws.getColumn(7).width = 16; ws.getColumn(8).width = 22;
-  ws.getCell(2,4).numFmt = '#,##0';
+  hRow.eachCell(function(c){ c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:BRAND.headerFillARGB} }; c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; c.border = THIN_BORDER; });
+  var d1 = new Date(Date.UTC(2026, 8, 1)), d2 = new Date(Date.UTC(2026, 8, 3));
+  var samples = [ ws.addRow([d1, d1, 500000000]), ws.addRow([d2, d2, 1200000000]) ];
+  samples.forEach(function(row){
+    row.eachCell({ includeEmpty: true }, function(c, col){
+      c.border = THIN_BORDER;
+      var type = LOAN_FIELDS[col - 1] && LOAN_FIELDS[col - 1][2];
+      if (type === 'date'){ c.numFmt = 'dd/mm/yyyy'; c.alignment = { horizontal:'center' }; }
+      if (type === 'money') c.numFmt = '#,##0';
+    });
+  });
+  [16, 16, 20].forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
   var buf = await workbook.xlsx.writeBuffer();
   var blob = new Blob([buf], { type:'application/octet-stream' });
-  downloadBlob(blob, 'Mau_SoChiTietTienVay.xlsx');
+  downloadBlob(blob, 'Mau_TienVay_TH_VAY.xlsx');
+}
+/**
+ * [2026-10-29] "Lưu ra Excel" ở tab Cập nhật khoản vay: các khoản đang hiện (đã lọc) → file 3 cột TH_VAY
+ * (ô ngày là NGÀY THẬT, tiền là số), dòng "Tổng cộng" cuối. Đúng định dạng nhập ⇒ nhập lại được ngay
+ * (dòng "Tổng cộng" tự bỏ qua khi nhập).
+ * @param {Object[]} rows khoản vay (loan-model schema 3)
+ */
+export async function exportKhoanVayExcel(rows){
+  if (!rows || !rows.length){ alert('Chưa có khoản vay nào để lưu ra Excel.'); return; }
+  var workbook = new libs.ExcelJS.Workbook();
+  var ws = workbook.addWorksheet('TH_VAY');
+  ws.addRow(LOAN_FIELDS.map(function(f){ return f[1]; }));
+  var hRow = ws.getRow(1);
+  hRow.font = { bold:true, color:{argb:'FFFFFFFF'} };
+  hRow.eachCell(function(c){ c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:BRAND.headerFillARGB} }; c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; c.border = THIN_BORDER; });
+  var total = 0;
+  rows.forEach(function(r){
+    total += r.tongTienVay || 0;
+    // Ngày chứng từ giữ nguyên chữ nếu file gốc ghi chữ (không đổi dữ liệu người dùng).
+    var row = ws.addRow([toExcelDate(r.ngayHachToan), toExcelDate(r.ngayChungTu) || (r.ngayChungTu || null), r.tongTienVay]);
+    row.eachCell({ includeEmpty: true }, function(c, col){
+      c.border = THIN_BORDER;
+      if (col <= 2){ c.numFmt = 'dd/mm/yyyy'; c.alignment = { horizontal:'center' }; } else c.numFmt = '#,##0';
+    });
+  });
+  var tRow = ws.addRow(['Tổng cộng', null, total]);
+  tRow.font = { bold:true };
+  tRow.eachCell({ includeEmpty: true }, function(c, col){ c.border = THIN_BORDER; c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:BRAND.totalFillARGB} }; if (col === 3) c.numFmt = '#,##0'; });
+  [16, 16, 20].forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
+  var buf = await workbook.xlsx.writeBuffer();
+  var d = new Date();
+  downloadBlob(new Blob([buf], { type:'application/octet-stream' }), 'KhoanVay_TH_VAY_' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '.xlsx');
 }
 function bankNgayLabel(ngayVal){
   var k = dateKey(ngayVal); if (k==null) return '';
@@ -220,11 +292,11 @@ function buildTNDNPdf(rows, info, ngayMax){
   ];
   var body = rows.map(function(r){ return [ fmtDate(r['Ngày tháng năm mua hàng']), r['Tên người bán'], r['Địa chỉ'], r['Số CCCD'], r['Số Điện thoại'], r['Tên hàng hóa/dịch vụ'], fmtKL(r['Số lượng/trọng lượng']), fmtMoney(r['Đơn giá']), fmtMoney(r['Tổng giá thanh toán']), r['Ghi chú'] ]; });
   var foot = [[ '', 'TỔNG CỘNG', '', '', '', '', fmtKL(totSL), '', fmtMoney(totTT), '' ]];
-  var columnStyles = { 6:{halign:'right'}, 7:{halign:'right'}, 8:{halign:'right'} };
+  var columnStyles = { 0:{halign:'center'}, 6:{halign:'right'}, 7:{halign:'right'}, 8:{halign:'right'} };
   forcePdfMoneyColumnWidths(doc, body, foot, [7, 8], columnStyles, 6.5); // 7=Đơn giá, 8=Tổng giá thanh toán
   doc.autoTable({
     head: head, body: body, foot: foot, startY: y, theme:'grid', showFoot:'lastPage',
-    styles: { font:'Roboto', fontStyle:'normal', fontSize:6.5, halign:'left', valign:'middle', lineColor:[183,198,214], lineWidth:0.15 },
+    styles: { font:'Roboto', fontStyle:'normal', fontSize:6.5, halign:'left', valign:'middle', lineColor: BRAND.lineRGB, lineWidth:0.15 },
     headStyles: { font:'Roboto', fontStyle:'bold', halign:'center', fillColor: BRAND.headerRGB, textColor:255 },
     footStyles: { font:'Roboto', fontStyle:'bold', halign:'left', fillColor: BRAND.totalRGB, textColor:[20,20,20] },
     alternateRowStyles: { fillColor: BRAND.zebraRGB },
@@ -316,8 +388,10 @@ function buildPNKPdf(rows, info){
 }
 export function exportPNKPdf(){
   var info = readBankInfoForm(); saveBankInfo(info);
-  var res = RESULTS && RESULTS.pnk; var rows = res ? res.rows : [];
-  if (!rows.length){ alert('Không có dữ liệu để xuất (kiểm tra lại khoảng ngày / bấm LẬP BÁO CÁO).'); return; }
+  var res = RESULTS && RESULTS.pnk; var allRows = res ? res.rows : [];
+  if (!allRows.length){ alert('Không có dữ liệu để xuất (kiểm tra lại khoảng ngày / bấm LẬP BÁO CÁO).'); return; }
+  var rows = selectedPnkRows(allRows);
+  if (!rows.length){ alert('Chưa chọn phiếu nhập kho nào để in.'); return; }
   if (rows.length > 400 && !confirm('Sẽ xuất ' + rows.length + ' trang phiếu trong 1 file PDF, có thể mất vài giây. Tiếp tục?')) return;
   var doc = buildPNKPdf(rows, info);
   var d = new Date();

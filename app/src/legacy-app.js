@@ -7,7 +7,7 @@
  * Xuất Excel/PDF/In, mẫu WO/02-TNDN/Phiếu nhập kho → `services/export/*`; Danh mục → `components/
  * dm-tables.js`; modal Tàu → `components/tau-modal.js` (xem ARCHITECTURE.md §5c).
  *
- * Import vòng có chủ đích: report-table, dashboard, data-service, backup-restore, tien-vay-import và các
+ * Import vòng có chủ đích: report-table, dashboard, data-service, backup-restore, loan-editor và các
  * module export/* import ngược `RESULTS`/`runReport` từ file này — an toàn vì chỉ dùng bên trong hàm xử
  * lý sự kiện (sau khi mọi module đã nạp xong), không dùng lúc nạp module.
  */
@@ -16,10 +16,10 @@
 import { ensureExportLibs } from './services/export-libs.js';
 import { CONFIG } from './config/config.js';
 
-import { NHAPKEO_COLS, XECHO_COLS, THANHTOAN_COLS, CONGNO_COLS, HOTRO_COLS, TROGIA_COLS, TONGHOPTRO_COLS, HOAHONG_COLS, BKLSCT_COLS, BKLSTH_COLS, TAUTONGHOP_COLS, BANKVAY_COLS, BANKTNDN_COLS, BANKPNK_COLS } from './constants/columns.js';
+import { NHAPKEO_COLS, XECHO_COLS, THANHTOAN_COLS, CONGNO_COLS, HOTRO_COLS, TROGIA_COLS, TONGHOPTRO_COLS, HOAHONG_COLS, BKLSCT_COLS, BKLSTH_COLS, TAUTONGHOP_COLS, BANKVAY_COLS, BANKTHTT_COLS, BANKTNDN_COLS, BANKPNK_COLS } from './constants/columns.js';
 import { pad2, toKeyFromInput, dateKeyToday } from './utils/date-utils.js';
 
-import { computeNhapKeo, computeXeCho1h, computeThanhToan, computeCongNo, computeHoTroOrTroGia, computeTongHopHoTro, computeHoaHongDL, computeTongHopNgay, computeXuatHang01, computeXuatHang02, computeTauTongHop, computeSoTienVay, computeBankTNDN, computePhieuNhapKho, sumCols } from './services/report-service.js';
+import { computeNhapKeo, computeXeCho1h, computeThanhToan, computeCongNo, computeHoTroOrTroGia, computeTongHopHoTro, computeHoaHongDL, computeTongHopNgay, computeXuatHang01, computeXuatHang02, computeTauTongHop, computeSoTienVay, computeTongHopThanhToan, computeBankTNDN, computePhieuNhapKho, sumCols } from './services/report-service.js';
 import { storageService } from './services/storage-service.js';
 import { logger } from './services/logger.js';
 
@@ -28,7 +28,9 @@ import { STATE, loadDM, applyFilters } from './store/state.js';
 import { setStatus, loadAllData } from './services/data-service.js';
 import { renderReportTable } from './components/report-table.js';
 import { renderDashboard } from './components/dashboard.js';
-import { handleTienVayFile } from './services/tien-vay-import.js';
+import { initLoanEditor, getLoanView } from './components/loan-editor.js';
+import { initThemePicker } from './components/theme-picker.js';
+import { initOpeningBalance, initLuyKeMode, renderTienVayKpi, renderThttKpi } from './components/tienvay-summary.js';
 import { pushUndoSnapshot, undo, redo } from './store/app-state.js';
 import { backupData, restoreData } from './services/backup-restore.js';
 import { loadTauAssignments } from './services/tau-assignment.js';
@@ -36,7 +38,7 @@ import { runExport } from './services/export-runner.js';
 
 import { onDMChanged, renderDMTables } from './components/dm-tables.js';
 import { closeTauModal, confirmTauAssignClick, confirmTauUnassignClick, openTauModal, renderTauRowList, tauNorm, updateTauSelectedCount } from './components/tau-modal.js';
-import { BANK_INFO_MODAL_MODE, closeBankInfoModal, downloadTienVayTemplate, exportPNKPdf, exportTNDNExcel, exportTNDNPDF, openBankInfoModal } from './services/export/bank-forms.js';
+import { BANK_INFO_MODAL_MODE, closeBankInfoModal, downloadTienVayTemplate, exportKhoanVayExcel, exportPNKPdf, exportTNDNExcel, exportTNDNPDF, openBankInfoModal } from './services/export/bank-forms.js';
 import { exportAllExcel, exportBankExcel, exportLamSanExcel, exportNgayExcel } from './services/export/excel-export.js';
 import { showReportTab } from './services/export/print-sheet.js';
 import { closeWOModal, exportWOExcel, exportWOPDF, openWOModal } from './services/export/wo-form.js';
@@ -84,13 +86,14 @@ export function runReport(){
   // khác nhau, không chỉ kỳ đang xem — xem JSDoc computeTauTongHop() trong report-service.js.
   var bklsAllRows = computeXuatHang01(STATE.hosokeo, STATE.hdmbByKey, null, null, tauAssignments).rows;
   var tautonghop = computeTauTongHop(bklsAllRows, tauAssignments);
-  var tienvay = computeSoTienVay(STATE.tienVayRaw, fromKey, toKey);
+  var tienvay = computeSoTienVay(STATE.vayRecords, STATE.dntt, fromKey, toKey, STATE.soDuDauSo, STATE.tienVayLuyKe); // vay: khoản vay TH_VAY (tab 1); chi: TOÀN BỘ DNTT_CT như Power Query
+  var thtt = computeTongHopThanhToan(STATE.dntt, fromKey, toKey); // THTT_NH: toàn bộ DNTT_CT như Power Query
   var tndn = computeBankTNDN(ctx.dntt, ctx.phieucanBySoCT, STATE.hdnccBySoHopDong, fromKey, toKey);
   var pnk = computePhieuNhapKho(ctx.phieucan, fromKey, toKey);
 
   // tonghop.rows (không phải cả object {rows,cols,totals}) — dashboard.js (biểu đồ) đọc
   // RESULTS.tonghop như 1 mảng (`.map(...)`), phải giữ đúng shape cũ để không vỡ biểu đồ.
-  RESULTS = { nhap: nhap, xecho: xecho, tt: tt, congno: congno, hotro: hotro, trogia: trogia, tonghoptro: tonghoptro, hoahong: hoahong, tonghop: tonghop.rows, bklsct: bklsct, bklsth: bklsth, tautonghop: tautonghop, tienvay: tienvay, tndn: tndn, pnk: pnk };
+  RESULTS = { nhap: nhap, xecho: xecho, tt: tt, congno: congno, hotro: hotro, trogia: trogia, tonghoptro: tonghoptro, hoahong: hoahong, tonghop: tonghop.rows, bklsct: bklsct, bklsth: bklsth, tautonghop: tautonghop, tienvay: tienvay, thtt: thtt, tndn: tndn, pnk: pnk };
 
   renderReportTable('nhapkeo', nhap.rows, NHAPKEO_COLS, { 'KL hàng (KG)': nhap.totalKL, 'Thành tiền': nhap.totalTien });
   renderReportTable('xecho', xecho, XECHO_COLS, null);
@@ -105,6 +108,9 @@ export function runReport(){
   renderReportTable('bklsth', bklsth.rows, BKLSTH_COLS, { 'Khối lượng_Tấn': bklsth.totalKL, 'Tổng trị giá': bklsth.totalTT });
   renderReportTable('tautonghop', tautonghop.rows, TAUTONGHOP_COLS, { 'Số dòng BKLS': tautonghop.totalDong, 'Khối lượng_Tấn': tautonghop.totalKL, 'Tổng thanh toán': tautonghop.totalTT });
   renderReportTable('tienvay', tienvay.rows, BANKVAY_COLS, { 'Tổng tiền vay': tienvay.totalVay, 'Tổng tiền chi': tienvay.totalChi });
+  renderTienVayKpi(tienvay, fromKey); // thẻ số liệu tổng phía trên sổ — cùng số với bảng
+  renderReportTable('thtt', thtt.rows, BANKTHTT_COLS, { 'Khối lượng': thtt.totalKL, 'Thành tiền': thtt.totalTien });
+  renderThttKpi(thtt); // thẻ số liệu tổng Tổng hợp thanh toán — cùng số với bảng
   renderReportTable('tndn', tndn.rows, BANKTNDN_COLS, { 'Số lượng/trọng lượng': tndn.totalSL, 'Tổng giá thanh toán': tndn.totalTT });
   renderReportTable('pnk', pnk.rows, BANKPNK_COLS, { 'Khối lượng': pnk.totalKL, 'Thành tiền': pnk.totalTT });
 
@@ -218,11 +224,9 @@ function initEvents(){
   on('#woModalOverlay', 'click', function(e){ if (e.target.id === 'woModalOverlay') closeWOModal(); });
 
   // [Báo cáo ngân hàng]
-  on('#tienVayFileInput', 'change', function(e){
-    var f = e.target.files && e.target.files[0];
-    if (f) handleTienVayFile(f);
-  });
+  // Nhập file Excel khoản vay (#tienVayFileInput) do components/loan-editor.js xử lý (initLoanEditor).
   on('#btnTienVayTemplate', 'click', runExport('tải file Excel mẫu', downloadTienVayTemplate));
+  on('#btnLoanExport', 'click', runExport('lưu khoản vay ra Excel', function(){ return exportKhoanVayExcel(getLoanView()); }));
   on('#btnExportAllNganHang', 'click', runExport('xuất Excel báo cáo ngân hàng', exportBankExcel));
   on('#btnTNDNModal', 'click', function(){ openBankInfoModal('tndn'); });
   on('#btnPNKModal', 'click', function(){ openBankInfoModal('pnk'); });
@@ -248,10 +252,14 @@ function boot(){
     if (woKhoInput) woKhoInput.placeholder = 'VD: Nhà máy dăm gỗ ' + CONFIG.TEN_CONG_TY;
   }
   installGlobalErrorHandlers();
+  initThemePicker();
   initDefaultDates();
   loadDM();
   renderDMTables();
   initEvents();
+  initLoanEditor(function(){ if (RESULTS) runReport(); });
+  initLuyKeMode(function(){ if (RESULTS) runReport(); }); // lũy kế trong kỳ báo cáo (mặc định) / từ đầu sổ
+  initOpeningBalance(function(){ if (RESULTS) runReport(); }); // số dư đầu kỳ nhập tay của Sổ chi tiết tiền vay
   loadAllData();
   preloadExportLibsWhenIdle();
 }

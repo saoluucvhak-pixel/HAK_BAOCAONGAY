@@ -14,7 +14,9 @@ export const STATE = {
   phieucan: [], dntt: [], hdncc: [], hosokeo: [],
   phieucanBySoCT: {}, dnttBySoCT: {}, hdmbByKey: {}, hdnccBySoHopDong: {},
   dmdl: [], dmht: [],
-  tienVayRaw: [], tienVayFileName: null, // Sổ chi tiết tiền vay: nạp từ file Excel người dùng tải lên
+  vayRecords: [], // Khoản vay TH_VAY 3 cột (tab "Cập nhật khoản vay", IndexedDB) — nguồn Tổng tiền vay của Sổ chi tiết tiền vay
+  soDuDauSo: null, // Số dư đầu kỳ nhập tay của Sổ chi tiết tiền vay {ngay ISO, soTien} (IndexedDB, kho meta) — null = chưa nhập
+  tienVayLuyKe: 'ky', // Lũy kế tiền vay chi: 'ky' = trong khoảng thời gian báo cáo (mặc định), 'dauSo' = từ đầu sổ
   lastUpdated: null,
   filtered: null // {phieucan, dntt, phieucanBySoCT, dnttBySoCT}
 };

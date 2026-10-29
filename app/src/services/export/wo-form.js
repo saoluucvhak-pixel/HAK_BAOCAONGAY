@@ -12,7 +12,7 @@ import { BRAND, OUTER_BORDER_STYLE, THIN_BORDER } from '../../constants/brand.js
 import { libs } from '../export-libs.js';
 import { storageService } from '../storage-service.js';
 import { STATE, TABLES } from '../../store/state.js';
-import { fmtDate, pad2 } from '../../utils/date-utils.js';
+import { fmtDate, pad2, toExcelDate } from '../../utils/date-utils.js';
 import { $, downloadBlob } from '../../utils/dom-utils.js';
 import { fmtKL, fmtMoney } from '../../utils/number-utils.js';
 import { ensurePdfFont, forcePdfMoneyColumnWidths } from './pdf-export.js';
@@ -174,13 +174,14 @@ function buildWOWorksheet(workbook, rows, info){
   rows.forEach(function(r, idx){
     var rr = startRow + idx;
     var isZebra = (idx % 2 === 1);
-    var vals = [ fmtDate(r.ngay), r.tenNguoiBan, r.diaChi, r.cccdNgayCap, r.tenNguyenLieu, r.maHS, r.noiKhaiThac, r.soLuong, r.donGia, r.tongTriGia, r.ghiChu ];
+    var vals = [ toExcelDate(r.ngay), r.tenNguoiBan, r.diaChi, r.cccdNgayCap, r.tenNguyenLieu, r.maHS, r.noiKhaiThac, r.soLuong, r.donGia, r.tongTriGia, r.ghiChu ];
     vals.forEach(function(v, i){
       var cell = ws.getCell(rr, i+1);
       cell.value = v;
       cell.border = THIN_BORDER;
       cell.alignment = { vertical:'middle', wrapText:(i===2||i===6) };
       if (isZebra) cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:BRAND.zebraFillARGB}, bgColor:{argb:BRAND.zebraFillARGB} };
+      if (i===0){ cell.numFmt='dd/mm/yyyy'; cell.alignment.horizontal='center'; } // [CHUẨN HAK] ngày thật, căn giữa
       if (i===7){ cell.numFmt='#,##0.00'; cell.alignment.horizontal='right'; }
       if (i===8||i===9){ cell.numFmt='#,##0'; cell.alignment.horizontal='right'; }
       if (i===10){ cell.alignment.horizontal='center'; }
@@ -260,14 +261,14 @@ function buildWOPdf(rows, info){
   });
   var foot = [[ '', 'TỔNG CỘNG', '', '', '', '', '', fmtKL(totKL), '', fmtMoney(totTT), '' ]];
 
-  var columnStyles = { 7:{halign:'right'}, 8:{halign:'right'}, 9:{halign:'right'}, 10:{halign:'center'} };
+  var columnStyles = { 0:{halign:'center'}, 7:{halign:'right'}, 8:{halign:'right'}, 9:{halign:'right'}, 10:{halign:'center'} };
   forcePdfMoneyColumnWidths(doc, body, foot, [8, 9], columnStyles, 6.5); // 8=Đơn giá, 9=Tổng trị giá
 
   doc.autoTable({
     head: head, body: body, foot: foot, startY: y,
     theme: 'grid',
     showFoot: 'lastPage',
-    styles: { font:'Roboto', fontStyle:'normal', fontSize:6.5, halign:'left', valign:'middle', lineColor:[183,198,214], lineWidth:0.15 },
+    styles: { font:'Roboto', fontStyle:'normal', fontSize:6.5, halign:'left', valign:'middle', lineColor: BRAND.lineRGB, lineWidth:0.15 },
     headStyles: { font:'Roboto', fontStyle:'bold', halign:'center', fillColor: BRAND.headerRGB, textColor:255 },
     footStyles: { font:'Roboto', fontStyle:'bold', halign:'left', fillColor: BRAND.totalRGB, textColor:[20,20,20] },
     alternateRowStyles: { fillColor: BRAND.zebraRGB },

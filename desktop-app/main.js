@@ -22,6 +22,10 @@
  * @module main
  */
 const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+// [CHUẨN HAK — 2026-10-29] Ô chọn ngày (Từ ngày/Đến ngày) hiển thị dd/mm/yyyy như chuẩn HAK, bất kể
+// Windows đang để ngôn ngữ gì — ô <input type="date"> theo ngôn ngữ của Chromium. Chỉ đổi hiển thị;
+// giá trị bên trong vẫn là yyyy-mm-dd như trước.
+app.commandLine.appendSwitch('lang', 'vi');
 const path = require('path');
 const fs = require('fs');
 

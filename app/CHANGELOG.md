@@ -5,6 +5,269 @@
 > PERF-01/02/03, BUG-01/02/03, sửa tên công ty — nằm trong `package/CHANGELOG.md`, không lặp
 > lại ở đây.
 
+## [Phase 4.12] — 30/10/2026 — Rà soát toàn bộ code app
+
+### Sửa
+- **Sao lưu hỏng hẳn khi không đọc được kho khoản vay** (BUG_FIXED.md): nay vẫn tải file sao lưu Danh mục/Cấu
+  hình, báo rõ file không có khoản vay. Test mới `test:backup-noidb` (bản trước 0/2, bản sửa 4/4).
+- Bản sao web trong app desktop (`desktop-app/app/index.html`) chưa được commit từ Phase 4.7 (bộ cài đã giao
+  vẫn đúng vì bước release luôn chép bản mới nhất) — nay commit đồng bộ với `app/dist/index.html`.
+- Bỏ 1 biến không dùng trong `excel-export.js` (có từ bản gốc) — ESLint sạch hoàn toàn; file xuất 37/37 không đổi.
+
+### Kết quả rà soát
+- 26 bộ test web + test desktop: đạt hết. ESLint 0 cảnh báo; không hàm > 100 dòng, không file > 800 dòng;
+  máy quét HAK_CODE_QUALITY_TEST: 0 lỗi, số cảnh báo/vòng phụ thuộc giữ nguyên như trước các phase này.
+- Đã đọc lại: tính sổ tiền vay (2 cách lũy kế, số dư nhập tay), kho IndexedDB (nâng cấp v1→v4 không xoá dữ
+  liệu, sao lưu/khôi phục mọi phiên bản cũ), nhập Excel trong Worker, xuất Excel/PDF/In, thẻ tổng (mọi chữ
+  hiển thị đều qua esc), chọn giao diện — không thấy lỗi khác.
+
+## [Phase 4.11] — 29/10/2026 — Lũy kế tiền vay chi tính trong khoảng thời gian báo cáo
+
+### Đổi (người dùng: "lũy kế tiền vay chi sẽ tính cho khoảng thời gian báo cáo")
+- MẶC ĐỊNH nay lũy kế chỉ tính trong Từ ngày – Đến ngày: sổ bắt đầu từ lần giải ngân đầu tiên TRONG KỲ, lũy kế
+  dòng đầu = số vay đó (vd tháng 6: 09/06 999.999.929 — đúng mẫu người dùng), không mang số dư trước kỳ sang.
+  Số dư đầu kỳ nhập tay chỉ dùng khi ngày nhập nằm trong kỳ (ngoài kỳ ⇒ thẻ ghi "ngoài kỳ — không dùng").
+- GIỮ cách cũ: ô chọn "Lũy kế tiền vay chi: Trong khoảng thời gian báo cáo | Từ đầu sổ (mang số dư trước kỳ
+  sang)" ở đầu sổ; lựa chọn nhớ trên máy. Không chọn kỳ ⇒ 2 cách cho cùng kết quả.
+- Bảng, In/PDF/Excel, thẻ tổng đều theo cách đang chọn (cùng 1 hàm tính `computeSoTienVay(…, mode)`).
+
+### Kiểm chứng
+- `test:khoanvay-model` 62 (+8: so với bản cài Power Query độc lập chạy trên riêng dữ liệu trong kỳ; số dư
+  nhập trong/ngoài kỳ; không chọn kỳ ⇒ 2 cách giống nhau). Các phép thử "số dư mang sang" cũ chạy ở chế độ
+  "Từ đầu sổ", kết quả giữ nguyên.
+- `test:khoanvay` 46 (+2), `test:tienvay-opening` 30 (+5: trong kỳ, số dư ngoài kỳ, Excel, nhớ lựa chọn).
+- Mọi test khác giữ nguyên kết quả; file xuất 37/37 không đổi.
+
+## [Phase 4.10] — 29/10/2026 — Thẻ số liệu tổng tab Cập nhật khoản vay + Tổng hợp thanh toán; "Lưu ra Excel"
+
+### Rõ việc lưu (người dùng: "cập nhật khoản vay không có chức năng lưu à?")
+- Dữ liệu vẫn TỰ LƯU trên máy ngay khi Thêm/Sửa/Xoá/Nhập file (như trước) — nay hiện rõ: "✓ Tự động lưu
+  trên máy · Đã lưu: N khoản vay, tổng … · Lần lưu gần nhất: giờ ngày".
+- Nút mới **"💾 Lưu ra Excel"**: các khoản đang hiện (theo tìm kiếm/lọc) → file `KhoanVay_TH_VAY_yyyymmdd.xlsx`
+  3 cột (ô ngày thật, tiền là số, dòng Tổng cộng), nhập lại được ngay; chưa có khoản ⇒ báo, không tạo file.
+
+### Mới — thẻ số liệu tổng
+- **Cập nhật khoản vay**: Tổng tiền vay (số khoản), Giải ngân gần nhất (ngày), Khoản lớn nhất (ngày, bình
+  quân/khoản), Thời gian giải ngân (từ – đến, số ngày). Đang lọc ⇒ thẻ tính theo phần lọc, ghi rõ tổng đã lưu.
+- **Tổng hợp thanh toán**: Tổng thành tiền (số dòng), Tổng khối lượng (đơn giá bình quân/tấn), Số chủ rừng
+  (gộp không phân biệt hoa/thường; chủ rừng nhận nhiều nhất), Số ngày thanh toán (bình quân/ngày). Số lấy từ
+  computeTongHopThanhToan — cùng số với bảng/dòng tổng.
+- Hàm vẽ thẻ dùng chung `components/stat-cards.js` (thẻ Sổ chi tiết tiền vay chuyển sang dùng, kết quả giữ nguyên).
+
+### Kiểm chứng
+- `test:bank-kpi` (19 — mới): thẻ = dữ liệu/dòng tổng, lọc, trạng thái lưu, Lưu ra Excel → nhập lại đúng,
+  chủ rừng gộp hoa/thường; chạy trên bản build trước ⇒ hỏng (đối chứng). `test:khoanvay-model` 54 (+6).
+- Mọi test khác giữ nguyên kết quả; file xuất 37/37 không đổi.
+
+## [Phase 4.9] — 29/10/2026 — Sổ chi tiết tiền vay: cập nhật số dư đầu kỳ + thẻ số liệu tổng
+
+### Mới — "Cập nhật số dư đầu kỳ" (người dùng: "chỗ cập nhật số dư đầu kỳ … chưa có")
+- Khung gập ngay trên sổ: **Ngày bắt đầu sổ** + **Số dư đầu kỳ** (đồng, được âm) → Lưu / Xoá (bấm 2 lần).
+- Có số dư nhập: sổ bắt đầu từ ngày đó, dòng đầu "Số dư đầu kỳ" = số nhập, lũy kế tính tiếp; khoản vay/chi
+  trước ngày đó coi như đã nằm trong số dư (không tính lại). Chọn "Từ ngày" sau đó ⇒ số dư đầu kỳ = số nhập
+  + phát sinh trước kỳ. Chưa nhập (mặc định) ⇒ sổ y như cũ (bắt đầu từ ngày giải ngân đầu tiên).
+- Lưu trên máy (IndexedDB v4, kho `meta`), có trong file sao lưu; file sao lưu bản trước (chưa có số dư)
+  khôi phục ⇒ giữ nguyên số dư đang có. In/PDF/Excel có dòng "Số dư đầu kỳ".
+
+### Mới — thẻ số liệu tổng phía trên sổ
+- 4 thẻ của kỳ đang xem: **Số dư đầu kỳ** (ghi rõ nguồn: nhập tay / lũy kế trước kỳ / giải ngân đầu),
+  **Tiền vay giải ngân** (số lần), **Tiền chi thanh toán** (số tấn, số dòng chi), **Số dư cuối kỳ** (âm ⇒
+  đỏ, "Chi vượt tiền vay …") + thanh **"Đã chi … % nguồn vốn trong kỳ"** (chi / (đầu kỳ + vay)).
+- Số trên thẻ lấy nguyên từ kết quả tính sổ (cùng số với bảng, dòng tổng, file xuất); co chữ vừa thẻ như
+  Dashboard (tách hàm co chữ ra `components/card-fit.js`, logic giữ nguyên — `test:dashboard-fit` 12/12).
+
+### Kiểm chứng
+- `test:tienvay-opening` (25 — mới): thẻ = bảng (đầu kỳ, vay, chi, cuối kỳ), nhập sai bị báo, nhập đúng ⇒ sổ
+  bắt đầu đúng ngày, số âm, Excel có dòng số dư, còn sau tải lại, sao lưu/khôi phục, file sao lưu cũ giữ số
+  dư, xoá ⇒ về như cũ. Chạy trên bản build trước ⇒ hỏng (đối chứng).
+- `test:khoanvay-model` 48 (+8: số dư nhập tay, lọc kỳ, số âm, đối chứng không nhập ⇒ như cũ).
+- Mọi test khác giữ nguyên kết quả; file xuất 37/37 không đổi (mặc định chưa có số dư nhập).
+
+## [Phase 4.8] — 29/10/2026 — "Cập nhật khoản vay" chỉ còn 3 cột như bảng TH_VAY
+
+### Đổi (người dùng: "chỉ nhập 3 cột đó")
+- Tab "Cập nhật khoản vay" lưu và hiện đúng 3 cột của bảng TH_VAY: **Ngày hạch toán, Ngày chứng từ, Tổng
+  tiền vay** (thay cho sổ phụ ngân hàng 12 cột). Thêm/sửa tay chỉ 3 ô; Tổng tiền vay bắt buộc, > 0; Ngày
+  chứng từ được để trống. Bỏ cột/ô lọc "Tiền vay" (mọi dòng đều là khoản vay).
+- Nhập Excel nhận 2 dạng: file 3 cột (sheet TH_VAY hoặc bất kỳ sheet có 2 cột Ngày hạch toán + Tổng tiền
+  vay — dòng trống/"Tổng cộng"/không có tiền vay bỏ qua), **hoặc** nguyên sổ phụ (sheet VAY) như trước — app
+  tự lấy dòng tiền vay đúng query TH_VAY (Diễn giải ∈ cấu hình, Tổng tiền vay = Thu) và chỉ lưu 3 cột.
+- File mẫu mới `Mau_TienVay_TH_VAY.xlsx` (3 cột).
+- Sổ chi tiết tiền vay KHÔNG đổi kết quả: dữ liệu thật (ChungTuNganHang.xlsx — 14 khoản, 14.399.999.582)
+  xuất Excel trước/sau giống nhau 746/746 dòng.
+
+### Dữ liệu cũ — không mất
+- Kho IndexedDB lên v3 (kho mới `thvay`); lần mở đầu tiên tự chép các dòng tiền vay của sổ phụ đã lưu sang
+  3 cột (giữ ngày, thứ tự, nguồn "Sổ phụ: …"). Sổ phụ cũ GIỮ NGUYÊN trên máy và nằm trong file sao lưu
+  (`soPhuCu`); khôi phục được cả file sao lưu của bản trước (MIGRATION §3).
+
+### Kiểm chứng
+- `test:khoanvay` 44 (viết lại theo 3 cột: nhập sổ phụ, nhập file 3 cột không nhân đôi với dữ liệu từ sổ
+  phụ, thêm/sửa/xoá, tải lại, sao lưu/khôi phục, khôi phục file sao lưu bản cũ, **máy đang có dữ liệu bản
+  trước tự chuyển sang 3 cột, sổ phụ cũ còn nguyên**); chạy trên bản build trước ⇒ hỏng (đối chứng).
+- `test:khoanvay-model` 40 (tham chiếu Power Query độc lập giữ nguyên), `test:tienvay-import` 19 (thêm 2
+  trường hợp file 3 cột có dòng trống/"Tổng cộng").
+- File xuất: chỉ file mẫu đổi (đúng dự kiến), 36 mẫu còn lại không đổi; mọi test khác giữ nguyên kết quả.
+
+## [Phase 4.7] — 29/10/2026 — Bảng kê chi tiết tiền vay theo mẫu; tab Tổng hợp thanh toán; chọn phiếu nhập kho để in
+
+### Đổi — "Sổ chi tiết tiền vay" trình bày đúng mẫu người dùng gửi ("BẢNG KÊ CHI TIẾT TIỀN VAY")
+- 7 cột: Ngày hạch toán · Ngày chứng từ · Tổng tiền vay · Ngày thanh toán · Số tấn · Tổng tiền chi ·
+  Lũy kế tiền vay chi (bỏ cột Ngày chung/Diễn giải khỏi bảng hiển thị — vẫn dùng Ngày chung để sắp xếp).
+- Sổ **bắt đầu từ ngày giải ngân đầu tiên** (như mẫu: dòng đầu 09/06/2026, vay 999.999.929, lũy kế
+  999.999.929); các khoản chi trước ngày đó không đưa vào sổ. Chọn "Từ ngày" sau ngày đó ⇒ dòng đầu là
+  "Số dư đầu kỳ" (in/PDF/Excel đều ghi nhãn này).
+- Thứ tự các dòng chi **trong cùng 1 ngày** theo thứ tự sheet DNTT_CT (Power Query sắp xếp không ổn
+  định nên file Excel có thể khác thứ tự trong ngày; tổng ngày và lũy kế cuối ngày khớp 146/146 ngày).
+
+### Mới — tab "Tổng hợp thanh toán" (đúng query THTT_NH)
+- Lấy từ sheet DNTT_CT (link trong Cấu hình): Họ tên Chủ rừng, Ngày thanh toán, Khối lượng, Thành tiền,
+  Ngày chung; lọc theo Ngày thanh toán trong kỳ; có dòng tổng Khối lượng/Thành tiền; In/PDF/Excel; nằm
+  trong "Xuất tất cả" (sheet THTT_NH).
+
+### Mới — Phiếu nhập kho: chọn phiếu để in
+- Hộp thông tin trước khi xuất PDF có danh sách phiếu (Số CT, ngày, người bán, khối lượng) với ô
+  "Chọn tất cả" (mặc định chọn hết = như cũ); PDF chỉ gồm các phiếu được chọn; không chọn phiếu nào ⇒
+  báo "Chưa chọn phiếu nhập kho nào để in.".
+
+### Kiểm chứng
+- `test:bank-tabs` (12 — mới): cột/số dòng/tổng THTT; chọn 0 phiếu ⇒ báo; chọn 2 ⇒ PDF 2 trang đúng
+  Số CT; chọn tất cả ⇒ đủ trang. `test:khoanvay-model` 39/39 (tham chiếu Power Query độc lập, bắt đầu
+  từ giải ngân đầu), `test:khoanvay` 33/33.
+- File xuất: chỉ 3 mẫu đổi đúng dự kiến (tienvay.xlsx/.pdf — cột mới; nganhang.xlsx — thêm sheet
+  THTT_NH), đã cập nhật mẫu; 34 mẫu còn lại không đổi. Mọi test khác giữ nguyên kết quả.
+
+## [Phase 4.6] — 29/10/2026 — Số trên thẻ Dashboard không còn tràn; chọn giao diện 5 chủ đề × sáng/tối
+
+### Sửa — số bị tràn khỏi thẻ Dashboard (ảnh người dùng gửi: "254.203.099.000 đ" bị cắt)
+- **Nguyên nhân:** bấm LẬP BÁO CÁO khi đang ở tab khác ⇒ Dashboard đang ẩn (bề rộng 0) ⇒ hàm co chữ
+  không đo được, giữ cỡ 24px; mở Dashboard hoặc đổi cửa sổ sau đó không đo lại.
+- **Sửa:** `components/dashboard.js` — đo theo bề rộng thật (tìm nhị phân 24→14px) và đo lại mỗi khi thẻ
+  đổi kích thước (ResizeObserver, bắt cả lúc từ ẩn sang hiện); quá hẹp thì xuống dòng trước đơn vị,
+  số luôn hiện đủ.
+- **Kiểm chứng:** `test:dashboard-fit` (số hàng nghìn tỷ, 4 bề rộng 1700/1366/1100/760 + thu hẹp cửa sổ):
+  bản trước lỗi ở cả 4 bề rộng; bản sửa 12/12.
+
+### Mới — chọn giao diện (menu trái, mục "Giao diện")
+- 5 chủ đề: **Luxe** (navy & vàng — mặc định, token HAK-Enterprise-Design-System), **Classic** (xanh ngọc
+  lam — token gốc teal của Design System, cũng là màu cũ của app), **Navy** (xanh hải quân), **Ngọc bích**
+  (xanh lục ngọc), **Neutral** (xám); mỗi chủ đề có **Sáng / Tối / Theo máy**.
+- Lưu trên máy (1 khoá riêng, không nằm trong file sao lưu dữ liệu); áp ngay trong `<head>` nên không
+  chớp màu khi mở app. File Excel/PDF xuất ra giữ màu chuẩn Luxe.
+- **Kiểm chứng:** `test:hak-theme` (60 — cả 10 tổ hợp chủ đề × sáng/tối đạt tương phản AA; Classic đúng
+  token gốc Design System), `test:theme-picker` (11 — đổi màu đúng, theo máy, lưu khi tải lại, dữ liệu
+  hỏng về mặc định). Mọi test cũ giữ nguyên kết quả (file xuất 37/37 không đổi).
+
+## [Phase 4.5] — 29/10/2026 (chiều) — Sổ chi tiết tiền vay dựng ĐÚNG luồng Power Query của người dùng
+
+**Người dùng chỉ ra:** "tiền vay sẽ lấy dữ liệu như file excel trên (ChungTuNganHang.xlsx) — xem lại công
+thức… trong Power Query có link lấy dữ liệu DNTT… 2 sheet TH_VAY, THTT_NH được tạo thế nào". Phase 4.4
+bắt nhập bảng kê ĐÃ TÍNH SẴN — sai nguồn. Đã trích Power Query (customXml → Formulas/Section1.m):
+
+| Query | Nguồn | Bước |
+|---|---|---|
+| TH_VAY | bảng **VAY** trong file (sổ phụ TK ngân hàng) | lọc Diễn giải ∈ 3 câu "Chuyển tiền nội bộ … vay keo VNĐ HAK"; Tổng tiền vay = Σ Thu theo Ngày hạch toán; Ngày chung = Ngày hạch toán |
+| THTT_NH | **DNTT_CT** — Google Sheet (link CSV, gid=1612289204) | giữ Họ tên Chủ rừng, Ngày thanh toán, Khối lượng, Thành tiền; Ngày chung = Ngày thanh toán; mọi dòng |
+| BKCT_TIENVAY | TH_VAY + THTT_NH | xếp theo Ngày chung; trống = 0; Chênh lệch = vay − chi; Lũy kế (công thức Excel) = lũy kế trên + vay − chi |
+
+### Thay đổi
+- Tab **Cập nhật khoản vay** = **sổ phụ ngân hàng** (12 cột bảng VAY): nhập Excel (tự tìm sheet "VAY"
+  trong file nhiều sheet), nhập tay / sửa / xoá / lưu; cột "Tiền vay" ✓ cho dòng có Diễn giải khớp;
+  lọc "Chỉ dòng tiền vay". 3 câu Diễn giải lấy nguyên văn query TH_VAY → `CONFIG.DIEN_GIAI_TIEN_VAY`.
+- **Sổ chi tiết tiền vay** = `computeSoTienVay(sổ phụ, STATE.dntt)`: tiền chi lấy TỰ ĐỘNG từ DNTT_CT (link
+  đã nhập trong cấu hình), không nhập tay nữa. Lũy kế từ đầu sổ + "Số dư đầu kỳ" khi lọc kỳ (như 4.4).
+- Khác Power Query có chủ đích: TH_VAY gom theo ngày rồi BUNG lại ⇒ nếu 1 ngày có 2 lần giải ngân, MỖI
+  dòng mang tổng cả ngày (cộng trùng). App tính theo từng bút toán (tổng luôn đúng; dữ liệu hiện tại
+  mỗi ngày 1 lần nên giống hệt). Cột Lũy kế trong file Excel bị #VALUE! ở mọi dòng (dòng đầu cộng vào ô
+  tiêu đề) — app tự tính nên không bị.
+- File mẫu tải về: `Mau_SoPhuNganHang_VAY.xlsx` (đúng cột bảng VAY).
+- Kho IndexedDB `baocaongay-khoanvay` v2: kho mới `vay`; kho cũ `loans` GIỮ NGUYÊN (không xoá).
+- Sửa thêm: dòng "Tổng cộng" (có khoảng trắng) ở cột đầu của file nhập không bị bỏ qua do lỗi ký tự
+  thoát trong mã Worker (test `tienvay-import` bắt được).
+
+### Kiểm chứng
+- **Đối chiếu với chính file ChungTuNganHang.xlsx:** nạp sheet VAY qua tab 1 + DNTT_CT dựng từ dữ liệu
+  THTT_NH đã lưu trong file → xuất Excel Sổ chi tiết từ app → so với bảng BKCT_TIENVAY: cùng 6.308 dòng
+  (cùng tập dòng), tổng vay 14.399.999.582 / tổng chi 147.161.510.000 giống hệt, tổng vay/chi từng ngày
+  và **lũy kế cuối mỗi ngày khớp 146/146 ngày**. Chỉ khác thứ tự các dòng TRONG cùng 1 ngày (Table.Sort
+  của Power Query không giữ thứ tự gốc; app giữ thứ tự DNTT_CT).
+- `test:khoanvay-model` (36): so app với 1 bản cài ĐỘC LẬP các bước M (TH_VAY/THTT_NH/BKCT) trên dữ liệu
+  ngẫu nhiên; `test:khoanvay` (31): nhập file nhiều sheet, chỉ dòng giải ngân là tiền vay, chi từ DNTT_CT,
+  thêm/sửa/xoá/sao lưu; `test:tienvay-import` (13). Mẫu chuẩn: chỉ `tienvay`, `nganhang`, `mau-tienvay`
+  đổi (bảng có thêm dòng chi từ DNTT_CT) — mọi báo cáo khác không đổi.
+
+## [Phase 4.4] — 29/10/2026 — Báo cáo ngân hàng 4 tab + chuẩn định dạng HAK toàn app
+
+**Yêu cầu:** "Báo cáo ngân hàng làm tab: 1. cập nhật khoản vay (nhập thủ công hoặc tải Excel, sửa, xoá,
+lưu) 2. Sổ chi tiết tiền vay 3. Bảng kê 02/TNDN 4. Phiếu nhập kho — đồng thời dùng các repo HAK để định
+dạng lại ngày, số, bảng cha con…". Người dùng chọn: dữ liệu khoản vay **phẳng** như file Excel; Lũy kế
+**từ đầu sổ**; chuẩn định dạng áp **toàn bộ app**.
+
+### Dùng 5 repo HAK
+- `HAK_ACCOUNTING_REPORT_STANDARD` (gói `@hak/accounting-report-standard`, commit a5833a9): định dạng số,
+  độ chính xác (tiền 0 số lẻ, khối lượng 2 số lẻ), ngày dd/MM/yyyy, căn lề theo kiểu cột — qua
+  `src/utils/hak-format.js`.
+- `HAK_SMART_FILTER` (`@hak/smart-filter`, 5181681): tìm không dấu, lọc khoảng ngày, đọc ngày gõ tay có
+  kiểm tra ngày có thật, mô tả điều kiện lọc — dùng ở tab Cập nhật khoản vay.
+- `HAK-Enterprise-Design-System` (`@hak/enterprise-design-system`, 69ac08a): chủ đề màu "luxe" (navy +
+  champagne, nền ngà) sáng/tối cho màn hình và file Excel/PDF; `tests/test-hak-theme.mjs` đối chiếu từng mã
+  màu với token gốc + tương phản AA.
+- `HAK_AI_SKILLS`: theo quy tắc hak-parent-child-data-model / hak-data-integrity / hak-migration-manager
+  (khoá ổn định, trống ≠ 0, giao dịch ghi trọn vẹn, chống ghi đè, nhập lại không nhân đôi, có sao lưu).
+- `HAK_CODE_QUALITY_TEST`: quét mã nguồn — 0 lỗi; cảnh báo còn lại là các vòng phụ thuộc có chủ đích
+  đã có từ trước (module mới không thêm vòng nào).
+
+### Mới — tab "Cập nhật khoản vay"
+- Nhập tay (ô ngày dd/MM/yyyy, ô tiền/số tấn có ngăn cách), sửa, xoá từng dòng hoặc nhiều dòng (bấm 2 lần
+  để xác nhận), tìm không dấu, lọc khoảng ngày, tổng vay/chi/còn lại theo bộ lọc.
+- Nhập Excel: hiện tóm tắt trước khi ghi; "Thêm các dòng mới" (nhập lại đúng file cũ không nhân đôi — so
+  theo số lần xuất hiện, các dòng giống hệt nhau trong cùng file vẫn giữ đủ) hoặc "Thay toàn bộ" (bấm 2 lần).
+- Lưu trên máy (IndexedDB `baocaongay-khoanvay`), ghi theo giao dịch; lỗi ghi báo "CHƯA lưu" (không giả vờ
+  đã lưu). Sao lưu/khôi phục (tab Cấu hình) có kèm khoản vay.
+- Sổ chi tiết tiền vay lấy dữ liệu từ tab này (bỏ ô tải file tạm thời mỗi lần mở app).
+
+### Đổi — Sổ chi tiết tiền vay
+- Lũy kế tính từ đầu sổ: có bút toán trước "Từ ngày" thì dòng đầu là "Số dư đầu kỳ (lũy kế trước kỳ)";
+  tổng vay/chi vẫn chỉ của kỳ. Không có bút toán trước kỳ → như cũ.
+
+### Đổi — chuẩn định dạng toàn app (màn hình, In, Excel, PDF, 02/TNDN, WO, PNK)
+- Tiền không kèm "đ"; đầu báo cáo ghi "Đơn vị tiền: đồng" (thẻ Dashboard vẫn ghi "đ" sau số như "tấn", "xe").
+- Khối lượng luôn đủ 2 chữ số lẻ (12,50).
+- Ngày căn giữa; Excel ghi ô NGÀY THẬT định dạng dd/mm/yyyy (lọc/sắp xếp được) thay vì chữ.
+- Màu luxe cho giao diện và tiêu đề/dòng tổng/đường kẻ của file xuất.
+- App desktop: ô chọn ngày theo tiếng Việt (dd/mm/yyyy) — `app.commandLine.appendSwitch('lang','vi')`.
+- Build target es2018 → es2020 (thư viện chuẩn dùng BigInt; chạy trên Chrome/Edge ≥ 80 và Electron).
+
+### Kiểm chứng
+- Mới: `test:khoanvay` (26), `test:khoanvay-model` (30), `test:hak-theme` (42); `test:tienvay-import`
+  chuyển sang luồng nhập mới (13); `test:perf-equivalence` đối chiếu định dạng mới = kết quả cũ chỉ khác
+  đúng các điểm của chuẩn; desktop `test-template-refresh` (9).
+- File xuất: so từng ô/từng chữ giữa bản trước và bản này trên cùng dữ liệu — mọi khác biệt thuộc đúng các
+  nhóm: màu luxe, ô ngày thật + căn giữa, bỏ "đ", khối lượng 2 số lẻ, dòng "Đơn vị tiền". 18/18 PDF có nội
+  dung chữ/số giống hệt (bỏ qua thứ tự do cột hẹp lại). Sau đó mới ghi lại mẫu chuẩn (`--update`): 37/37.
+- Với file thật `ChungTuNganHang_DH.xlsx` (7.437 bút toán): nhập đủ 7.437 dòng; tổng vay 14.399.999.582,
+  tổng chi 125.056.138.000; Sổ chi tiết 10/06–30/06/2026 khớp tính độc lập bằng Python (số dư đầu kỳ
+  −106.345.564.071, vay 13.399.999.653, chi 15.291.581.000).
+
+## [Phase 4.3] — 29/10/2026 — Sửa lỗi treo khi tải file "Sổ chi tiết tiền vay"
+
+**Bối cảnh:** Rà soát luồng Báo cáo ngân hàng → Sổ chi tiết tiền vay.
+
+### Lỗi [BUG-TV01]
+- **Hiện tượng:** tải file Excel có 1 dòng trống (ở giữa hoặc cuối) hoặc dòng "Tổng cộng"/"Total" →
+  app đứng mãi ở "Đang đọc file...", bảng không có số liệu, không báo lỗi.
+- **Nguyên nhân:** khi chuyển phần đọc file sang Web Worker (`services/excel-import-worker.js`), 2 lệnh
+  `continue` (bỏ qua dòng, đọc tiếp) của bản gốc `BaoCaoNgay.html` bị đổi thành `return` — thoát hẳn
+  `self.onmessage`, không gửi kết quả về luồng chính.
+- **Sửa:** trả lại đúng `continue` (2 dòng). Không đổi công thức Chênh lệch/Lũy kế, cột, giao diện.
+
+### Kiểm chứng
+- **[MỚI]** `tests/test-tienvay-import.mjs` (`npm run test:tienvay-import`) — Chromium + Worker thật,
+  chọn file như người dùng; 4 kiểu file (liền mạch / dòng trống / "Tổng cộng" / tiêu đề ở dòng 3 + "Total")
+  + file sai cấu trúc phải báo lỗi rõ ràng.
+- Đối chứng: bản trước khi sửa 4 đạt / **9 lỗi** (treo); bản sửa **13/13**.
+- Toàn bộ bộ test cũ chạy lại đều đạt (36 file xuất khớp mẫu chuẩn).
+
 ## [Phase 4.2] — Rà soát hoàn thiện + tối ưu: mở app nhanh gấp ~2,6 lần, tách mã nguồn
 
 **Bối cảnh:** Người dùng: "xem app còn gì cần hoàn thiện và tối ưu hiệu suất, đồng thời gởi bản mã nguồn".

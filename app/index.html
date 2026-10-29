@@ -13,34 +13,158 @@
      tiền vay") tương tự — đã nhúng thẳng vào Web Worker, xem src/services/excel-import-worker.js.
      Chi tiết đầy đủ trong BUG_FIXED.md/CHANGELOG.md. -->
 
+<script>
+/* [2026-10-29] Áp chủ đề đã chọn NGAY khi mở trang (trước khi vẽ) để không bị chớp màu mặc định.
+   Chỉ đọc 1 khoá localStorage; lỗi (chế độ riêng tư, bị chặn) → dùng mặc định. Xem components/theme-picker.js. */
+(function(){try{var t=JSON.parse(localStorage.getItem('baocaongay_ui_theme')||'{}'),h=document.documentElement;
+if(/^(classic|navy|ngoc|neutral)$/.test(t.skin))h.setAttribute('data-skin',t.skin);
+if(t.mode==='light'||t.mode==='dark')h.setAttribute('data-theme',t.mode);}catch(e){}})();
+</script>
 <style>
 /* ==========================================================================
-   Giao diện theo style.css HAK (brand teal #0e7c86) — chỉ đổi màu/hình khối,
-   giữ nguyên toàn bộ tên class/id cũ để không ảnh hưởng logic JS phía dưới.
+   [CHUẨN HAK — 2026-10-29] Màu theo chủ đề "luxe" (navy + champagne, nền ngà) của
+   HAK-Enterprise-Design-System (tokens/luxe.css, commit 69ac08a) — mặc định của mọi app HAK.
+   Giá trị chép NGUYÊN từ token gốc ([data-skin="luxe"] sáng / [data-skin="luxe"][data-theme="dark"]
+   tối); chữ phụ dùng --mut-aa để đạt tương phản AA. tests/test-hak-theme.mjs đối chiếu từng giá trị
+   với file token trong node_modules để không lệch chuẩn. Giữ nguyên tên biến/class cũ của app.
+   [2026-10-29 chiều] Thêm chủ đề chọn được (html[data-skin]): classic (token gốc teal của Design
+   System), navy, ngọc bích, neutral — mỗi chủ đề có sáng/tối; html[data-theme]= light|dark (không có =
+   theo máy). Chỉ đổi HIỂN THỊ, không ghi vào dữ liệu nghiệp vụ, file xuất giữ màu chuẩn luxe.
    ========================================================================== */
 :root{
-  --bg:#f3f6fa; --panel:#ffffff; --ink:#132433; --muted:#6b7a8c; --line:#e3e9f0;
-  --side:#0a1c30; --side-ink:#b8c7d9; --side-active:#14a3ad; --side-hover:rgba(255,255,255,.07);
-  --accent:#0e7c86; --accent-2:#14a3ad; --accent-soft:rgba(14,124,134,.12); --accent-ink:#ffffff;
-  --ok:#1a8a4a; --err:#e5484d; --warn:#b8860b;
-  --head:#f3f6fa; --hover:#f6fafb; --card1:#0e7c86; --card2:#1a8a4a; --card3:#b8860b; --card4:#e5484d;
-  --radius:14px; --shadow:0 1px 2px rgba(16,35,58,.05), 0 6px 18px rgba(16,35,58,.06);
+  --bg:#f5f2ec; --panel:#fffefb; --ink:#1a2130; --muted:#6b655a; --line:#e5dfd1; --side:#0a1220;
+  --side-top:#0f1b33; --side-ink:#c8cfdc; --side-active:#e6cf9b; --side-hover:rgba(214,178,106,.12);
+  --accent:#1d3a63; --accent-2:#2d5388; --accent-soft:rgba(29,58,99,.10); --accent-ink:#ffffff;
+  --champ:#b8903f; --champL:#e6cf9b; --ok:#177f44; --err:#c2410c; --warn:#b45309; --head:#f1ece0;
+  --hover:#f6f1e5; --card1:#1d3a63; --card2:#177f44; --card3:#9a7531; --card4:#c2410c;
+  --shadow:0 1px 2px rgba(26,33,48,.05),0 8px 22px rgba(26,33,48,.07);
+  --radius:12px;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0d151e; --panel:#15202c; --ink:#e7edf5; --muted:#8ea0b5; --line:#243244;
-    --side:#071019; --side-ink:#aeb9c9; --side-active:#21b5c0; --side-hover:rgba(255,255,255,.07);
-    --accent:#21b5c0; --accent-2:#3ddce6; --accent-soft:rgba(33,181,192,.16); --accent-ink:#062c30;
-    --ok:#3bc272; --err:#ff6b66; --warn:#e0ad3d;
-    --head:#1b232f; --hover:#1a2230; --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.3);
+    --bg:#0b101a; --panel:#121926; --ink:#e8e6df; --muted:#9aa0ad; --line:#232c3d; --side:#060a12;
+    --side-top:#090e19; --side-ink:#c8cfdc; --side-active:#e3c88f; --side-hover:rgba(212,176,106,.12);
+    --accent:#d4b06a; --accent-2:#e3c88f; --accent-soft:rgba(212,176,106,.16); --accent-ink:#1b1405;
+    --champ:#d4b06a; --champL:#e3c88f; --ok:#3bc272; --err:#ff8a6a; --warn:#f0b35a; --head:#18202f;
+    --hover:#19222f; --card1:#e3c88f; --card2:#3bc272; --card3:#e3c88f; --card4:#ff8a6a;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 22px rgba(0,0,0,.3);
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0d151e; --panel:#15202c; --ink:#e7edf5; --muted:#8ea0b5; --line:#243244;
-  --side:#071019; --side-ink:#aeb9c9; --side-active:#21b5c0; --side-hover:rgba(255,255,255,.07);
-  --accent:#21b5c0; --accent-2:#3ddce6; --accent-soft:rgba(33,181,192,.16); --accent-ink:#062c30;
-  --ok:#3bc272; --err:#ff6b66; --warn:#e0ad3d;
-  --head:#1b232f; --hover:#1a2230; --shadow:0 1px 2px rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.3);
+  --bg:#0b101a; --panel:#121926; --ink:#e8e6df; --muted:#9aa0ad; --line:#232c3d; --side:#060a12;
+  --side-top:#090e19; --side-ink:#c8cfdc; --side-active:#e3c88f; --side-hover:rgba(212,176,106,.12);
+  --accent:#d4b06a; --accent-2:#e3c88f; --accent-soft:rgba(212,176,106,.16); --accent-ink:#1b1405;
+  --champ:#d4b06a; --champL:#e3c88f; --ok:#3bc272; --err:#ff8a6a; --warn:#f0b35a; --head:#18202f;
+  --hover:#19222f; --card1:#e3c88f; --card2:#3bc272; --card3:#e3c88f; --card4:#ff8a6a;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 22px rgba(0,0,0,.3);
+}
+/* --- Classic — xanh ngọc lam (teal, token gốc Design System) --- */
+:root[data-skin="classic"]{
+  --bg:#f3f6fa; --panel:#ffffff; --ink:#14212b; --muted:#5b6878; --line:#e3e9f0; --side:#0a1c30;
+  --side-top:#0f2740; --side-ink:#b8c7d9; --side-active:#47c8d1; --side-hover:rgba(255,255,255,.07);
+  --accent:#0e7c86; --accent-2:#0b6870; --accent-soft:rgba(14,124,134,.12); --accent-ink:#ffffff;
+  --champ:#14a3ad; --champL:#7fdbe2; --ok:#177f44; --err:#c2410c; --warn:#b45309; --head:#f5f8fa;
+  --hover:#f1f7f8; --card1:#0e7c86; --card2:#177f44; --card3:#b45309; --card4:#c2410c;
+  --shadow:0 1px 2px rgba(16,35,58,.05),0 8px 22px rgba(16,35,58,.07);
+}
+@media (prefers-color-scheme: dark){
+  :root[data-skin="classic"]:not([data-theme="light"]){
+    --bg:#0d151e; --panel:#15202c; --ink:#e3eaf2; --muted:#8ea0b5; --line:#243244; --side:#071019;
+    --side-top:#0a1826; --side-ink:#b8c7d9; --side-active:#47c8d1; --side-hover:rgba(255,255,255,.07);
+    --accent:#21b5c0; --accent-2:#47c8d1; --accent-soft:rgba(33,181,192,.16); --accent-ink:#062c30;
+    --champ:#21b5c0; --champL:#7fdbe2; --ok:#3bc272; --err:#ff8a6a; --warn:#f0b35a; --head:#1a2633;
+    --hover:#1b2a38; --card1:#47c8d1; --card2:#3bc272; --card3:#f0b35a; --card4:#ff8a6a;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 22px rgba(0,0,0,.3);
+  }
+}
+:root[data-skin="classic"][data-theme="dark"]{
+  --bg:#0d151e; --panel:#15202c; --ink:#e3eaf2; --muted:#8ea0b5; --line:#243244; --side:#071019;
+  --side-top:#0a1826; --side-ink:#b8c7d9; --side-active:#47c8d1; --side-hover:rgba(255,255,255,.07);
+  --accent:#21b5c0; --accent-2:#47c8d1; --accent-soft:rgba(33,181,192,.16); --accent-ink:#062c30;
+  --champ:#21b5c0; --champL:#7fdbe2; --ok:#3bc272; --err:#ff8a6a; --warn:#f0b35a; --head:#1a2633;
+  --hover:#1b2a38; --card1:#47c8d1; --card2:#3bc272; --card3:#f0b35a; --card4:#ff8a6a;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 22px rgba(0,0,0,.3);
+}
+/* --- Navy — xanh hải quân --- */
+:root[data-skin="navy"]{
+  --bg:#f3f5f9; --panel:#ffffff; --ink:#111c2e; --muted:#56627a; --line:#dde3ec; --side:#0b1730;
+  --side-top:#13254a; --side-ink:#c5d0e3; --side-active:#9db9ff; --side-hover:rgba(157,185,255,.12);
+  --accent:#1e3a8a; --accent-2:#2b4fb3; --accent-soft:rgba(30,58,138,.10); --accent-ink:#ffffff;
+  --champ:#2b4fb3; --champL:#9db9ff; --ok:#177f44; --err:#c2410c; --warn:#b45309; --head:#eef2f8;
+  --hover:#f1f4fa; --card1:#1e3a8a; --card2:#177f44; --card3:#b45309; --card4:#c2410c;
+  --shadow:0 1px 2px rgba(16,35,58,.05),0 8px 22px rgba(16,35,58,.07);
+}
+@media (prefers-color-scheme: dark){
+  :root[data-skin="navy"]:not([data-theme="light"]){
+    --bg:#0a1020; --panel:#111a2e; --ink:#e6ebf5; --muted:#9aa6bd; --line:#22304a; --side:#060b16;
+    --side-top:#0b1530; --side-ink:#c5d0e3; --side-active:#9db9ff; --side-hover:rgba(157,185,255,.12);
+    --accent:#7aa2ff; --accent-2:#9db9ff; --accent-soft:rgba(122,162,255,.16); --accent-ink:#0a1020;
+    --champ:#7aa2ff; --champL:#9db9ff; --ok:#3bc272; --err:#ff8a6a; --warn:#f0b35a; --head:#16213a;
+    --hover:#18243d; --card1:#9db9ff; --card2:#3bc272; --card3:#f0b35a; --card4:#ff8a6a;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 22px rgba(0,0,0,.3);
+  }
+}
+:root[data-skin="navy"][data-theme="dark"]{
+  --bg:#0a1020; --panel:#111a2e; --ink:#e6ebf5; --muted:#9aa6bd; --line:#22304a; --side:#060b16;
+  --side-top:#0b1530; --side-ink:#c5d0e3; --side-active:#9db9ff; --side-hover:rgba(157,185,255,.12);
+  --accent:#7aa2ff; --accent-2:#9db9ff; --accent-soft:rgba(122,162,255,.16); --accent-ink:#0a1020;
+  --champ:#7aa2ff; --champL:#9db9ff; --ok:#3bc272; --err:#ff8a6a; --warn:#f0b35a; --head:#16213a;
+  --hover:#18243d; --card1:#9db9ff; --card2:#3bc272; --card3:#f0b35a; --card4:#ff8a6a;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 22px rgba(0,0,0,.3);
+}
+/* --- Ngọc bích — xanh lục --- */
+:root[data-skin="ngoc"]{
+  --bg:#f1f7f5; --panel:#ffffff; --ink:#10241e; --muted:#536860; --line:#d9e7e1; --side:#05201a;
+  --side-top:#0a3329; --side-ink:#bfdad0; --side-active:#6ee7b7; --side-hover:rgba(110,231,183,.12);
+  --accent:#047857; --accent-2:#065f46; --accent-soft:rgba(4,120,87,.10); --accent-ink:#ffffff;
+  --champ:#059669; --champL:#6ee7b7; --ok:#15803d; --err:#c2410c; --warn:#b45309; --head:#eaf4ef;
+  --hover:#eef7f3; --card1:#047857; --card2:#15803d; --card3:#b45309; --card4:#c2410c;
+  --shadow:0 1px 2px rgba(16,35,58,.05),0 8px 22px rgba(16,35,58,.07);
+}
+@media (prefers-color-scheme: dark){
+  :root[data-skin="ngoc"]:not([data-theme="light"]){
+    --bg:#07130f; --panel:#0e1d18; --ink:#e3efe9; --muted:#93ab9f; --line:#1f3a30; --side:#030c09;
+    --side-top:#0a1f18; --side-ink:#bfdad0; --side-active:#6ee7b7; --side-hover:rgba(110,231,183,.12);
+    --accent:#34d399; --accent-2:#6ee7b7; --accent-soft:rgba(52,211,153,.16); --accent-ink:#052e22;
+    --champ:#34d399; --champL:#6ee7b7; --ok:#4ade80; --err:#ff8a6a; --warn:#f0b35a; --head:#132820;
+    --hover:#15291f; --card1:#6ee7b7; --card2:#4ade80; --card3:#f0b35a; --card4:#ff8a6a;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 22px rgba(0,0,0,.3);
+  }
+}
+:root[data-skin="ngoc"][data-theme="dark"]{
+  --bg:#07130f; --panel:#0e1d18; --ink:#e3efe9; --muted:#93ab9f; --line:#1f3a30; --side:#030c09;
+  --side-top:#0a1f18; --side-ink:#bfdad0; --side-active:#6ee7b7; --side-hover:rgba(110,231,183,.12);
+  --accent:#34d399; --accent-2:#6ee7b7; --accent-soft:rgba(52,211,153,.16); --accent-ink:#052e22;
+  --champ:#34d399; --champL:#6ee7b7; --ok:#4ade80; --err:#ff8a6a; --warn:#f0b35a; --head:#132820;
+  --hover:#15291f; --card1:#6ee7b7; --card2:#4ade80; --card3:#f0b35a; --card4:#ff8a6a;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 22px rgba(0,0,0,.3);
+}
+/* --- Neutral — xám trung tính --- */
+:root[data-skin="neutral"]{
+  --bg:#f4f5f7; --panel:#ffffff; --ink:#1f2329; --muted:#585f6b; --line:#e2e5ea; --side:#16191f;
+  --side-top:#242832; --side-ink:#cfd4dc; --side-active:#f1f5f9; --side-hover:rgba(255,255,255,.08);
+  --accent:#334155; --accent-2:#1e293b; --accent-soft:rgba(51,65,85,.10); --accent-ink:#ffffff;
+  --champ:#64748b; --champL:#cbd5e1; --ok:#177f44; --err:#c2410c; --warn:#b45309; --head:#f1f3f5;
+  --hover:#f3f4f6; --card1:#334155; --card2:#177f44; --card3:#b45309; --card4:#c2410c;
+  --shadow:0 1px 2px rgba(16,35,58,.05),0 8px 22px rgba(16,35,58,.07);
+}
+@media (prefers-color-scheme: dark){
+  :root[data-skin="neutral"]:not([data-theme="light"]){
+    --bg:#0f1115; --panel:#171a20; --ink:#e7e9ee; --muted:#a0a7b4; --line:#2a2f38; --side:#0a0c10;
+    --side-top:#14171d; --side-ink:#cfd4dc; --side-active:#f1f5f9; --side-hover:rgba(255,255,255,.08);
+    --accent:#cbd5e1; --accent-2:#e2e8f0; --accent-soft:rgba(203,213,225,.14); --accent-ink:#0f1115;
+    --champ:#94a3b8; --champL:#cbd5e1; --ok:#3bc272; --err:#ff8a6a; --warn:#f0b35a; --head:#1d2129;
+    --hover:#1f232b; --card1:#e2e8f0; --card2:#3bc272; --card3:#f0b35a; --card4:#ff8a6a;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 22px rgba(0,0,0,.3);
+  }
+}
+:root[data-skin="neutral"][data-theme="dark"]{
+  --bg:#0f1115; --panel:#171a20; --ink:#e7e9ee; --muted:#a0a7b4; --line:#2a2f38; --side:#0a0c10;
+  --side-top:#14171d; --side-ink:#cfd4dc; --side-active:#f1f5f9; --side-hover:rgba(255,255,255,.08);
+  --accent:#cbd5e1; --accent-2:#e2e8f0; --accent-soft:rgba(203,213,225,.14); --accent-ink:#0f1115;
+  --champ:#94a3b8; --champL:#cbd5e1; --ok:#3bc272; --err:#ff8a6a; --warn:#f0b35a; --head:#1d2129;
+  --hover:#1f232b; --card1:#e2e8f0; --card2:#3bc272; --card3:#f0b35a; --card4:#ff8a6a;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 22px rgba(0,0,0,.3);
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -51,14 +175,14 @@ a{color:var(--accent)}
 .app{display:flex;min-height:100vh}
 
 /* ---------- Sidebar ---------- */
-.side{width:260px;flex:0 0 260px;background:linear-gradient(180deg,#0f2740 0%,var(--side) 100%);color:var(--side-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;box-shadow:4px 0 24px rgba(0,0,0,.12)}
+.side{width:260px;flex:0 0 260px;background:linear-gradient(180deg,var(--side-top) 0%,var(--side) 100%);color:var(--side-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;box-shadow:4px 0 24px rgba(0,0,0,.12)}
 .side .brand{padding:20px 20px 14px;font-weight:700;font-size:16px;letter-spacing:.02em;color:#fff;display:flex;flex-direction:column;gap:2px}
-.side .brand::before{content:"";display:block;width:42px;height:42px;border-radius:12px;margin-bottom:10px;background:linear-gradient(135deg,var(--accent-2),#0a5f68);box-shadow:0 4px 12px rgba(20,163,173,.4)}
+.side .brand::before{content:"";display:block;width:42px;height:42px;border-radius:12px;margin-bottom:10px;background:linear-gradient(135deg,var(--champL),var(--champ));box-shadow:0 4px 12px rgba(184,163,173,.4)}
 .side .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--side-ink);opacity:.75;margin-top:2px;letter-spacing:0}
 .side nav{flex:1;padding:8px 12px}
 .side .item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--side-ink);white-space:nowrap;font-size:13.5px;font-weight:500;margin-bottom:2px;transition:all .15s}
 .side .item:hover{background:var(--side-hover);color:#fff}
-.side .item.active{background:linear-gradient(90deg,rgba(20,163,173,.35),rgba(20,163,173,.12));color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--accent-2)}
+.side .item.active{background:linear-gradient(90deg,color-mix(in srgb,var(--side-active) 28%,transparent),color-mix(in srgb,var(--side-active) 8%,transparent));color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--side-active)}
 .side .item .ic{width:20px;text-align:center;font-size:14px}
 .side .foot{padding:14px 16px 18px;font-size:11px;color:var(--side-ink);opacity:.7;border-top:1px solid rgba(255,255,255,.08)}
 .side-toggle{display:none}
@@ -123,6 +247,9 @@ table.dataTbl{border-collapse:collapse;width:100%;font-size:12.8px}
 table.dataTbl th,table.dataTbl td{padding:.5rem .75rem;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}
 table.dataTbl th{position:sticky;top:0;background:var(--panel);cursor:pointer;user-select:none;z-index:1;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);box-shadow:0 1px 0 var(--line)}
 table.dataTbl td.num,table.dataTbl th.num{text-align:right;font-variant-numeric:tabular-nums}
+/* [CHUẨN HAK] Ngày/giờ căn giữa; dòng "Số dư đầu kỳ" của Sổ chi tiết tiền vay in nghiêng. */
+table.dataTbl td.ctr,table.dataTbl th.ctr{text-align:center;font-variant-numeric:tabular-nums}
+table.dataTbl tr.opening td{font-style:italic;background:var(--head)}
 table.dataTbl tbody tr:hover{background:var(--hover)}
 table.dataTbl tr.total td{font-weight:800;background:var(--head);position:sticky;bottom:0}
 .pager{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:var(--muted);font-size:12.5px;flex-wrap:wrap;gap:8px}
@@ -145,6 +272,72 @@ table.dataTbl tr.total td{font-weight:800;background:var(--head);position:sticky
 .cfgList{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.7}
 .cfgList code{background:var(--head);padding:1px 6px;border-radius:5px;word-break:break-all;color:var(--accent)}
 
+/* ---------- [2026-10-29] Cập nhật khoản vay ---------- */
+.loanSummary{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 12px;font-size:13px;color:var(--muted)}
+.loanSummary b{color:var(--ink);font-variant-numeric:tabular-nums}
+.loanLbl{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.loanLbl input{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:110px;text-align:center}
+.loanLbl input.invalid,.modalGrid input.invalid{border-color:var(--err)}
+.loanStatus{font-size:12.5px;color:var(--muted)}
+.loanStatus.ok{color:var(--ok)} .loanStatus.err{color:var(--err);font-weight:600}
+/* [2026-10-29] Sổ chi tiết tiền vay: thẻ số liệu tổng + số dư đầu kỳ */
+.tvTop{margin-bottom:14px}
+.tvCards{margin-bottom:10px;grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:1280px){.tvCards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:620px){.tvCards{grid-template-columns:1fr}}
+.card .sub{margin-top:4px;font-size:12px;color:var(--muted);line-height:1.35}
+.tvEmpty{grid-column:1 / -1;padding:14px 16px;border:1px dashed var(--line);border-radius:var(--radius);color:var(--muted);font-size:13px}
+.tvUse{margin:0 0 10px}
+.tvMode{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 10px;font-size:12.5px;color:var(--muted)}
+.tvMode label{font-weight:700;color:var(--ink)}
+.tvMode select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+.loanSaved{color:var(--ok);font-weight:700}
+.tvUseHead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;font-size:12.5px;color:var(--muted);margin-bottom:5px}
+.tvUseHead b{color:var(--ink)}
+.tvUseBar{height:8px;border-radius:99px;background:var(--head);border:1px solid var(--line);overflow:hidden}
+.tvUseBar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.tvUseBar.over i{background:var(--err)}
+.tvOpening{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px}
+.tvOpening summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;list-style:none}
+.tvOpening summary::-webkit-details-marker{display:none}
+.tvOpTitle{font-weight:700;color:var(--accent)}
+.tvOpCurrent{font-size:12.5px;color:var(--muted)}
+.tvOpCurrent b{color:var(--ink)}
+.tvOpForm{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin-top:10px}
+.tvOpForm label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.tvOpForm input{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:400}
+#tvOpNgay{width:120px;text-align:center} #tvOpTien{width:180px;text-align:right}
+.tvOpForm input.invalid{border-color:var(--err)}
+.tvOpHint{margin:8px 0 0;font-size:12px;color:var(--muted)}
+.loanSourceNote{margin:0 0 10px;padding:8px 12px;border-left:3px solid var(--champ);background:var(--head);border-radius:6px;font-size:12.5px;color:var(--muted)}
+.loanFormErrors{color:var(--err);font-size:12.5px;margin-top:10px;white-space:pre-line}
+.loanImportSummary{font-size:13px;line-height:1.7}
+.loanImportSummary ul{margin:6px 0 0;padding-left:18px;max-height:160px;overflow:auto;color:var(--err)}
+.loanImportSummary ul.warn{color:var(--warn)}
+.modalGrid input.numInput{text-align:right;font-variant-numeric:tabular-nums}
+.btn.danger{color:var(--err);border-color:color-mix(in srgb, var(--err) 45%, var(--line))}
+.btn.danger:hover{background:color-mix(in srgb, var(--err) 10%, var(--panel));border-color:var(--err)}
+.btn.danger.confirm{background:var(--err);color:#fff;border-color:var(--err)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+table.dataTbl td.act{white-space:nowrap;text-align:center}
+table.dataTbl td.act .btn{padding:3px 8px;font-size:12px}
+table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
+
+/* ---------- [2026-10-29] Chọn giao diện (menu trái) ---------- */
+.themeBox{margin:auto 14px 10px;padding:10px;border:1px solid var(--side-hover);border-radius:10px;display:grid;grid-template-columns:1fr;gap:6px}
+.themeBox label{font-size:11px;color:var(--side-ink);opacity:.8;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.themeBox select{min-width:0;padding:6px 8px;border-radius:7px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-size:12px}
+.themeBox select option{color:#111;background:#fff}
+
+/* ---------- [2026-10-29] Chọn phiếu nhập kho để in ---------- */
+.pnkPick{margin-top:14px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.pnkPickHead{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--head);font-size:13px;font-weight:600}
+.pnkPickHead span{color:var(--muted);font-weight:500}
+.pnkPickList{max-height:240px;overflow:auto}
+.pnkPickList label{display:grid;grid-template-columns:22px 92px 1fr 90px 130px;gap:8px;align-items:center;padding:6px 12px;border-top:1px solid var(--line);font-size:12.5px;cursor:pointer;font-variant-numeric:tabular-nums}
+.pnkPickList label:hover{background:var(--hover)}
+.pnkPickList .n{text-align:right}
+
 .hidden{display:none !important}
 .empty{padding:30px;text-align:center;color:var(--muted)}
 
@@ -157,6 +350,7 @@ table.dataTbl tr.total td{font-weight:800;background:var(--head);position:sticky
 .printSheet table.psTable th,.printSheet table.psTable td{border:1px solid #000;padding:3px 6px;text-align:left;white-space:nowrap}
 .printSheet table.psTable th{background:#eee;font-weight:700}
 .printSheet table.psTable td.num,.printSheet table.psTable th.num{text-align:right}
+.printSheet table.psTable td.ctr,.printSheet table.psTable th.ctr{text-align:center}
 .printSheet table.psTable tr.psTotalRow{font-weight:800}
 /* [BUGFIX 2026-09-23] Dòng Tổng cộng còn cần "page-break-inside:avoid" — nếu không, khi bảng bị
    ngắt trang đúng ngay tại dòng này, trình duyệt có thể cắt dòng làm 2 nửa, vẽ viền dở dang. */
@@ -220,6 +414,21 @@ table.dataTbl tr.total td{font-weight:800;background:var(--head);position:sticky
       <div class="item" data-target="danhmuc"><span class="ic">&#128203;</span> Danh mục</div>
       <div class="item" data-target="cauhinh"><span class="ic">&#9881;</span> Cấu hình</div>
     </nav>
+    <div class="themeBox" role="group" aria-label="Giao diện">
+      <label for="themeSkin">Giao diện</label>
+      <select id="themeSkin">
+        <option value="luxe">Luxe — navy &amp; vàng</option>
+        <option value="classic">Classic — xanh ngọc lam</option>
+        <option value="navy">Navy — xanh hải quân</option>
+        <option value="ngoc">Ngọc bích — xanh lục</option>
+        <option value="neutral">Neutral — xám</option>
+      </select>
+      <select id="themeMode" aria-label="Chế độ sáng / tối">
+        <option value="auto">Sáng / tối theo máy</option>
+        <option value="light">Luôn sáng</option>
+        <option value="dark">Luôn tối</option>
+      </select>
+    </div>
     <div class="foot">Dữ liệu đọc trực tiếp từ Google Sheet (CSV công khai). HTML chỉ đọc, không ghi ngược vào Sheet.</div>
   </aside>
 
@@ -330,12 +539,59 @@ table.dataTbl tr.total td{font-weight:800;background:var(--head);position:sticky
           </div>
         </div>
         <div class="reportTabs" id="reportTabsBarNganHang">
-          <button class="rtab active" data-rtab="tienvay">Sổ chi tiết tiền vay</button>
+          <button class="rtab active" data-rtab="khoanvay">Cập nhật khoản vay</button>
+          <button class="rtab" data-rtab="tienvay">Sổ chi tiết tiền vay</button>
+          <button class="rtab" data-rtab="thtt">Tổng hợp thanh toán</button>
           <button class="rtab" data-rtab="tndn">Bảng kê 02/TNDN</button>
           <button class="rtab" data-rtab="pnk">Phiếu nhập kho</button>
         </div>
 
-        <div class="reportPanel active" data-rpanel="tienvay"><div class="pageHead"><h2>Sổ chi tiết tiền vay</h2><div class="tools" data-tools="tienvay"></div></div><div class="panel"><div class="bankVayUpload" style="margin:0 0 10px;padding:10px 12px;border:1px dashed #c9c9c9;border-radius:8px;background:#fafafa;"><label style="font-weight:600;margin-right:8px;">Nguồn dữ liệu — tải file Excel Sổ chi tiết tiền vay:</label><input type="file" id="tienVayFileInput" accept=".xlsx,.xls"> <button class="btn small" id="btnTienVayTemplate" type="button">📥 Tải file mẫu</button><span id="tienVayFileStatus" style="margin-left:10px;color:#666;font-size:13px;">Chưa tải file — bảng dưới đây đang trống.</span><div style="margin-top:4px;color:#999;font-size:12px;">File cần đúng cấu trúc cột: Ngày chung, Ngày hạch toán, Ngày chứng từ, Tổng tiền vay, Ngày thanh toán, Số tấn, Tổng tiền chi, Họ tên Chủ rừng — không cần cấu hình gì thêm, chỉ tải lại khi có dữ liệu mới. File chỉ đọc ngay trên trình duyệt, không gửi lên đâu cả. Chưa có file đúng cấu trúc? Bấm "📥 Tải file mẫu" ở trên.</div></div><div class="tblTools" data-toolbar="tienvay"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-tienvay"></table></div><div class="pager" data-pager="tienvay"></div></div></div>
+        <!-- [2026-10-29] Tab 1: nhập/sửa/xoá/lưu các bút toán vay — nguồn dữ liệu của Sổ chi tiết tiền vay. -->
+        <div class="reportPanel active" data-rpanel="khoanvay"><div class="pageHead"><h2>Cập nhật khoản vay</h2><div class="tools">
+          <button class="btn primary small" id="btnLoanAdd" type="button">&#10133; Thêm khoản vay</button>
+          <label class="btn small" for="tienVayFileInput" title="File 3 cột: Ngày hạch toán, Ngày chứng từ, Tổng tiền vay — hoặc nguyên sổ phụ ngân hàng (sheet VAY), app tự lấy các dòng tiền vay">&#128229; Nhập từ Excel</label><input type="file" id="tienVayFileInput" accept=".xlsx,.xls" class="hidden">
+          <button class="btn small" id="btnLoanExport" type="button" title="Lưu các khoản vay đang hiện ra file Excel 3 cột (nhập lại được)">&#128190; Lưu ra Excel</button>
+          <button class="btn small" id="btnTienVayTemplate" type="button">&#128196; Tải file mẫu</button>
+        </div></div>
+        <div class="cards tvCards" id="loanKpi"></div>
+        <div class="panel">
+          <div class="loanSummary" id="loanSummary">Đang đọc dữ liệu đã lưu…</div>
+          <div class="tblTools">
+            <input type="search" id="loanSearch" placeholder="Tìm ngày, số tiền, nguồn" style="min-width:240px">
+            <label class="loanLbl">Từ <input type="text" id="loanFrom" placeholder="dd/MM/yyyy" inputmode="numeric" size="11"></label>
+            <label class="loanLbl">Đến <input type="text" id="loanTo" placeholder="dd/MM/yyyy" inputmode="numeric" size="11"></label>
+            <button class="btn small" id="btnLoanClearFilter" type="button">Bỏ lọc</button>
+            <button class="btn small danger" id="btnLoanDeleteSel" type="button" disabled>&#128465; Xoá dòng đã chọn</button>
+            <span class="loanStatus" id="loanStatus" role="status" aria-live="polite"></span>
+          </div>
+          <div class="scrollWrap"><table class="dataTbl" id="tbl-khoanvay"></table></div>
+          <div class="pager" id="loanPager"></div>
+        </div></div>
+
+        <div class="reportPanel" data-rpanel="tienvay"><div class="pageHead"><h2>Bảng kê chi tiết tiền vay</h2><div class="tools" data-tools="tienvay"></div></div>
+          <!-- [2026-10-29] Số dư đầu kỳ nhập tay + thẻ số liệu tổng (components/tienvay-summary.js) -->
+          <div class="tvTop">
+            <div class="tvMode"><label for="tvLuyKeMode">Lũy kế tiền vay chi</label>
+              <select id="tvLuyKeMode"><option value="ky">Trong khoảng thời gian báo cáo</option><option value="dauSo">Từ đầu sổ (mang số dư trước kỳ sang)</option></select>
+              <span class="tvModeHint">Trong kỳ: sổ bắt đầu từ lần giải ngân đầu tiên trong Từ ngày – Đến ngày, không mang số dư trước kỳ.</span></div>
+            <div class="cards tvCards" id="tienVayKpi"><div class="tvEmpty">Bấm <b>LẬP BÁO CÁO</b> để xem số liệu tổng của sổ.</div></div>
+            <div class="tvUse" id="tienVayUse"></div>
+            <details class="tvOpening" id="tvOpening">
+              <summary><span class="tvOpTitle">&#9998; Cập nhật số dư đầu kỳ</span> <span class="tvOpCurrent" id="tvOpCurrent">Đang đọc…</span></summary>
+              <div class="tvOpForm">
+                <label for="tvOpNgay">Ngày bắt đầu sổ <input type="text" id="tvOpNgay" placeholder="dd/MM/yyyy" inputmode="numeric" size="11"></label>
+                <label for="tvOpTien">Số dư đầu kỳ (đồng) <input type="text" id="tvOpTien" inputmode="numeric" size="18"></label>
+                <button class="btn primary small" id="btnTvOpSave" type="button">&#128190; Lưu</button>
+                <button class="btn small danger" id="btnTvOpClear" type="button" disabled>Xoá</button>
+                <span class="loanStatus" id="tvOpStatus" role="status" aria-live="polite"></span>
+              </div>
+              <p class="tvOpHint">Sổ bắt đầu từ <b>Ngày bắt đầu sổ</b> với lũy kế = <b>Số dư đầu kỳ</b> (tiền vay còn lại mang sang, được nhập số âm); khoản vay/chi trước ngày đó coi như đã nằm trong số dư nên không tính lại. Xoá số dư ⇒ sổ bắt đầu từ ngày giải ngân đầu tiên như trước. Lưu trên máy, có trong file sao lưu.</p>
+            </details>
+          </div>
+          <div class="panel"><div class="loanSourceNote" id="tienVaySourceNote">Lập theo đúng luồng Power Query BKCT_TIENVAY: <b>Tổng tiền vay</b> = các khoản vay ở tab "Cập nhật khoản vay", Ngày chung = Ngày hạch toán; <b>Tổng tiền chi</b> = Thành tiền của sheet DNTT_CT (link trong cấu hình), Ngày chung = Ngày thanh toán. Lũy kế = lũy kế dòng trên + vay − chi. Mặc định lũy kế tính <b>trong khoảng thời gian báo cáo</b>: sổ bắt đầu từ lần giải ngân đầu tiên trong kỳ (hoặc Số dư đầu kỳ nhập ở trên nếu ngày nhập nằm trong kỳ). Chọn "Từ đầu sổ" thì các dòng trước kỳ cộng vào dòng "Số dư đầu kỳ".</div><div class="tblTools" data-toolbar="tienvay"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-tienvay"></table></div><div class="pager" data-pager="tienvay"></div></div></div>
+
+        <!-- [2026-10-29] Tổng hợp thanh toán = query THTT_NH (DNTT_CT từ Google Sheet). -->
+        <div class="reportPanel" data-rpanel="thtt"><div class="pageHead"><h2>Tổng hợp thanh toán</h2><div class="tools" data-tools="thtt"></div></div><div class="cards tvCards" id="thttKpi"><div class="tvEmpty">Bấm <b>LẬP BÁO CÁO</b> để xem số liệu tổng.</div></div><div class="panel"><div class="loanSourceNote">Lấy từ sheet DNTT_CT (link trong cấu hình) — đúng query THTT_NH: Họ tên Chủ rừng, Ngày thanh toán, Khối lượng, Thành tiền; Ngày chung = Ngày thanh toán. Lọc theo Ngày thanh toán trong kỳ.</div><div class="tblTools" data-toolbar="thtt"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-thtt"></table></div><div class="pager" data-pager="thtt"></div></div></div>
 
         <div class="reportPanel" data-rpanel="tndn"><div class="pageHead"><h2>Bảng kê thu mua hàng hóa, dịch vụ không có hóa đơn (Mẫu 02/TNDN)</h2><div class="tools" data-tools="tndn"><button class="btn primary small" id="btnTNDNModal">&#128196; Xuất mẫu 02/TNDN chính thức</button></div></div><div class="panel"><div class="tblTools" data-toolbar="tndn"></div><div class="scrollWrap"><table class="dataTbl" id="tbl-tndn"></table></div><div class="pager" data-pager="tndn"></div></div></div>
 
@@ -463,10 +719,42 @@ table.dataTbl tr.total td{font-weight:800;background:var(--head);position:sticky
       <div class="f bankInfoPNKOnly"><label>Thủ kho</label><input type="text" id="bankThuKho"></div>
       <div class="f bankInfoPNKOnly"><label>Giám đốc</label><input type="text" id="bankGiamDoc"></div>
     </div>
+    <!-- [2026-10-29] Chọn phiếu nhập kho cần in (mặc định chọn tất cả). -->
+    <div class="pnkPick bankInfoPNKOnly" id="pnkPick">
+      <div class="pnkPickHead"><label><input type="checkbox" id="pnkPickAll" checked> Chọn tất cả</label><span id="pnkPickCount"></span></div>
+      <div class="pnkPickList" id="pnkPickList"></div>
+    </div>
     <div class="modalActions">
       <button class="btn" id="btnBankCancel">Đóng</button>
       <button class="btn" id="btnBankPdf">&#128196; Xuất PDF</button>
       <button class="btn primary" id="btnBankExcel">&#128202; Xuất Excel</button>
+    </div>
+  </div>
+</div>
+
+<!-- [2026-10-29] Modal thêm/sửa 1 dòng khoản vay -->
+<div class="modalOverlay" id="loanModalOverlay" role="dialog" aria-modal="true" aria-labelledby="loanModalTitle">
+  <div class="modalBox">
+    <h3 id="loanModalTitle">Thêm khoản vay</h3>
+    <p class="modalNote">1 khoản vay giải ngân (như 1 dòng bảng TH_VAY). Ngày gõ dd/MM/yyyy; Tổng tiền vay là số nguyên (đồng), lớn hơn 0; Ngày chứng từ được để trống.</p>
+    <div class="modalGrid" id="loanFormGrid"></div>
+    <div class="loanFormErrors" id="loanFormErrors" role="alert"></div>
+    <div class="modalActions">
+      <button class="btn" id="btnLoanCancel" type="button">Huỷ</button>
+      <button class="btn primary" id="btnLoanSave" type="button">&#128190; Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- [2026-10-29] Modal xác nhận nhập file Excel khoản vay -->
+<div class="modalOverlay" id="loanImportOverlay" role="dialog" aria-modal="true" aria-labelledby="loanImportTitle">
+  <div class="modalBox">
+    <h3 id="loanImportTitle">Nhập khoản vay từ Excel</h3>
+    <div class="loanImportSummary" id="loanImportSummary"></div>
+    <div class="modalActions">
+      <button class="btn" id="btnLoanImportCancel" type="button">Huỷ</button>
+      <button class="btn danger" id="btnLoanImportReplace" type="button">Thay toàn bộ dữ liệu đã lưu</button>
+      <button class="btn primary" id="btnLoanImportAppend" type="button">Thêm các dòng mới</button>
     </div>
   </div>
 </div>

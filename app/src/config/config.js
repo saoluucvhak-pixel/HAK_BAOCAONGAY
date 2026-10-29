@@ -25,6 +25,15 @@ export const CONFIG = Object.freeze({
   DEFAULT_BANK_INFO: Object.freeze({ maSoThue: '', diaChi: '', soDienThoai: '', diaChiThuMua: '' }),
   DEFAULT_WO_INFO: Object.freeze({ maSoThue: '', diaChiThuMua: '' }),
 
+  // [2026-10-29] Sổ chi tiết tiền vay — dòng sổ phụ ngân hàng (tab "Cập nhật khoản vay") được tính là
+  // TIỀN VAY GIẢI NGÂN khi cột "Diễn giải" đúng 1 trong các câu dưới. Lấy NGUYÊN VĂN từ bước
+  // "Filtered Rows" của query TH_VAY trong file ChungTuNganHang.xlsx (Power Query của người dùng).
+  DIEN_GIAI_TIEN_VAY: Object.freeze([
+    'Chuyển tiền nội bộ gửi VNĐ sang tk keo VNĐ ( do giải ngân đổ nhầm tài khoản)',
+    'Chuyển tiền nội bộ gửi VNĐ sang vay keo VNĐ HAK',
+    'Chuyển tiền nội bộ vay USD sang vay keo VNĐ HAK'
+  ]),
+
   // Khoá localStorage — tập trung 1 chỗ để StorageService dùng (BƯỚC 9), tránh chuỗi
   // "baocaongay_xxx" rải rác nhiều nơi trong code (magic string).
   STORAGE_KEYS: {

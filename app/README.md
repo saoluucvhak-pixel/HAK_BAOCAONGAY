@@ -34,6 +34,24 @@ trình duyệt/máy chặn app gọi dữ liệu Google Sheet khi mở kiểu do
 File này tự mở trình duyệt tới `http://localhost:8791` — giao diện y hệt, không có gì khác,
 chỉ khác cách mở. Cứ để cửa sổ đen (terminal) đó mở trong lúc dùng báo cáo.
 
+## Giao diện
+
+Menu trái → **Giao diện**: chọn chủ đề (Luxe, Classic xanh ngọc lam, Navy, Ngọc bích, Neutral) và Sáng /
+Tối / Theo máy. Chỉ đổi màu màn hình — không đổi dữ liệu, file xuất giữ màu chuẩn.
+
+## Báo cáo ngân hàng — Sổ chi tiết tiền vay lấy từ đâu
+
+Đúng luồng Power Query trong file `ChungTuNganHang.xlsx`:
+- **Tiền vay** = cột **Thu** của sổ phụ ngân hàng (tab **Cập nhật khoản vay**) ở các dòng có Diễn giải là
+  chuyển tiền vay/giải ngân (3 câu trong `CONFIG.DIEN_GIAI_TIEN_VAY`); Ngày chung = Ngày hạch toán.
+- **Tiền chi** = sheet **DNTT_CT** (link Google Sheet đã nhập trong cấu hình): Thành tiền, Khối lượng (số
+  tấn), Họ tên Chủ rừng; Ngày chung = Ngày thanh toán. Tự lấy mỗi lần "Cập nhật dữ liệu".
+- Xếp theo Ngày chung; Chênh lệch = vay − chi; Lũy kế cộng dồn từ đầu sổ (lọc kỳ thì có "Số dư đầu kỳ").
+
+Tab **Cập nhật khoản vay**: **Nhập từ Excel** (chọn file sổ phụ — app tự tìm sheet "VAY"), **Thêm dòng**,
+**Sửa**/**Xoá** (Xoá bấm 2 lần), lọc **Chỉ dòng tiền vay**. Dữ liệu lưu trên máy; file **Sao lưu dữ liệu**
+ở tab Cấu hình có kèm sổ phụ.
+
 ## Dùng khi mất mạng (offline)
 
 Mỗi lần tải dữ liệu Google Sheet thành công, app tự lưu 1 bản vào bộ nhớ trình duyệt (IndexedDB).
@@ -70,7 +88,7 @@ thêm `npm run build:config` để nhúng lại bản `dist/index.html` MỚI NH
 ## Phát triển tiếp (chỉ cần ở máy lập trình viên)
 
 ```bash
-npm install        # cài Vite + vite-plugin-singlefile (1 lần)
+npm install        # cài Vite + vite-plugin-singlefile + 3 gói chuẩn HAK từ GitHub (1 lần, cần mạng)
 npm run dev          # chạy dev server có hot-reload, mở link hiện ra trong terminal
 npm run build         # build lại dist/index.html sau khi sửa code trong src/
 ```
@@ -91,6 +109,16 @@ npm run test:offline         # chạy khi mất mạng (IndexedDB)
 npm run test:ng-codes        # mã Nguồn gốc/Đại lý không bị rơi
 npm run test:dm-recalc       # sửa Danh mục → báo cáo tính lại
 npm run test:number-input    # ô số kiểu VN (1.250.000 · 1.234,56)
+npm run test:tienvay-import   # tải file Sổ chi tiết tiền vay có dòng trống / "Tổng cộng" không bị treo
+npm run test:khoanvay        # tab Cập nhật khoản vay: nhập Excel (đúng ngày giờ VN), thêm/sửa/xoá, lưu, sao lưu
+npm run test:khoanvay-model  # chuẩn định dạng HAK + kiểm tra dữ liệu khoản vay + lũy kế từ đầu sổ
+npm run test:hak-theme       # màu đúng token luxe của Design System + tương phản AA (5 chủ đề × sáng/tối)
+npm run test:theme-picker    # chọn giao diện: đổi màu, lưu khi tải lại
+npm run test:dashboard-fit   # số trên thẻ Dashboard không tràn khung
+npm run test:bank-tabs       # tab Tổng hợp thanh toán + chọn phiếu nhập kho để in
+npm run test:tienvay-opening # số dư đầu kỳ nhập tay + thẻ số liệu tổng của Sổ chi tiết tiền vay
+npm run test:bank-kpi        # thẻ tổng Cập nhật khoản vay + Tổng hợp thanh toán, Lưu ra Excel
+npm run test:backup-noidb    # sao lưu vẫn chạy khi máy chặn kho khoản vay (IndexedDB)
 npm run test:export-libs     # thư viện xuất file chạy không cần mạng
 npm run test:pdf-money-wrap; npm run test:pdf-custom-money-wrap; npm run test:print-blankpage; npm run test:print-total-row
 npm run test:config          # config.html tạo đúng file mới

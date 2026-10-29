@@ -122,6 +122,12 @@ const ACCENT_MAP = [
 function oldNormalize(s) { let out = String(s == null ? '' : s); for (const [re, p] of ACCENT_MAP) out = out.replace(re, p); return out.toLowerCase(); }
 function oldFmtMoney(n) { if (n == null || isNaN(n)) return ''; const neg = n < 0; n = Math.abs(Math.round(n)); return (neg ? '-' : '') + n.toLocaleString('vi-VN') + ' đ'; }
 function oldFmtKL(n) { if (n == null || isNaN(n)) return ''; return n.toLocaleString('vi-VN', { maximumFractionDigits: 2 }); }
+// [2026-10-29 — CHUẨN HAK, thay đổi CHỦ ĐỘNG] Kết quả mong đợi = đúng kết quả code cũ, chỉ đổi đúng 2
+// điểm của chuẩn định dạng: tiền bỏ " đ" (và "-0" → "0"); khối lượng luôn đủ 2 chữ số lẻ; ±vô cực
+// (dữ liệu hỏng) hiện ô trống thay vì "∞". Mọi khác
+// biệt ngoài 2 điểm này (vd lệch làm tròn 1 đồng) vẫn bị phát hiện.
+function expectMoney(n) { if (typeof n === 'number' && !isFinite(n)) return ''; const s = oldFmtMoney(n).replace(/ đ$/, ''); return s === '-0' ? '0' : s; }
+function expectKL(n) { if (n == null || isNaN(n) || (typeof n === 'number' && !isFinite(n))) return ''; return typeof n === 'number' ? n.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : oldFmtKL(n); }
 
 let seed = 7; const R = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
 const nums = [0, -0, 1, -1, 0.5, -0.5, 1.005, 2.675, 1e15, -1e15, 123456789.987, NaN, Infinity, -Infinity, null, undefined, '12', '1234.5', 'abc', '', 0.004999, 0.995, 99.995];
@@ -137,7 +143,7 @@ for (let lap = 0; lap < 2; lap++) {
   for (const x of strs.concat(nums)) if (!same(parseNum(x), oldParseNum(x))) cnt.parseNum++;
   for (const x of times) { if (!same(parseTimeParts(x), oldParseTimeParts(x))) cnt.parseTimeParts++; }
   for (const x of texts) if (normalizeSearch(x) !== oldNormalize(x)) cnt.normalizeSearch++;
-  for (const x of nums) { if (fmtMoney(x) !== oldFmtMoney(x)) cnt.fmtMoney++; if (fmtKL(x) !== oldFmtKL(x)) cnt.fmtKL++; }
+  for (const x of nums) { if (fmtMoney(x) !== expectMoney(x)) cnt.fmtMoney++; if (fmtKL(x) !== expectKL(x)) cnt.fmtKL++; }
 }
 Object.keys(cnt).forEach((k) => check(k + ' khớp code cũ trên toàn bộ đầu vào (2 lượt, lượt 2 qua cache)', cnt[k] === 0, cnt[k] ? cnt[k] + ' chỗ lệch' : ''));
 // toMinutes/fmtTime dùng parseTimeParts đã cache — kiểm tra thêm 1 vòng qua 2 hàm này

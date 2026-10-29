@@ -13,7 +13,7 @@ import { BRAND } from '../../constants/brand.js';
 import { libs } from '../export-libs.js';
 import { TABLES } from '../../store/state.js';
 import { pad2 } from '../../utils/date-utils.js';
-import { companyNameFor, reportDateLabel, reportTitle } from './report-meta.js';
+import { companyNameFor, reportDateLabel, reportTitle, unitNote } from './report-meta.js';
 
 /* QUAN TRỌNG: addFont() đăng ký font vào ĐÚNG 1 document jsPDF instance đang truyền vào (doc),
    KHÔNG dùng chung được giữa các document khác nhau. Mỗi lần bấm xuất PDF, exportPDF()/buildWOPdf()/
@@ -60,7 +60,7 @@ export function exportPDF(key){
   doc.setFontSize(12); doc.setTextColor(20,20,20);
   doc.text(reportTitle(key), pageW/2, 19, { align:'center' });
   doc.setFont('Roboto','normal'); doc.setFontSize(9); doc.setTextColor(90,90,90);
-  doc.text(reportDateLabel(), pageW/2, 24.5, { align:'center' });
+  doc.text(reportDateLabel() + unitNote(st.cols, reportDateLabel()), pageW/2, 24.5, { align:'center' });
   doc.setDrawColor.apply(doc, BRAND.companyRGB); doc.setLineWidth(0.4);
   doc.line(10, 27, pageW-10, 27);
 
@@ -75,7 +75,7 @@ export function exportPDF(key){
   // render SAI "đ" thành "d" (mất gạch ngang) khi đứng ngay sau NBSP. Đã bỏ hẳn phần này, chỉ
   // giữ lại cách ép bề rộng cột (an toàn, không đụng tới ký tự hiển thị).
   var head = [st.cols.map(function(c){ return c[1]; })];
-  var body = (st.view||[]).map(function(r){ return st.cols.map(function(c){ return fmtCell(r[c[0]], c[2]); }); });
+  var body = (st.view||[]).map(function(r){ return st.cols.map(function(c, i){ return (i === 0 && r._label) ? r._label : fmtCell(r[c[0]], c[2]); }); });
   var foot = st.totals ? [st.cols.map(function(c,i){
     if (i===0) return 'Tổng cộng';
     return st.totals.hasOwnProperty(c[0]) ? fmtCell(st.totals[c[0]], c[2]) : '';
@@ -102,7 +102,7 @@ export function exportPDF(key){
     margin: { left:8, right:8, bottom:14 },
     theme: 'grid',
     showFoot: 'lastPage',
-    styles: { font:'Roboto', fontStyle:'normal', fontSize:8, cellPadding:1.6, lineColor:[183,198,214], lineWidth:0.15, textColor:[30,30,30] },
+    styles: { font:'Roboto', fontStyle:'normal', fontSize:8, cellPadding:1.6, lineColor: BRAND.lineRGB, lineWidth:0.15, textColor:[30,30,30] },
     headStyles: { font:'Roboto', fontStyle:'bold', fillColor: BRAND.headerRGB, textColor:255, halign:'center', valign:'middle' },
     footStyles: { font:'Roboto', fontStyle:'bold', fillColor: BRAND.totalRGB, textColor:[20,20,20] },
     alternateRowStyles: { fillColor: BRAND.zebraRGB },

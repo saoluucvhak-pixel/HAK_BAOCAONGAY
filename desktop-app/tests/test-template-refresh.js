@@ -14,9 +14,10 @@ fs.writeFileSync(path.join(appDir, 'app', 'setup.html'), '<html>setup</html>');
 fs.copyFileSync(path.join(__dirname, '..', 'main.js'), path.join(appDir, 'main.js'));
 
 let loaded = [], readyCb = null;
+const switches = {};
 const handlers = {};
 const electronMock = {
-  app: { getPath: () => userData, whenReady: () => ({ then: (cb) => { readyCb = cb; } }), on: () => {}, quit: () => {} },
+  app: { getPath: () => userData, whenReady: () => ({ then: (cb) => { readyCb = cb; } }), on: () => {}, quit: () => {}, commandLine: { appendSwitch: (k, v) => { switches[k] = v; } } },
   BrowserWindow: Object.assign(function () { this.loadFile = (f) => loaded.push(f); this.webContents = { setWindowOpenHandler() {}, session: { on() {} } }; this.on = () => {}; }, { getAllWindows: () => [] }),
   Menu: { setApplicationMenu() {}, buildFromTemplate: () => ({}) },
   shell: { openExternal() {} },
@@ -38,6 +39,7 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 
 // Lần cài 1: mẫu v1 → người dùng cấu hình công ty
 fs.writeFileSync(path.join(appDir, 'app', 'index.html'), realTemplate.replace('</body>', '<!--TEMPLATE-V1--></body>'));
 startApp();
+check('[2026-10-29] Ô ngày theo tiếng Việt: main.js bật --lang=vi', switches.lang === 'vi', switches.lang);
 const res = handlers['save-config'](null, { TenCty: 'CONG TY THU NGHIEM', PhieuCan: 'https://example.com/pc.csv', DNTT: 'https://example.com/dn.csv' });
 check('Cấu hình lần đầu thành công', res && res.ok, JSON.stringify(res));
 const reportPath = path.join(userData, 'report.html');

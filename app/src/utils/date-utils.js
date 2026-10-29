@@ -107,6 +107,16 @@ export function toMinutes(dateStr, timeStr) {
 /** @param {number} n @returns {string} */
 export function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
+/**
+ * [CHUẨN HAK] Ngày của app ("YYYY-MM-DD" / "M/D/YYYY" từ Google Sheet) → Date UTC 0 giờ để ghi ô NGÀY
+ * THẬT vào Excel (ExcelJS đổi Date sang số ngày Excel theo UTC ⇒ không lệch ngày theo múi giờ máy).
+ * Sai/rỗng → null (ô trống).
+ */
+export function toExcelDate(v) {
+  const p = parseDateParts(v);
+  return p ? new Date(Date.UTC(p.y, p.mo - 1, p.d)) : null;
+}
+
 /** @param {string} str @returns {string} */
 export function fmtDate(str) {
   const p = parseDateParts(str);

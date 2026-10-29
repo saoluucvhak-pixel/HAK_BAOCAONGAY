@@ -400,27 +400,127 @@ export function excelSerialToStr(v) {
 }
 
 /**
- * Sổ chi tiết tiền vay — KHÔNG tính từ PHIEUCAN, đọc "Tổng tiền vay" trực tiếp từ file Excel
- * người dùng tải lên (theo xác nhận nghiệp vụ của người dùng — xem ARCHITECTURE.md §Nghiệp vụ).
- * Chênh lệch/Lũy kế LUÔN tự tính lại ở đây (không lấy cột có sẵn trong file).
+ * Sổ chi tiết tiền vay — [2026-10-29] dựng ĐÚNG luồng Power Query "BKCT_TIENVAY" trong file
+ * ChungTuNganHang.xlsx của người dùng (customXml → Formulas/Section1.m):
+ *   TH_VAY  = các khoản vay ở tab "Cập nhật khoản vay" (3 cột Ngày hạch toán, Ngày chứng từ, Tổng tiền
+ *             vay — tải nguyên sổ phụ VAY thì app đã lọc sẵn theo CONFIG.DIEN_GIAI_TIEN_VAY, Tổng tiền vay
+ *             = Thu, xem loan-model); Ngày chung = Ngày hạch toán.
+ *   THTT_NH = DNTT_CT (Google Sheet, link trong cấu hình — app đã tải sẵn); MỌI dòng; Ngày chung =
+ *             Ngày thanh toán; Số tấn = Khối lượng; Tổng tiền chi = Thành tiền.
+ *   BKCT    = TH_VAY + THTT_NH, xếp tăng theo Ngày chung, ô trống = 0; Chênh lệch = vay − chi;
+ *             Lũy kế = lũy kế dòng trên + vay − chi (từ đầu sổ).
+ * Khác Power Query DUY NHẤT: TH_VAY gom theo ngày rồi bung lại nên nếu 1 ngày có 2 lần giải ngân,
+ * MỖI dòng mang tổng cả ngày (cộng trùng). Ở đây mỗi khoản vay mang đúng số tiền của nó — tổng luôn
+ * đúng; khi mỗi ngày 1 lần giải ngân (như dữ liệu hiện có) kết quả giống hệt.
+ * Lọc kỳ: dòng trước "Từ ngày" (và dòng không có Ngày chung — Power Query xếp chúng đầu sổ) cộng vào
+ * "Số dư đầu kỳ"; tổng vay/chi chỉ tính trong kỳ.
+ * [2026-10-29 — mẫu người dùng gửi] Sổ BẮT ĐẦU từ ngày giải ngân ĐẦU TIÊN (lũy kế dòng đầu = số tiền vay
+ * đầu tiên, vd 09/06/2026: 999.999.929): các khoản chi DNTT trước ngày đó không dùng tiền vay nên không
+ * vào sổ. Chưa có lần giải ngân nào thì giữ cả sổ.
+ * [2026-10-29] Số dư đầu sổ NHẬP TAY (opening = {ngay, soTien}): sổ bắt đầu từ ngày đó, lũy kế khởi đầu =
+ * số tiền nhập; khoản vay/chi trước ngày đó coi như đã nằm trong số dư (không tính lại). Có số dư nhập
+ * thì không dùng quy tắc "bắt đầu từ ngày giải ngân đầu".
+ * @param {Object[]} vayRecords khoản vay đã lưu (services/loan-model schema 3: ngayHachToan/ngayChungTu/tongTienVay)
+ * @param {Object[]} dnttRows STATE.dntt (DNTT_CT — toàn bộ, không theo bộ lọc Đại lý/Khách hàng)
+ * [2026-10-29 — người dùng: "lũy kế tiền vay chi sẽ tính cho khoảng thời gian báo cáo"] mode:
+ *   'ky'   (MẶC ĐỊNH) — lũy kế CHỈ trong kỳ Từ ngày–Đến ngày: lấy các dòng có Ngày chung trong kỳ rồi áp đúng
+ *          quy tắc sổ (bắt đầu từ lần giải ngân đầu TRONG KỲ, lũy kế dòng đầu = số vay đó — như mẫu tháng 6:
+ *          09/06 999.999.929); không mang số dư trước kỳ. Số dư nhập tay chỉ dùng khi ngày nhập nằm TRONG kỳ.
+ *          Không chọn kỳ ⇒ giống 'dauSo'.
+ *   'dauSo' — lũy kế từ đầu sổ (bản trước): dòng trước kỳ cộng vào "Số dư đầu kỳ".
+ * @param {?{ngay: string, soTien: number}} [opening] số dư đầu sổ nhập tay (ngày ISO)
+ * @param {'ky'|'dauSo'} [mode='ky']
+ * @returns {{rows, totalVay, totalChi, luyKeCuoi, soDuDauKy, soLanVay, soDongChi, totalSoTan, batDau, mode, boQuaSoDu}}
+ *   batDau = {loai: 'nhap'|'giaiNgan'|'', ngay} — sổ bắt đầu từ đâu; boQuaSoDu = có số dư nhập nhưng ngày
+ *   nằm ngoài kỳ nên không dùng (chế độ 'ky')
  */
-export function computeSoTienVay(rawRows, fromKey, toKey) {
-  let filtered = (rawRows || []).filter((r) => inDateRange(r['Ngày chung'], fromKey, toKey));
-  filtered = sortByNumKey(filtered, (r) => dateKey(r['Ngày chung']));
-  let luyKe = 0, totalVay = 0, totalChi = 0;
-  const out = filtered.map((r, i) => {
-    const vay = parseNum(r['Tổng tiền vay']) || 0, chi = parseNum(r['Tổng tiền chi']) || 0;
-    luyKe += vay - chi; totalVay += vay; totalChi += chi;
-    return {
-      STT: i + 1, 'Ngày chung': r['Ngày chung'],
-      'Ngày hạch toán': r['Ngày hạch toán'] || r['Ngày chung'],
-      'Ngày chứng từ': r['Ngày chứng từ'] || r['Ngày chung'],
-      'Tổng tiền vay': vay, 'Ngày thanh toán': r['Ngày thanh toán'] || null,
-      'Số tấn': parseNum(r['Số tấn']) || 0, 'Tổng tiền chi': chi,
-      'Họ tên Chủ rừng': r['Họ tên Chủ rừng'] || '', 'Chênh lệch': vay - chi, 'Lũy kế tiền vay chi': luyKe
-    };
+export function computeSoTienVay(vayRecords, dnttRows, fromKey, toKey, opening, mode) {
+  const all = buildSoTienVayRows(vayRecords, dnttRows);
+  const hasOpening = !!(opening && dateKey(opening.ngay) != null && typeof opening.soTien === 'number' && isFinite(opening.soTien));
+  if (mode !== 'dauSo' && (fromKey != null || toKey != null)) {
+    const inKy = (k) => k != null && (fromKey == null || k >= fromKey) && (toKey == null || k <= toKey);
+    const op = hasOpening && inKy(dateKey(opening.ngay)) ? opening : null;
+    const res = ledgerTienVay(all.filter((r) => inKy(dateKey(r['Ngày chung']))), null, null, op);
+    return Object.assign(res, { mode: 'ky', boQuaSoDu: hasOpening && !op });
+  }
+  return Object.assign(ledgerTienVay(all, fromKey, toKey, hasOpening ? opening : null), { mode: mode === 'dauSo' ? 'dauSo' : 'ky', boQuaSoDu: false });
+}
+
+/** Dòng vay (TH_VAY) + dòng chi (THTT_NH) chưa sắp xếp. */
+function buildSoTienVayRows(vayRecords, dnttRows) {
+  const all = [];
+  (vayRecords || []).forEach((r) => {
+    if (!r || !(r.tongTienVay > 0)) return;
+    all.push({ 'Ngày chung': r.ngayHachToan, 'Ngày hạch toán': r.ngayHachToan, 'Ngày chứng từ': r.ngayChungTu || null,
+      'Tổng tiền vay': r.tongTienVay, 'Ngày thanh toán': null, 'Số tấn': 0, 'Tổng tiền chi': 0, 'Họ tên Chủ rừng': '' });
   });
-  return { rows: out, totalVay, totalChi, luyKeCuoi: luyKe };
+  (dnttRows || []).forEach((r) => {
+    all.push({ 'Ngày chung': r['Ngày thanh toán'] || null, 'Ngày hạch toán': null, 'Ngày chứng từ': null, 'Tổng tiền vay': 0,
+      'Ngày thanh toán': r['Ngày thanh toán'] || null, 'Số tấn': parseNum(r['Khối lượng']) || 0,
+      'Tổng tiền chi': parseNum(r['Thành tiền']) || 0, 'Họ tên Chủ rừng': r['Họ tên Chủ rừng'] || '' });
+  });
+  return all;
+}
+
+/** Lập sổ trên các dòng đã có (lũy kế từ dòng đầu; dòng trước fromKey vào "Số dư đầu kỳ"). opening đã kiểm tra hợp lệ. */
+function ledgerTienVay(all, fromKey, toKey, opening) {
+  // Xếp tăng theo Ngày chung, ổn định (cùng ngày: dòng vay trước, dòng chi theo thứ tự DNTT_CT);
+  // không có ngày ⇒ đầu sổ (như Table.Sort của Power Query).
+  let sorted = sortByNumKey(all, (r) => { const k = dateKey(r['Ngày chung']); return k == null ? -1 : k; });
+  const startFrom = (k0) => { sorted = sorted.filter((r) => { const k = dateKey(r['Ngày chung']); return k != null && k >= k0; }); };
+  const hasOpening = !!opening;
+  let batDau = { loai: '', ngay: null };
+  if (hasOpening) { startFrom(dateKey(opening.ngay)); batDau = { loai: 'nhap', ngay: opening.ngay }; }
+  else {
+    const firstVay = sorted.find((r) => r['Tổng tiền vay'] > 0);
+    if (firstVay) { startFrom(dateKey(firstVay['Ngày chung'])); batDau = { loai: 'giaiNgan', ngay: firstVay['Ngày chung'] }; }
+  }
+  const start0 = hasOpening ? opening.soTien : 0;
+  let soDuDauKy = start0, coTruocKy = hasOpening, luyKe = start0, totalVay = 0, totalChi = 0, soLanVay = 0, soDongChi = 0, totalSoTan = 0;
+  const out = [];
+  sorted.forEach((r) => {
+    const k = dateKey(r['Ngày chung']), vay = r['Tổng tiền vay'], chi = r['Tổng tiền chi'];
+    if (fromKey != null && (k == null || k < fromKey)) { coTruocKy = true; soDuDauKy += vay - chi; luyKe = soDuDauKy; return; }
+    // Không có "Từ ngày": dòng thiếu Ngày chung nằm đầu sổ và được hiện (như Power Query).
+    const inKy = k == null ? fromKey == null : inDateRange(r['Ngày chung'], fromKey, toKey);
+    if (!inKy) return; // sau "Đến ngày"
+    luyKe += vay - chi; totalVay += vay; totalChi += chi;
+    if (vay > 0) soLanVay++;
+    if (chi > 0) { soDongChi++; totalSoTan += r['Số tấn'] || 0; }
+    out.push(Object.assign({ STT: out.length + 1 }, r, { 'Chênh lệch': vay - chi, 'Lũy kế tiền vay chi': luyKe }));
+  });
+  if (coTruocKy) {
+    out.unshift({ STT: null, 'Ngày chung': null, 'Ngày hạch toán': null, 'Ngày chứng từ': null, 'Tổng tiền vay': null,
+      'Ngày thanh toán': null, 'Số tấn': null, 'Tổng tiền chi': null, 'Họ tên Chủ rừng': 'Số dư đầu kỳ (lũy kế trước kỳ)',
+      'Chênh lệch': null, 'Lũy kế tiền vay chi': soDuDauKy, _opening: true, _label: 'Số dư đầu kỳ' });
+  }
+  return { rows: out, totalVay, totalChi, luyKeCuoi: luyKe, soDuDauKy, soLanVay, soDongChi, totalSoTan, batDau };
+}
+
+/**
+ * [2026-10-29] Tổng hợp thanh toán = query THTT_NH của người dùng: DNTT_CT (Google Sheet) giữ Họ tên Chủ
+ * rừng, Ngày thanh toán, Khối lượng, Thành tiền; Ngày chung = Ngày thanh toán. Lọc theo Ngày thanh toán
+ * trong kỳ, xếp tăng theo ngày (cùng ngày giữ thứ tự DNTT_CT).
+ * Kèm số liệu cho thẻ tổng: soChuRung (số chủ rừng khác nhau), soNgay (số ngày có thanh toán),
+ * topChuRung {ten, tien} (chủ rừng nhận nhiều tiền nhất trong kỳ).
+ */
+export function computeTongHopThanhToan(dnttRows, fromKey, toKey) {
+  let rows = (dnttRows || []).filter((r) => inDateRange(r['Ngày thanh toán'], fromKey, toKey));
+  rows = sortByNumKey(rows, (r) => dateKey(r['Ngày thanh toán']));
+  let totalKL = 0, totalTien = 0;
+  const byChuRung = new Map(), ngay = new Set();
+  const out = rows.map((r) => {
+    const kl = parseNum(r['Khối lượng']) || 0, tien = parseNum(r['Thành tiền']) || 0;
+    totalKL += kl; totalTien += tien;
+    // [2026-10-29] Số liệu cho thẻ tổng: chủ rừng (gộp không phân biệt hoa/thường, khoảng trắng) và ngày.
+    const ten = String(r['Họ tên Chủ rừng'] || '').trim().replace(/\s+/g, ' ');
+    if (ten) { const k = ten.toUpperCase(), cur = byChuRung.get(k) || { ten, tien: 0 }; cur.tien += tien; byChuRung.set(k, cur); }
+    const dk = dateKey(r['Ngày thanh toán']); if (dk != null) ngay.add(dk);
+    return { 'Họ tên Chủ rừng': r['Họ tên Chủ rừng'] || '', 'Ngày thanh toán': r['Ngày thanh toán'] || null, 'Khối lượng': kl, 'Thành tiền': tien, 'Ngày chung': r['Ngày thanh toán'] || null };
+  });
+  let topChuRung = null;
+  byChuRung.forEach((v) => { if (!topChuRung || v.tien > topChuRung.tien) topChuRung = v; });
+  return { rows: out, totalKL, totalTien, soChuRung: byChuRung.size, soNgay: ngay.size, topChuRung };
 }
 
 /**

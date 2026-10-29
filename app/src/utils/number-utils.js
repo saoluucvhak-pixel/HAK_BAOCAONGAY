@@ -1,8 +1,10 @@
 /**
  * [UTILS] Hàm thuần xử lý số — parse số từ chuỗi CSV (nhiều định dạng VN/quốc tế),
- * format hiển thị tiền/khối lượng. Logic GIỮ NGUYÊN so với bản gốc.
+ * format hiển thị tiền/khối lượng (theo chuẩn HAK — xem utils/hak-format.js).
  * @module utils/number-utils
  */
+
+import { formatMoney, formatQuantity } from './hak-format.js';
 
 /** Cache kết quả parseNum theo chuỗi gốc (PERF-04). @type {Map<string, number>} */
 const _numCache = new Map();
@@ -53,29 +55,21 @@ function _parseNumUncached(v) {
 }
 
 /**
- * [PERF-05] Bộ định dạng số tạo 1 lần, dùng lại. Theo đặc tả ECMA-402,
- * `x.toLocaleString(locale, opts)` (bản cũ) chính là `new Intl.NumberFormat(locale, opts).format(x)`
- * — tức là MỖI lần gọi đều tạo lại 1 bộ định dạng mới (tốn kém). Kết quả chuỗi GIỐNG HỆT. Chỉ dùng
- * bộ định dạng cache khi đầu vào đúng là kiểu number; kiểu khác vẫn đi đường cũ để giữ nguyên
- * hành vi 100% (vd chuỗi '12' gọi `.toLocaleString()` của String, khác với Number).
+ * [CHUẨN HAK — 2026-10-29] Hiển thị tiền/khối lượng theo HAK_ACCOUNTING_REPORT_STANDARD (xem
+ * utils/hak-format.js): tiền là số nguyên KHÔNG kèm "đ" (đơn vị ghi ở tiêu đề báo cáo); khối lượng
+ * luôn đủ 2 chữ số lẻ để cột thẳng hàng. Chỉ đổi cách HIỂN THỊ — số liệu tính toán giữ nguyên.
  */
-const _hasIntl = typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function';
-const _fmtInt = _hasIntl ? new Intl.NumberFormat('vi-VN') : null;
-const _fmtKL = _hasIntl ? new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }) : null;
-
-/** @param {number} n @returns {string} vd "1.234.567 đ" */
+/** @param {number} n @returns {string} vd "1.234.567" */
 export function fmtMoney(n) {
   if (n == null || isNaN(n)) return '';
-  const neg = n < 0;
-  n = Math.abs(Math.round(n));
-  return (neg ? '-' : '') + (_fmtInt ? _fmtInt.format(n) : n.toLocaleString('vi-VN')) + ' đ';
+  return formatMoney(Number(n));
 }
 
-/** @param {number} n @returns {string} vd "1.234,56" (tối đa 2 chữ số thập phân) */
+/** @param {number} n @returns {string} vd "1.234,50" (đúng 2 chữ số thập phân) */
 export function fmtKL(n) {
   if (n == null || isNaN(n)) return '';
-  if (_fmtKL && typeof n === 'number') return _fmtKL.format(n);
-  return n.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+  if (typeof n === 'number') return formatQuantity(n);
+  return String(n); // giữ hành vi cũ với giá trị không phải số (chuỗi giữ nguyên)
 }
 
 /** Làm tròn xuống hàng nghìn gần nhất (dùng cho tính tiền hỗ trợ/hoa hồng). @param {number} x */

@@ -14,10 +14,11 @@ import { CONGNO_COLS, HOAHONG_COLS, HOTRO_COLS, NHAPKEO_COLS, THANHTOAN_COLS, TO
 import { libs } from '../export-libs.js';
 import { computeCongNo, computeHoTroOrTroGia, computeHoaHongDL, computeNhapKeo, computeThanhToan, computeTongHopHoTro, computeTongHopNgay, computeXeCho1h, sumCols } from '../report-service.js';
 import { STATE, TABLES } from '../../store/state.js';
-import { dateKeyToday, fmtDate, fmtTime, pad2, toKeyFromInput } from '../../utils/date-utils.js';
+import { dateKeyToday, fmtDate, fmtTime, pad2, toExcelDate, toKeyFromInput } from '../../utils/date-utils.js';
+import { alignOf } from '../../utils/hak-format.js';
 import { $, downloadBlob } from '../../utils/dom-utils.js';
 import { RESULTS } from '../../legacy-app.js';
-import { companyNameFor, ddmmyyyy, reportDateLabel, reportTitle } from './report-meta.js';
+import { companyNameFor, ddmmyyyy, reportDateLabel, reportTitle, unitNote } from './report-meta.js';
 
 /* Dựng 1 sheet Excel (ExcelJS) theo đúng bố cục mẫu, có định dạng: tên công ty / tiêu đề / ngày /
    tiêu đề cột in đậm có nền / số có định dạng phân cách nghìn / viền ô / dòng Tổng cộng in đậm / độ rộng cột hợp lý */
@@ -69,21 +70,20 @@ function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName
   ws.mergeCells(2,1,2,ncols);
   var c2 = ws.getCell(2,1); c2.value = title; c2.font = { bold:true, size:13 }; c2.alignment = { horizontal:'center' };
   ws.mergeCells(3,1,3,ncols);
-  var c3 = ws.getCell(3,1); c3.value = dateLabel; c3.font = { size:10, italic:true, color:{argb:'FF555555'} }; c3.alignment = { horizontal:'center' };
+  var c3 = ws.getCell(3,1); c3.value = dateLabel + unitNote(cols, dateLabel); c3.font = { size:10, italic:true, color:{argb:'FF555555'} }; c3.alignment = { horizontal:'center' };
   ws.getRow(1).height = 20; ws.getRow(2).height = 18;
   // đường kẻ mảnh dưới khối tiêu đề để tách biệt với bảng dữ liệu
-  for (var ci=1; ci<=ncols; ci++){ ws.getCell(4,ci).border = { bottom:{style:'thin', color:{argb:'FFB7C6D6'}} }; }
+  for (var ci=1; ci<=ncols; ci++){ ws.getCell(4,ci).border = { bottom:{style:'thin', color:{argb:BRAND.lineARGB}} }; }
 
   var headerRowIdx = 5;
   var headerRow = ws.getRow(headerRowIdx);
   cols.forEach(function(c,i){
-    var isNum = (c[2]==='money'||c[2]==='kl'||c[2]==='int');
     var cell = headerRow.getCell(i+1);
     cell.value = c[1];
     cell.font = { bold:true, color:{argb:BRAND.headerTextARGB} };
     cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:BRAND.headerFillARGB }, bgColor:{ argb:BRAND.headerFillARGB } };
     cell.border = THIN_BORDER;
-    cell.alignment = { vertical:'middle', horizontal: isNum ? 'right' : 'left', wrapText:true };
+    cell.alignment = { vertical:'middle', horizontal: alignOf(c[2]), wrapText:true };
   });
   headerRow.height = 30;
   headerRow.commit();
@@ -95,18 +95,23 @@ function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName
       var isNum = (c[2]==='money'||c[2]==='kl'||c[2]==='int');
       var cell = row.getCell(i+1);
       var v = r[c[0]];
-      if (isNum){
+      if (i === 0 && r._label){
+        cell.value = r._label; cell.font = { italic:true }; // dòng "Số dư đầu kỳ"
+      } else if (isNum){
         cell.value = (v==null||isNaN(v)) ? null : v;
         cell.numFmt = c[2]==='kl' ? '#,##0.00' : '#,##0';
         cell.alignment = { horizontal:'right' };
       } else if (c[2]==='date'){
-        cell.value = fmtDate(v);
+        // [CHUẨN HAK] Ô ngày là NGÀY THẬT của Excel (lọc/sắp xếp/tính được), hiển thị dd/mm/yyyy.
+        cell.value = toExcelDate(v);
+        cell.numFmt = 'dd/mm/yyyy';
         cell.alignment = { horizontal:'center' };
       } else if (c[2]==='time'){
         cell.value = fmtTime(v);
         cell.alignment = { horizontal:'center' };
       } else if (c[2]==='datekey'){
-        cell.value = fmtCell(v,'datekey');
+        cell.value = toExcelDate(v == null ? null : String(v).replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3'));
+        cell.numFmt = 'dd/mm/yyyy';
         cell.alignment = { horizontal:'center' };
       } else {
         cell.value = v==null ? '' : v;
@@ -121,7 +126,6 @@ function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName
   if (totals){
     var totalRow = ws.getRow(headerRowIdx+1+rows.length);
     cols.forEach(function(c,i){
-      var isNum = (c[2]==='money'||c[2]==='kl'||c[2]==='int');
       var cell = totalRow.getCell(i+1);
       if (i===0){ cell.value = 'Tổng cộng'; }
       else if (totals.hasOwnProperty(c[0])){
@@ -258,7 +262,7 @@ export async function exportLamSanExcel(){
 export async function exportBankExcel(){
   if (!RESULTS){ alert('Chưa có dữ liệu báo cáo. Hãy bấm LẬP BÁO CÁO trước.'); return; }
   var workbook = new libs.ExcelJS.Workbook();
-  var sheets = [ ['tienvay', 'SO_CHITIET_TIENVAY'], ['tndn', 'BK02_TNDN'], ['pnk', 'PHIEU_NHAPKHO'] ];
+  var sheets = [ ['tienvay', 'BKCT_TIENVAY'], ['thtt', 'THTT_NH'], ['tndn', 'BK02_TNDN'], ['pnk', 'PHIEU_NHAPKHO'] ];
   sheets.forEach(function(s){
     var key = s[0], sheetName = s[1];
     var st = TABLES[key];

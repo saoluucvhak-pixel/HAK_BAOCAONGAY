@@ -7,6 +7,20 @@ trước khi giao" đã thống nhất).
 
 ---
 
+## [Rà soát 30/10/2026] Sao lưu dữ liệu hỏng hẳn khi máy không đọc được kho khoản vay
+
+**Phát hiện khi rà soát toàn bộ code (không phải người dùng báo):** từ Phase 4.4, nút "Sao lưu" đọc thêm kho
+khoản vay (IndexedDB). Máy chặn IndexedDB (chính sách bảo mật, chế độ riêng tư) hoặc kho lỗi ⇒ cả bản sao lưu
+báo "Lỗi tạo file sao lưu" và KHÔNG tải file nào — mất luôn khả năng sao lưu Danh mục/Cấu hình vốn chạy được
+trước đó.
+
+**Sửa:** `services/backup-restore.js` — lỗi đọc khoản vay chỉ ghi nhật ký; vẫn tải file (không có trường
+`khoanVay` ⇒ khôi phục file đó giữ nguyên khoản vay đang có) và báo rõ "file này KHÔNG có khoản vay" kèm lý do.
+
+**Kiểm chứng:** `test:backup-noidb` — bản trước: 0/2 (không có file); bản sửa: 4/4.
+
+---
+
 ## [Không phải lỗi do tách file] "Failed to fetch" khi double-click `dist/index.html` trực tiếp
 
 **Người dùng báo:** mở `dist/index.html` bằng double-click thấy "Lỗi tải dữ liệu: PHIEUCAN:
@@ -413,3 +427,28 @@ in
   dòng lẽ ra không nên xuất hiện trong báo cáo này).
 - `npm run test:ui` (đã cập nhật baseline vì đây là thay đổi hành vi CHỦ ĐỘNG, đã xác nhận bằng
   chứng) và `npm run test:features` đều PASS sau khi sửa.
+
+## BUG-TV01 (29/10/2026) — Tải "Sổ chi tiết tiền vay" bị treo "Đang đọc file..."
+
+- **Tái hiện:** file Excel có 1 dòng trống hoặc dòng "Tổng cộng"/"Total" → Worker đọc file thoát
+  giữa chừng (`return` thay cho `continue` của bản gốc), không gửi kết quả → treo vĩnh viễn.
+- **Sửa:** `src/services/excel-import-worker.js` — trả lại `continue` (2 dòng).
+- **Bằng chứng:** `npm run test:tienvay-import` — trước sửa 4 đạt / 9 lỗi, sau sửa 13/13.
+
+## BUG-TV02 (29/10/2026) — Ngày trong file Excel tiền vay bị lùi 1 ngày (có từ bản gốc)
+
+- **Tái hiện:** máy đặt giờ Việt Nam, file `ChungTuNganHang_DH.xlsx` ô Ngày chung 23/12/2025 → app đọc
+  thành 22/12/2025 (cả 7.437 dòng). SheetJS `cellDates:true` trả Date 16:59:30Z ngày hôm trước (giờ lịch
+  sử +7:06:30), bản gốc lấy `getUTC*` ⇒ lùi 1 ngày ⇒ Sổ chi tiết xếp sai ngày, tổng theo kỳ sai.
+  Đo trên kỳ 10/06–30/06/2026: tổng vay app cũ 12.599.999.683 ≠ đúng 13.399.999.653.
+- **Sửa:** `excel-import-worker.js` đọc số ngày Excel gốc + mã định dạng ô (`cellNF:true`), đổi bằng
+  `XLSX.SSF.parse_date_code` (theo lịch, không qua múi giờ).
+- **Bằng chứng:** `npm run test:khoanvay` (Chromium đặt giờ Asia/Ho_Chi_Minh): 30/08/2026 hiện đúng 30/08/2026.
+
+## Rủi ro mất dữ liệu đã chặn khi làm tab "Cập nhật khoản vay" (29/10/2026)
+
+- File thật có **43 dòng giống hệt nhau** nhưng đều là bút toán thật (cùng ngày, chủ rừng, số tiền). Cách
+  chống trùng "bỏ dòng đã thấy" làm mất 417.171.000 đồng tiền chi → đổi sang so theo SỐ LẦN xuất hiện.
+- File mẫu cũ hướng dẫn ghi "PC0001" vào cột Ngày chứng từ → dòng như vậy được GIỮ NGUYÊN chữ + cảnh
+  báo, không bị từ chối (chỉ Ngày chung bắt buộc đúng ngày). File mẫu mới dùng ô ngày thật.
+- Dòng 0 đồng có chủ rừng (có trong sổ thật) được giữ.

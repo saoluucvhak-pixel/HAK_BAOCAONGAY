@@ -7,7 +7,10 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 export default defineConfig({
   plugins: [viteSingleFile()],
   build: {
-    target: 'es2018',
+    // [2026-10-29] es2018 → es2020: thư viện chuẩn HAK_ACCOUNTING_REPORT_STANDARD (định dạng số) dùng
+    // BigInt để không sai chữ số với số rất lớn — es2018 không có. es2020 chạy trên Chrome/Edge ≥ 80
+    // (2020) và Electron của bản cài; không phải sửa/chép lại thư viện chuẩn.
+    target: 'es2020',
     cssCodeSplit: false,
     assetsInlineLimit: 100 * 1024 * 1024, // nhúng toàn bộ asset (kể cả font base64) vào 1 file
     chunkSizeWarningLimit: 10 * 1024 // file to do nhung font Roboto base64, tat canh bao mac dinh

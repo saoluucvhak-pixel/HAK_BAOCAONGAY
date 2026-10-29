@@ -58,10 +58,13 @@ export const TAUTONGHOP_COLS = [ ['STT','STT','int'], ['Tàu','Tàu','text'], ['
   ['Số dòng BKLS','Số dòng BKLS','int'], ['Khối lượng_Tấn','Khối lượng (tấn)','kl'], ['Tổng thanh toán','Tổng thanh toán','money'],
   ['Ngày gán gần nhất','Ngày gán gần nhất','text'] ];
 /* [Báo cáo ngân hàng] */
-export const BANKVAY_COLS = [ ['STT','STT','int'], ['Ngày chung','Ngày chung','date'], ['Ngày hạch toán','Ngày hạch toán','date'],
-  ['Ngày chứng từ','Ngày chứng từ','date'], ['Tổng tiền vay','Tổng tiền vay','money'], ['Ngày thanh toán','Ngày thanh toán','date'],
-  ['Số tấn','Số tấn','kl'], ['Tổng tiền chi','Tổng tiền chi','money'], ['Họ tên Chủ rừng','Họ tên Chủ rừng','text'],
-  ['Chênh lệch','Chênh lệch','money'], ['Lũy kế tiền vay chi','Lũy kế tiền vay chi','money'] ];
+// [2026-10-29] Đúng mẫu "BẢNG KÊ CHI TIẾT TIỀN VAY" người dùng gửi (7 cột, không STT/Ngày chung/Chủ rừng/Chênh lệch).
+export const BANKVAY_COLS = [ ['Ngày hạch toán','Ngày hạch toán','date'], ['Ngày chứng từ','Ngày chứng từ','date'],
+  ['Tổng tiền vay','Tổng tiền vay','money'], ['Ngày thanh toán','Ngày thanh toán','date'], ['Số tấn','Số tấn','kl'],
+  ['Tổng tiền chi','Tổng tiền chi','money'], ['Lũy kế tiền vay chi','Lũy kế tiền vay chi','money'] ];
+// [2026-10-29] Tổng hợp thanh toán = query THTT_NH (DNTT_CT): đúng các cột của sheet THTT_NH.
+export const BANKTHTT_COLS = [ ['Họ tên Chủ rừng','Họ tên Chủ rừng','text'], ['Ngày thanh toán','Ngày thanh toán','date'],
+  ['Khối lượng','Khối lượng','kl'], ['Thành tiền','Thành tiền','money'], ['Ngày chung','Ngày chung','date'] ];
 export const BANKTNDN_COLS = [ ['STT','STT','int'], ['Ngày tháng năm mua hàng','Ngày mua hàng','date'], ['Tên người bán','Tên người bán','text'],
   ['Địa chỉ','Địa chỉ','text'], ['Số CCCD','Số CCCD','text'], ['Số Điện thoại','Số điện thoại','text'],
   ['Tên hàng hóa/dịch vụ','Tên hàng hóa/dịch vụ','text'], ['Số lượng/trọng lượng','Số lượng/trọng lượng','kl'],
@@ -71,7 +74,7 @@ export const BANKPNK_COLS = [ ['STT','STT','int'], ['Ngày nhập kho','Ngày nh
   ['Số CT','Số CT','text'] ];
 
 /** Danh sách key của 14 báo cáo, dùng cho export "Xuất tất cả" và điều hướng In/PDF chung. */
-export const REPORT_KEYS = ['nhapkeo','thanhtoan','congno','xecho','tonghop','hotro','trogia','tonghoptro','hoahong','bklsct','bklsth','tautonghop','tienvay','tndn','pnk'];
+export const REPORT_KEYS = ['nhapkeo','thanhtoan','congno','xecho','tonghop','hotro','trogia','tonghoptro','hoahong','bklsct','bklsth','tautonghop','tienvay','thtt','tndn','pnk'];
 
 /** Tiêu đề in đúng theo tên báo cáo trong file Excel mẫu (BaoCaoNgay_DH_*.xlsx). */
 export const REPORT_TITLES = {
@@ -87,7 +90,8 @@ export const REPORT_TITLES = {
   bklsct: 'BẢNG KÊ LÂM SẢN XUẤT KHẨU — CHI TIẾT',
   bklsth: 'BẢNG KÊ LÂM SẢN XUẤT KHẨU — TỔNG HỢP',
   tautonghop: 'BÁO CÁO TỔNG HỢP NGUYÊN LIỆU XUẤT THEO TÀU',
-  tienvay: 'SỔ CHI TIẾT TIỀN VAY',
+  tienvay: 'BẢNG KÊ CHI TIẾT TIỀN VAY',
+  thtt: 'BẢNG TỔNG HỢP THANH TOÁN',
   tndn: 'BẢNG KÊ THU MUA HÀNG HÓA, DỊCH VỤ KHÔNG CÓ HÓA ĐƠN (MẪU 02/TNDN)',
   // "BẢNG KÊ PHIẾU NHẬP KHO" chỉ dùng cho In/PDF/Excel chung (bảng liệt kê) — khác với tiêu đề
   // "PHIẾU NHẬP KHO" hardcode riêng trong export-service (mẫu 01-VT in từng ngày) — cố ý, không phải lỗi.
