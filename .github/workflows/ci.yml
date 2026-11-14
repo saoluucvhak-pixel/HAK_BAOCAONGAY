@@ -1,0 +1,30 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Các test trỏ cố định tới /opt/pw-browsers/chromium (môi trường phát triển) → trỏ về Chromium của Playwright.
+      - run: sudo mkdir -p /opt/pw-browsers && sudo ln -sf "$(node -e "console.log(require('playwright').chromium.executablePath())")" /opt/pw-browsers/chromium
+      - run: npm run build
+      - run: npm run lint
+      - run: npm test
+      # Cảnh báo lỗ hổng thư viện (xlsx chưa có bản vá; jsPDF/autotable cần nâng major) — chưa chặn CI.
+      - run: npm audit --omit=dev
+        continue-on-error: true
