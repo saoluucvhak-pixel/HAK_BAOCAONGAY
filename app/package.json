@@ -51,8 +51,11 @@
     "@hak/smart-filter": "github:saoluucvhak-pixel/HAK_SMART_FILTER#5181681",
     "chart.js": "4.4.1",
     "exceljs": "4.4.0",
-    "jspdf": "2.5.1",
-    "jspdf-autotable": "3.8.1",
+    "jspdf": "4.2.1",
+    "jspdf-autotable": "5.0.9",
     "xlsx": "0.18.5"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   }
 }

@@ -10,14 +10,14 @@
  * dạng CHUỖI (`?raw`) — trình duyệt chỉ lướt qua chuỗi lúc mở app (rất nhanh), chưa dịch/chạy. Lần
  * đầu bấm xuất file, chuỗi được nạp thành <script> (qua Blob URL) đúng 1 lần, các lần sau dùng lại.
  * Đây là đúng bản dựng cho trình duyệt của chính các thư viện đang dùng (ExcelJS: `browser` =
- * dist/exceljs.min.js — y hệt file trước đây được đóng gói; jsPDF 2.5.1 bản UMD cùng phiên bản),
+ * dist/exceljs.min.js — y hệt file trước đây được đóng gói; jsPDF 4.2.1 bản UMD cùng phiên bản),
  * nên file xuất ra GIỐNG HỆT — kiểm chứng bằng `npm run test:export-golden` (36 file, từng ô/từng chữ).
  * Không dùng eval: chỉ nạp mã thư viện đóng gói sẵn của chính app, không nạp mã từ dữ liệu/người dùng.
  * @module services/export-libs
  */
 import excelJsSrc from 'exceljs/dist/exceljs.min.js?raw';
 import jsPdfSrc from 'jspdf/dist/jspdf.umd.min.js?raw';
-import autoTableSrc from 'jspdf-autotable?raw'; // = dist/jspdf.plugin.autotable.js, đúng file trước đây được đóng gói
+import autoTableSrc from '../../node_modules/jspdf-autotable/dist/jspdf.plugin.autotable.js?raw'; // bản UMD; v5 'exports' trỏ sang .mjs nên nạp thẳng theo đường dẫn file
 
 /** Thư viện sau khi nạp: `libs.ExcelJS`, `libs.jsPDF` (null cho tới khi gọi ensureExportLibs()). */
 export const libs = { ExcelJS: null, jsPDF: null };
