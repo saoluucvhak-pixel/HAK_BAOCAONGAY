@@ -1,9 +1,12 @@
 name: Release installer
 
 # Đóng bộ cài app desktop "Báo cáo ngày" (Windows) — chạy tay: tab Actions → "Release installer" → Run workflow.
-# Kết quả nằm trong Artifacts của lần chạy: file Setup .exe, các phần .part (≤ 28 MB), GHEP_FILE.bat, HUONG_DAN_GHEP_FILE.txt.
+# Kết quả được đăng lên mục Releases của repo (tải từng file trực tiếp) và nằm trong Artifacts của lần chạy: file Setup .exe, các phần .part (≤ 28 MB), GHEP_FILE.bat, HUONG_DAN_GHEP_FILE.txt.
 on:
   workflow_dispatch:
+
+permissions:
+  contents: write   # tạo GitHub Release
 
 jobs:
   installer:
@@ -42,3 +45,17 @@ jobs:
             desktop-app/release/HUONG_DAN_GHEP_FILE.txt
           if-no-files-found: error
           retention-days: 30
+
+      # Đăng lên Releases để tải trực tiếp từng file (không cần tải zip Artifacts).
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./desktop-app/package.json').version")
+          TAG="installer-v${VERSION}-${{ github.run_number }}"
+          gh release create "$TAG" \
+            desktop-app/release/*.exe desktop-app/release/*.part \
+            desktop-app/release/GHEP_FILE.bat desktop-app/release/HUONG_DAN_GHEP_FILE.txt \
+            --title "Bộ cài Báo cáo ngày ${VERSION} (lần ${{ github.run_number }})" \
+            --notes "Bộ cài desktop Báo cáo ngày ${VERSION}, đóng từ commit ${{ github.sha }}. Tải các file .part cùng GHEP_FILE.bat vào một thư mục, nhấp đúp GHEP_FILE.bat; hoặc tải thẳng file Setup .exe."
