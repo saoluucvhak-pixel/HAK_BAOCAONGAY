@@ -1,0 +1,44 @@
+name: Release installer
+
+# Đóng bộ cài app desktop "Báo cáo ngày" (Windows) — chạy tay: tab Actions → "Release installer" → Run workflow.
+# Kết quả nằm trong Artifacts của lần chạy: file Setup .exe, các phần .part (≤ 28 MB), GHEP_FILE.bat, HUONG_DAN_GHEP_FILE.txt.
+on:
+  workflow_dispatch:
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            app/package-lock.json
+            desktop-app/package-lock.json
+
+      # Bản web mới nhất (desktop-app/scripts/release.mjs chép app/dist/index.html vào app desktop)
+      - name: Build web
+        working-directory: app
+        run: |
+          npm ci
+          npm run build
+          npm run build:config
+
+      - name: Build installer
+        working-directory: desktop-app
+        run: |
+          npm ci
+          npm run release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaoCaoNgay-installer
+          path: |
+            desktop-app/release/*.exe
+            desktop-app/release/*.part
+            desktop-app/release/GHEP_FILE.bat
+            desktop-app/release/HUONG_DAN_GHEP_FILE.txt
+          if-no-files-found: error
+          retention-days: 30
