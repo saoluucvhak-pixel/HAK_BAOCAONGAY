@@ -133,5 +133,20 @@ check('HH: đầu vào rỗng → []', eq(computeHoaHongDL([], {}, dmdl, null, n
 const hhAll = computeHoaHongDL(dntt, pcMap, dmdl, null, null);
 check('HH: không giới hạn kỳ → thêm DL3 (CT8, 9 tấn, không có trong DM → tên "DL3", tiền 0)', hhAll.some((x) => x['Tên Đại lý'] === 'DL3' && x['Khối lượng thanh toán'] === 9 && x['Tiền hoa hồng'] === 0), hhAll.map((x) => x['Tên Đại lý']));
 
+
+// ---- Khoảng trắng thừa ở mã NG (phiếu cân) và mã Đại lý (phiếu cân + danh mục) vẫn khớp
+{
+  const pcSp = [{ So_CT: 'S1', 'Ngày cân 1': '2026-06-10', 'NG': ' D2', 'KL hàng (KG)': '1000', 'ĐL': ' DL9 ' }];
+  const dmSp = [{ 'Nguồn gốc': 'D2', 'Hình thức': 'Hỗ trợ', 'Hỗ trợ': '10000', 'Ngày bắt đầu': '', 'Ngày kết thúc': '' }];
+  const htSp = computeHoTroOrTroGia(pcSp, dmSp, null, null, 'Hỗ trợ', 'Hỗ trợ');
+  check('HT: mã NG của phiếu cân dính khoảng trắng " D2" vẫn khớp danh mục "D2"', htSp.rows ? htSp.rows.length === 1 : htSp.length === 1, htSp);
+  const hhSp = computeHoaHongDL(
+    [{ 'Số CT': 'S1', 'Ngày thanh toán': '2026-06-12', 'Khối lượng': '2' }],
+    { S1: pcSp[0] },
+    [{ 'Đại lý': ' DL9', 'Tên Đại lý': 'Dai Ly 9', 'Sản lượng Min': '0', 'Sản lượng max': '10', 'Hoa hồng': '1000' }],
+    null, null);
+  check('HH: mã ĐL dính khoảng trắng ở cả phiếu cân (" DL9 ") và danh mục (" DL9") vẫn khớp → tên đại lý, tiền 2000', hhSp.length === 1 && hhSp[0]['Tên Đại lý'] === 'Dai Ly 9' && hhSp[0]['Tiền hoa hồng'] === 2000, hhSp);
+}
+
 console.log(`\n=== RESULT: ${pass} passed, ${fail} failed ===`);
 process.exit(fail ? 1 : 0);

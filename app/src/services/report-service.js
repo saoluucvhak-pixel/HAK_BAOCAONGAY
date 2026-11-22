@@ -133,7 +133,7 @@ export function computeHoTroOrTroGia(phieucan, dmht, fromKey, toKey, hinhThuc, t
   const out = [];
   rows.forEach((r) => {
     const canKey = dateKey(r['Ngày cân 1']);
-    const candidates = dmByNG[r['NG']];
+    const candidates = dmByNG[String(r['NG'] == null ? '' : r['NG']).trim()];
     const match = candidates ? candidates.find((d) =>
       (dateKey(d['Ngày bắt đầu']) == null || canKey >= dateKey(d['Ngày bắt đầu'])) &&
       (dateKey(d['Ngày kết thúc']) == null || canKey <= dateKey(d['Ngày kết thúc']))
@@ -187,7 +187,7 @@ export function computeHoaHongDL(dntt, phieucanBySoCT, dmdl, fromKey, toKey) {
   const rows = dntt.filter((r) => r['Ngày thanh toán'] && inDateRange(r['Ngày thanh toán'], fromKey, toKey));
   const map = {};
   rows.forEach((r) => {
-    const pc = phieucanBySoCT[r['Số CT']] || {}, dl = pc['ĐL'] || '(trống)';
+    const pc = phieucanBySoCT[r['Số CT']] || {}, dl = String(pc['ĐL'] == null ? '' : pc['ĐL']).trim() || '(trống)';
     if (!map[dl]) map[dl] = { dl, kl: 0, tuNgay: null, denNgay: null };
     const g = map[dl];
     g.kl += parseNum(r['Khối lượng']) || 0;
@@ -195,7 +195,7 @@ export function computeHoaHongDL(dntt, phieucanBySoCT, dmdl, fromKey, toKey) {
     if (ck != null) { if (g.tuNgay == null || ck < g.tuNgay) g.tuNgay = ck; if (g.denNgay == null || ck > g.denNgay) g.denNgay = ck; }
   });
   const dmdlByKey = {};
-  dmdl.forEach((d) => { const k = d['Đại lý']; if (!(k in dmdlByKey)) dmdlByKey[k] = d; });
+  dmdl.forEach((d) => { const k = String(d['Đại lý'] == null ? '' : d['Đại lý']).trim(); if (!(k in dmdlByKey)) dmdlByKey[k] = d; });
   const out = Object.keys(map).map((k) => {
     const g = map[k], dm = dmdlByKey[k];
     const ten = dm ? dm['Tên Đại lý'] : k, min = dm ? parseNum(dm['Sản lượng Min']) : null, max = dm ? parseNum(dm['Sản lượng max']) : null;
@@ -215,6 +215,9 @@ export function computeHoaHongDL(dntt, phieucanBySoCT, dmdl, fromKey, toKey) {
  * vào ngoài (không tự đọc storageService ở đây) để hàm này vẫn thuần/dễ test như các hàm khác.
  * @param {Object} tauAssignments map { [soBKLS]: {tau, khachHang, ngayGan} } — truyền {} nếu chưa có.
  */
+/** Số thiếu/không đọc được → null (ô trống trên bảng/Excel), không để NaN lọt vào dòng báo cáo. */
+function numOrNull(v) { const n = parseNum(v); return typeof n === 'number' && isFinite(n) ? n : null; }
+
 export function computeXuatHang01(hosokeo, hdmbByKey, fromKey, toKey, tauAssignments) {
   const tau = tauAssignments || {};
   let rows = hosokeo.filter((r) => r['Mã hợp đồng'] && inDateRange(r['Ngày nhập'], fromKey, toKey));
@@ -226,8 +229,8 @@ export function computeXuatHang01(hosokeo, hdmbByKey, fromKey, toKey, tauAssignm
     return {
       STT: i + 1, 'Số BKLS': r['Số BKLS'], 'Ngày BKLS': r['Ngày nhập'], 'Họ và tên người bán': r['Họ và tên chủ rừng'],
       'Số CCCD': r['Mã khách hàng'], 'Tên nguyên liệu': 'Dăm gỗ keo', 'Địa điểm khai thác': r['ĐỊA CHỈ RỪNG'],
-      'Khối lượng (Tấn)': parseNum(r['Khối lượng (Tấn)']), 'Mã hợp đồng': r['Mã hợp đồng'], 'Nhà máy': CONFIG.NHA_MAY,
-      'Đơn giá': parseNum(r['Đơn giá']), 'Thanh toán': parseNum(r['Thanh toán']), 'Địa chỉ thường trú': hd['Địa chỉ thường trú'] || '',
+      'Khối lượng (Tấn)': numOrNull(r['Khối lượng (Tấn)']), 'Mã hợp đồng': r['Mã hợp đồng'], 'Nhà máy': CONFIG.NHA_MAY,
+      'Đơn giá': numOrNull(r['Đơn giá']), 'Thanh toán': numOrNull(r['Thanh toán']), 'Địa chỉ thường trú': hd['Địa chỉ thường trú'] || '',
       'Tàu': ga ? ga.tau : '', 'Khách hàng xuất': ga ? ga.khachHang : ''
     };
   });
@@ -257,7 +260,8 @@ export function computeXuatHang02(rows01) {
     const ck = dateKey(r['Ngày BKLS']);
     if (ck != null && (g.ngayMaxKey == null || ck > g.ngayMaxKey)) { g.ngayMaxKey = ck; g.ngayMax = r['Ngày BKLS']; }
     g.klSum += r['Khối lượng (Tấn)'] || 0;
-    g.dgSum += r['Đơn giá'] || 0; g.dgCnt++;
+    // Đơn giá trung bình chỉ tính các dòng CÓ giá (dòng thiếu giá không kéo trung bình về 0).
+    if (typeof r['Đơn giá'] === 'number' && isFinite(r['Đơn giá'])) { g.dgSum += r['Đơn giá']; g.dgCnt++; }
     g.ttSum += r['Thanh toán'] || 0;
   });
   const out = Object.keys(map).map((k) => {

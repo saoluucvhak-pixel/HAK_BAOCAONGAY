@@ -60,7 +60,7 @@ check('XH01: ghép hợp đồng bán theo khoá "Mã HĐ||Họ tên" → địa
 check('XH01: không khớp hdmb (HD3||Chi) → địa chỉ rỗng', x1.rows[5]['Địa chỉ thường trú'] === '', x1.rows[5]['Địa chỉ thường trú']);
 check('XH01: gán tàu theo Số BKLS (S1 → T1/KH1)', r1['Tàu'] === 'T1' && r1['Khách hàng xuất'] === 'KH1');
 check('XH01: dòng không có tàu (S6) → Tàu/Khách hàng rỗng', r6['Tàu'] === '' && r6['Khách hàng xuất'] === '');
-check('XH01: giá trị số thiếu → NaN trên dòng nhưng không phá tổng', Number.isNaN(r6['Khối lượng (Tấn)']) && Number.isNaN(r6['Thanh toán']) && Number.isNaN(r6['Đơn giá']), [r6['Khối lượng (Tấn)'], r6['Thanh toán']]);
+check('XH01: giá trị số thiếu → null (ô trống) trên dòng, không NaN và không phá tổng', r6['Khối lượng (Tấn)'] === null && r6['Thanh toán'] === null && r6['Đơn giá'] === null, [r6['Khối lượng (Tấn)'], r6['Thanh toán'], r6['Đơn giá']]);
 check('XH01: tauAssignments undefined/null → mọi dòng không tàu, không lỗi', (() => {
   const a = computeXuatHang01(hosokeo, hdmbByKey, K('2026-06-01'), K('2026-06-30'));
   const b = computeXuatHang01(hosokeo, hdmbByKey, K('2026-06-01'), K('2026-06-30'), null);
@@ -89,7 +89,7 @@ const g1 = x2.rows[0];
 check('XH02: nhóm An/T1 → KL 15.5, trị giá 15.5M, đơn giá TB (1M+1M)/2 = 1M', g1['Khối lượng_Tấn'] === 15.5 && g1['Tổng trị giá'] === 15500000 && g1['Đơn giá'] === 1000000, g1);
 check('XH02: nhóm An/T1 mang Tàu T1, KH1, Mã HS cấu hình, địa chỉ', g1['Tàu'] === 'T1' && g1['Khách hàng xuất'] === 'KH1' && g1['Mã HS'] === '4401220090' && g1['Địa chỉ thường trú'] === 'Dia chi An');
 const gS6 = x2.rows[1];
-check('XH02: dòng không tàu (S6, số thiếu) → Tàu rỗng, KL 0, đơn giá 0 (NaN xem như 0, vẫn đếm 1 dòng)', gS6['Tàu'] === '' && gS6['Khối lượng_Tấn'] === 0 && gS6['Đơn giá'] === 0 && gS6['Tổng trị giá'] === 0, gS6);
+check('XH02: dòng không tàu (S6, số thiếu) → Tàu rỗng, KL 0, đơn giá 0 (không có dòng nào có giá → 0)', gS6['Tàu'] === '' && gS6['Khối lượng_Tấn'] === 0 && gS6['Đơn giá'] === 0 && gS6['Tổng trị giá'] === 0, gS6);
 check('XH02: cùng người bán Binh nhưng khác tàu → 2 dòng riêng (S6 vs S3)', gS6['Họ và tên người bán'] === 'Binh' && x2.rows[2]['Họ và tên người bán'] === 'Binh' && x2.rows[2]['Tàu'] === 'T2');
 check('XH02: nhóm Binh/T2 = S3: KL 4, đơn giá 2M, trị giá 8M', x2.rows[2]['Khối lượng_Tấn'] === 4 && x2.rows[2]['Đơn giá'] === 2000000 && x2.rows[2]['Tổng trị giá'] === 8000000);
 check('XH02: An/T2 tách riêng khỏi An/T1 (S9: 2 tấn, 2M)', x2.rows[3]['Họ và tên người bán'] === 'An' && x2.rows[3]['Tàu'] === 'T2' && x2.rows[3]['Khối lượng_Tấn'] === 2 && x2.rows[3]['Tổng trị giá'] === 2000000);
@@ -103,7 +103,7 @@ const t02 = computeXuatHang02([
 ]);
 check('XH02: khác CCCD → không gộp (2 nhóm)', t02.rows.length === 2, t02.rows.length);
 const tA = t02.rows.find((r) => r['Số CCCD'] === '1');
-check('XH02: nhóm CCCD=1 (3 dòng, 1 ngày hỏng, giá trị null): KL 1+3+0=4, trị giá 100, đơn giá TB (10+30+0)/3', tA['Khối lượng_Tấn'] === 4 && tA['Tổng trị giá'] === 100 && Math.abs(tA['Đơn giá'] - 40 / 3) < 1e-9, tA);
+check('XH02: nhóm CCCD=1 (3 dòng, 1 ngày hỏng, 1 dòng thiếu giá): KL 1+3+0=4, trị giá 100, đơn giá TB chỉ tính dòng có giá (10+30)/2 = 20', tA['Khối lượng_Tấn'] === 4 && tA['Tổng trị giá'] === 100 && tA['Đơn giá'] === 20, tA);
 check('XH02: Ngày nhập của nhóm = ngày lớn nhất hợp lệ (02/06), bỏ qua ngày hỏng và thứ tự đầu vào', tA['Ngày nhập'] === '2026-06-02', tA['Ngày nhập']);
 check('XH02: đầu vào rỗng → rỗng, tổng 0', (() => { const e = computeXuatHang02([]); return e.rows.length === 0 && e.totalKL === 0 && e.totalTT === 0; })());
 check('XH02: không sửa rows đầu vào', JSON.stringify(x1.rows).length > 0 && x1.rows[0].STT === 1 && x1.rows[0]['Khối lượng (Tấn)'] === 5.5 && !('klSum' in x1.rows[0]));
