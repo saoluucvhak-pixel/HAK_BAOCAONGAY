@@ -57,6 +57,8 @@ function toIsoDateCells(ws) {
     var p = XLSX.SSF.parse_date_code(c.v);
     if (!p) return;
     c.t = 's'; c.v = p.y + '-' + (p.m < 10 ? '0' : '') + p.m + '-' + (p.d < 10 ? '0' : '') + p.d;
+    // SheetJS 0.20+: ô chuỗi còn mã định dạng ngày (z) / chữ hiển thị (w) cũ thì sheet_to_json(raw) trả null ⇒ xoá 2 thuộc tính này.
+    delete c.z; delete c.w;
   });
 }
 function findHeader(grid, keys) {
