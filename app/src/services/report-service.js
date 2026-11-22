@@ -555,22 +555,24 @@ export function computeTongHopThanhToan(dnttRows, fromKey, toKey) {
  * @param {Object} hdnccBySoHopDong - map Số hợp đồng -> dòng HD_NCC (STATE.hdnccBySoHopDong)
  */
 export function computeBankTNDN(dntt, phieucanBySoCT, hdnccBySoHopDong, fromKey, toKey) {
-  let filtered = dntt.filter((r) => {
+  // Ngày cân 1 của từng dòng DNTT giữ trong cặp {r, ngayCan1} (tra map 1 lần) — KHÔNG gán lên chính dòng DNTT
+  // đầu vào (STATE) để không làm bẩn dữ liệu gốc.
+  let filtered = [];
+  dntt.forEach((r) => {
     const pc = phieucanBySoCT[r['Số CT']];
     const ngayCan1 = pc ? pc['Ngày cân 1'] : null;
-    r.__ngayCan1 = ngayCan1; // dùng lại bên dưới, tránh tra map 2 lần
-    return inDateRange(ngayCan1, fromKey, toKey);
+    if (inDateRange(ngayCan1, fromKey, toKey)) filtered.push({ r: r, ngayCan1: ngayCan1 });
   });
-  filtered = sortByNumKey(filtered, (r) => dateKey(r.__ngayCan1));
+  filtered = sortByNumKey(filtered, (x) => dateKey(x.ngayCan1));
   let maxKey = null, maxDate = null, totalSL = 0, totalTT = 0;
-  const out = filtered.map((r, i) => {
-    const ck = dateKey(r.__ngayCan1);
-    if (ck != null && (maxKey == null || ck > maxKey)) { maxKey = ck; maxDate = r.__ngayCan1; }
+  const out = filtered.map((x, i) => {
+    const r = x.r, ck = dateKey(x.ngayCan1);
+    if (ck != null && (maxKey == null || ck > maxKey)) { maxKey = ck; maxDate = x.ngayCan1; }
     const hd = hdnccBySoHopDong[r['Số hợp đồng']] || {};
     const sl = parseNum(r['Khối lượng']) || 0, dg = parseNum(r['Đơn giá thanh toán']) || 0, tt = parseNum(r['Thành tiền']) || 0;
     totalSL += sl; totalTT += tt;
     return {
-      STT: i + 1, 'Ngày tháng năm mua hàng': r.__ngayCan1, 'Tên người bán': r['Họ tên Chủ rừng'] || '',
+      STT: i + 1, 'Ngày tháng năm mua hàng': x.ngayCan1, 'Tên người bán': r['Họ tên Chủ rừng'] || '',
       'Địa chỉ': hd['Địa chỉ thường trú'] || '', 'Số CCCD': hd['Số CCCD Chủ rừng'] || '',
       'Số Điện thoại': hd['Số ĐT DĐ Chủ rừng'] || '', 'Tên hàng hóa/dịch vụ': 'Gỗ tròn keo',
       'Số lượng/trọng lượng': sl, 'Đơn giá': dg, 'Tổng giá thanh toán': tt, 'Ghi chú': r['Số CT']
