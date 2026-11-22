@@ -3,11 +3,11 @@
  *
  * [Phase 4.2 — 2026-10-06] Tách NGUYÊN VĂN từ legacy-app.js (không đổi logic) để mỗi file < 800
  * dòng, dễ đọc/bảo trì. Kiểm chứng: `npm run test:export-golden` (36 file xuất khớp từng ô/chữ)
- * + toàn bộ bộ test. Import vòng với legacy-app.js (RESULTS/runReport) an toàn — chỉ dùng bên
+ * + toàn bộ bộ test. RESULTS/runReport lấy từ store/report-runtime.js (không còn import vòng với legacy-app.js) — chỉ dùng bên
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module services/export/print-sheet
  */
-import { alignClass, cellDisplay, fmtCell } from '../../components/report-table.js';
+import { alignClass, cellDisplay, fmtCell } from '../../utils/cell-format.js';
 import { REPORT_KEYS } from '../../constants/columns.js';
 import { TABLES } from '../../store/state.js';
 import { $, $$, esc } from '../../utils/dom-utils.js';

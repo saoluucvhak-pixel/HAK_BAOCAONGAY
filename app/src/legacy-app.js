@@ -41,6 +41,7 @@ import { closeTauModal, confirmTauAssignClick, confirmTauUnassignClick, openTauM
 import { BANK_INFO_MODAL_MODE, closeBankInfoModal, downloadTienVayTemplate, exportKhoanVayExcel, exportPNKPdf, exportTNDNExcel, exportTNDNPDF, openBankInfoModal } from './services/export/bank-forms.js';
 import { exportAllExcel, exportBankExcel, exportLamSanExcel, exportNgayExcel } from './services/export/excel-export.js';
 import { showReportTab } from './services/export/print-sheet.js';
+import { RESULTS, registerRunReport, setResults } from './store/report-runtime.js';
 import { closeWOModal, exportWOExcel, exportWOPDF, openWOModal } from './services/export/wo-form.js';
 
 /* ============================================================
@@ -93,7 +94,7 @@ export function runReport(){
 
   // tonghop.rows (không phải cả object {rows,cols,totals}) — dashboard.js (biểu đồ) đọc
   // RESULTS.tonghop như 1 mảng (`.map(...)`), phải giữ đúng shape cũ để không vỡ biểu đồ.
-  RESULTS = { nhap: nhap, xecho: xecho, tt: tt, congno: congno, hotro: hotro, trogia: trogia, tonghoptro: tonghoptro, hoahong: hoahong, tonghop: tonghop.rows, bklsct: bklsct, bklsth: bklsth, tautonghop: tautonghop, tienvay: tienvay, thtt: thtt, tndn: tndn, pnk: pnk };
+  setResults({ nhap: nhap, xecho: xecho, tt: tt, congno: congno, hotro: hotro, trogia: trogia, tonghoptro: tonghoptro, hoahong: hoahong, tonghop: tonghop.rows, bklsct: bklsct, bklsth: bklsth, tautonghop: tautonghop, tienvay: tienvay, thtt: thtt, tndn: tndn, pnk: pnk });
 
   renderReportTable('nhapkeo', nhap.rows, NHAPKEO_COLS, { 'KL hàng (KG)': nhap.totalKL, 'Thành tiền': nhap.totalTien });
   renderReportTable('xecho', xecho, XECHO_COLS, null);
@@ -117,7 +118,7 @@ export function runReport(){
   renderDashboard(ctx, reportKey);
 }
 
-export let RESULTS = null;
+registerRunReport(runReport);
 
 /* ============================================================
    tổng — thuần thao tác DOM, không chứa business logic (đọc từ RESULTS/CONSTANTS).

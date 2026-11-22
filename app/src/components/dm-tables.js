@@ -3,7 +3,7 @@
  *
  * [Phase 4.2 — 2026-10-06] Tách NGUYÊN VĂN từ legacy-app.js (không đổi logic) để mỗi file < 800
  * dòng, dễ đọc/bảo trì. Kiểm chứng: `npm run test:export-golden` (36 file xuất khớp từng ô/chữ)
- * + toàn bộ bộ test. Import vòng với legacy-app.js (RESULTS/runReport) an toàn — chỉ dùng bên
+ * + toàn bộ bộ test. RESULTS/runReport lấy từ store/report-runtime.js (không còn import vòng với legacy-app.js) — chỉ dùng bên
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module components/dm-tables
  */
@@ -11,7 +11,7 @@ import { makeVNNumberInput, parseVNNumber } from './number-input.js';
 import { pushUndoSnapshot } from '../store/app-state.js';
 import { STATE, saveDM } from '../store/state.js';
 import { $ } from '../utils/dom-utils.js';
-import { RESULTS, runReport } from '../legacy-app.js';
+import { RESULTS, runReport } from '../store/report-runtime.js';
 
 /**
  * [SỬA 2026-10-05] Người dùng báo: "thay đổi đơn giá (Danh mục) nhưng báo cáo không tính lại tiền".

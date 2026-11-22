@@ -2,51 +2,22 @@
  * [COMPONENT] Bảng báo cáo — render/sort/search/phân trang cho TẤT CẢ 14 bảng báo cáo (dùng
  * chung 1 bộ hàm, tham số hoá bằng `key`). Logic GIỮ NGUYÊN 100% so với bản gốc.
  *
- * Ghi chú kỹ thuật: `ensureToolbar()` gọi tới `exportExcel/exportPDF/printSection/
- * openBankInfoModal` — các hàm này vẫn nằm trong `legacy-app.js` (lớp EXPORT_SERVICE, xem
- * TODO.md Phase 2 phần còn lại). Import ở đây tạo ra 1 cạnh phụ thuộc vòng (circular) giữa
- * module này và `legacy-app.js`, nhưng AN TOÀN trong trường hợp cụ thể này vì: (1) cả 2 module
- * chỉ dùng `function` declaration (được hoist đầy đủ trong phạm vi module của chính nó), và
- * (2) các hàm export/modal chỉ thực sự được GỌI bên trong 1 event handler (khi người dùng bấm
- * nút) — tức là sau khi toàn bộ module đã chạy xong phần khởi tạo (top-level), không phải lúc
- * đang import — nên không gặp lỗi "Cannot access before initialization". Đã kiểm chứng bằng
- * `npm run build` + `npm run test:ui` không lỗi.
+ * Các hàm xuất/in/modal ngân hàng nằm ở services/export/*; định dạng ô nằm ở utils/cell-format.js (re-export bên dưới).
  * @module components/report-table
  */
 import { TABLES } from '../store/state.js';
 import { $, $$, esc } from '../utils/dom-utils.js';
-import { dateKey, fmtDate, fmtTime } from '../utils/date-utils.js';
-import { fmtMoney, fmtKL } from '../utils/number-utils.js';
-import { alignOf } from '../utils/hak-format.js';
+import { dateKey } from '../utils/date-utils.js';
 import { normalizeSearch } from '../utils/fuzzy-search.js';
 import { exportExcel } from '../services/export/excel-export.js';
 import { exportPDF } from '../services/export/pdf-export.js';
 import { printSection } from '../services/export/print-sheet.js';
 import { openBankInfoModal } from '../services/export/bank-forms.js';
 import { runExport } from '../services/export-runner.js';
+import { alignClass, fmtCell, cellDisplay } from '../utils/cell-format.js';
 
-/**
- * [CHUẨN HAK] Lớp CSS căn lề theo kiểu cột: số → phải (' num'), ngày/giờ → giữa (' ctr'), chữ → trái.
- * Dùng chung cho bảng trên màn hình và bản in để 2 nơi luôn giống nhau.
- * @param {string} type kiểu cột ('money' | 'kl' | 'int' | 'date' | ...)
- */
-export function alignClass(type) {
-  var a = alignOf(type);
-  return a === 'right' ? ' num' : (a === 'center' ? ' ctr' : '');
-}
-
-export function fmtCell(val, type) {
-  if (val == null || val === '') return '';
-  switch (type) {
-    case 'money': return fmtMoney(val);
-    case 'kl': return fmtKL(val);
-    case 'int': return Math.round(val).toLocaleString('vi-VN');
-    case 'date': return fmtDate(val);
-    case 'time': return fmtTime(val);
-    case 'datekey': { var s = String(val); if (s.length !== 8) return ''; return s.slice(6, 8) + '/' + s.slice(4, 6) + '/' + s.slice(0, 4); }
-    default: return esc(val);
-  }
-}
+// Giữ đường import cũ (loan-editor.js…) hoạt động.
+export { alignClass, fmtCell, cellDisplay };
 
 export function renderReportTable(key, rows, cols, totals) {
   TABLES[key] = TABLES[key] || { sortCol: -1, sortDir: 1, page: 0, pageSize: 50, search: '' };
@@ -153,15 +124,6 @@ function tfootHTML(st) {
     return '<td></td>';
   }).join('') + '</tr></tfoot>';
 }
-/**
- * [2026-10-29] Ô hiển thị của 1 dòng — dòng đặc biệt có `_label` (vd "Số dư đầu kỳ" của Bảng kê chi tiết
- * tiền vay) hiện nhãn ở CỘT ĐẦU dù cột đó là cột ngày. Dùng chung cho màn hình, In, PDF, Excel.
- */
-export function cellDisplay(r, c, i) {
-  if (i === 0 && r && r._label) return esc(r._label);
-  return fmtCell(r[c[0]], c[2]);
-}
-
 function rowHTML(st, r) {
   return '<tr' + (r._opening ? ' class="opening"' : '') + '>' + st.cols.map(function (c, i) {
     var numCls = alignClass(c[2]);

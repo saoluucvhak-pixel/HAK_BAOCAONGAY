@@ -3,7 +3,7 @@
  *
  * [Phase 4.2 — 2026-10-06] Tách NGUYÊN VĂN từ legacy-app.js (không đổi logic) để mỗi file < 800
  * dòng, dễ đọc/bảo trì. Kiểm chứng: `npm run test:export-golden` (36 file xuất khớp từng ô/chữ)
- * + toàn bộ bộ test. Import vòng với legacy-app.js (RESULTS/runReport) an toàn — chỉ dùng bên
+ * + toàn bộ bộ test. RESULTS/runReport lấy từ store/report-runtime.js (không còn import vòng với legacy-app.js) — chỉ dùng bên
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module services/export/bank-forms
  */
@@ -16,7 +16,7 @@ import { TABLES } from '../../store/state.js';
 import { dateKey, fmtDate, pad2, toExcelDate } from '../../utils/date-utils.js';
 import { $, $$, downloadBlob, esc } from '../../utils/dom-utils.js';
 import { fmtKL, fmtMoney } from '../../utils/number-utils.js';
-import { RESULTS } from '../../legacy-app.js';
+import { RESULTS } from '../../store/report-runtime.js';
 import { ensurePdfFont, forcePdfMoneyColumnWidths } from './pdf-export.js';
 
 /* Thông tin báo cáo ngân hàng — nhập 1 lần qua modal, dùng cho mẫu 02/TNDN chính thức

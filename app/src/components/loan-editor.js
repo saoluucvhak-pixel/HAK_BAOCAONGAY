@@ -13,7 +13,7 @@
 import { createFilter, core as sf } from '@hak/smart-filter';
 import { $, esc } from '../utils/dom-utils.js';
 import { STATE } from '../store/state.js';
-import { alignClass, fmtCell } from './report-table.js';
+import { alignClass, fmtCell } from '../utils/cell-format.js';
 import { formatVNNumber, makeVNNumberInput, parseVNNumber } from './number-input.js';
 import { formatIsoDate, dateRangeProblem, parseUserDate } from '../utils/hak-format.js';
 import { fmtMoney } from '../utils/number-utils.js';

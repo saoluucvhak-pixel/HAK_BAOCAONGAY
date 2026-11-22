@@ -13,7 +13,7 @@ import { STATE } from '../store/state.js';
 import { $, esc } from '../utils/dom-utils.js';
 import { dateKey, pad2 } from '../utils/date-utils.js';
 import { parseCSV, csvToObjects } from '../utils/csv-utils.js';
-import { runReport } from '../legacy-app.js';
+import { runReport } from '../store/report-runtime.js';
 import { logger } from './logger.js';
 import { saveSheetText, loadSheetText } from './offline-cache.js';
 

@@ -17,7 +17,7 @@ import Chart from 'chart.js/auto';
 import { $ } from '../utils/dom-utils.js';
 import { fmtMoney, fmtKL, parseNum } from '../utils/number-utils.js';
 import { fmtDate, inDateRange, toKeyFromInput } from '../utils/date-utils.js';
-import { RESULTS } from '../legacy-app.js';
+import { RESULTS } from '../store/report-runtime.js';
 import { fitCardsIn } from './card-fit.js';
 
 const CHARTS = {};

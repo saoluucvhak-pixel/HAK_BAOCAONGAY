@@ -13,7 +13,7 @@ import { loadDM } from '../store/state.js';
 import { storageService } from './storage-service.js';
 import { logger } from './logger.js';
 import { pushUndoSnapshot } from '../store/app-state.js';
-import { RESULTS, runReport } from '../legacy-app.js';
+import { RESULTS, runReport } from '../store/report-runtime.js';
 import { renderDMTables } from '../components/dm-tables.js';
 import { exportLoans, restoreLoans } from './loan-store.js';
 import { reloadOpening } from '../components/tienvay-summary.js';
