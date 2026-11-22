@@ -29,6 +29,7 @@
     "test:tienvay-import": "node tests/test-tienvay-import.mjs",
     "test:khoanvay": "node tests/test-khoanvay.mjs",
     "test:khoanvay-model": "node tests/test-khoanvay-model.mjs",
+    "test:report-service": "node tests/test-report-service.mjs",
     "test:hak-theme": "node tests/test-hak-theme.mjs",
     "test:theme-picker": "node tests/test-theme-picker.mjs",
     "test:dashboard-fit": "node tests/test-dashboard-fit.mjs",
