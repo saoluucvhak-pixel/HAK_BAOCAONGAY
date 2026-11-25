@@ -40,7 +40,11 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 
 fs.writeFileSync(path.join(appDir, 'app', 'index.html'), realTemplate.replace('</body>', '<!--TEMPLATE-V1--></body>'));
 startApp();
 check('[2026-10-29] Ô ngày theo tiếng Việt: main.js bật --lang=vi', switches.lang === 'vi', switches.lang);
-const res = handlers['save-config'](null, { TenCty: 'CONG TY THU NGHIEM', PhieuCan: 'https://example.com/pc.csv', DNTT: 'https://example.com/dn.csv' });
+const trustedSetupEvent = { senderFrame: { url: require('url').pathToFileURL(path.join(appDir, 'app', 'setup.html')).toString() } };
+const untrustedEvent = { senderFrame: { url: 'https://untrusted.example/path' } };
+check('Không cho trang lạ lấy cấu hình', handlers['get-config'](untrustedEvent) === null);
+check('Không cho trang lạ sửa cấu hình', handlers['save-config'](untrustedEvent, { TenCty: 'HACK' }).ok === false);
+const res = handlers['save-config'](trustedSetupEvent, { TenCty: 'CONG TY THU NGHIEM', PhieuCan: 'https://example.com/pc.csv', DNTT: 'https://example.com/dn.csv' });
 check('Cấu hình lần đầu thành công', res && res.ok, JSON.stringify(res));
 const reportPath = path.join(userData, 'report.html');
 check('report.html sinh từ mẫu v1', fs.readFileSync(reportPath, 'utf8').includes('TEMPLATE-V1'));
