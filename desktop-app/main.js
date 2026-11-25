@@ -186,6 +186,16 @@ function isTrustedSetupUrl(value) {
   } catch (e) { return false; }
 }
 
+ipcMain.handle('open-config', (event) => {
+  // Chỉ trang báo cáo được tạo trong thư mục dữ liệu ứng dụng mới được yêu cầu mở cấu hình.
+  if (!event || !event.senderFrame || !isTrustedAppUrl(event.senderFrame.url)) {
+    return { ok: false, error: 'Nguồn yêu cầu không được phép.' };
+  }
+  if (!mainWindow) return { ok: false, error: 'Không có cửa sổ báo cáo.' };
+  mainWindow.loadFile(SETUP_HTML);
+  return { ok: true };
+});
+
 ipcMain.handle('get-config', (event) => {
   if (!isTrustedSetupSender(event)) return null;
   if (!fs.existsSync(CONFIG_JSON)) return null;
