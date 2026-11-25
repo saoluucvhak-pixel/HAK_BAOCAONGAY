@@ -51,6 +51,17 @@ jobs:
           node-version: 22
       - run: node desktop-app/tests/test-template-refresh.js
       - run: node desktop-app/tests/test-source-validator.js
+      - name: Smoke test installer audit on a signed Windows system executable
+        shell: pwsh
+        run: |
+          $testDir = Join-Path $env:RUNNER_TEMP 'hak-audit-smoke'
+          New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+          Copy-Item (Join-Path $env:WINDIR 'System32/cmd.exe') (Join-Path $testDir 'cmd.exe')
+          ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir $testDir -RequireSignature
+          $result = Get-Content (Join-Path $testDir 'INSTALLER_SECURITY.json') -Raw | ConvertFrom-Json
+          if ($result.installers.Count -ne 1 -or $result.installers[0].authenticode -ne 'Valid') {
+            throw 'Security manifest smoke test failed'
+          }
 
   desktop-installer:
     # Chỉ build bộ cài từ main sau khi build/test và Windows mock đều đạt;
