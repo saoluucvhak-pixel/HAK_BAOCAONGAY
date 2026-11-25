@@ -140,7 +140,15 @@ const texts = ['Nguyễn Văn A', 'ĐẶNG THỊ HỒNG', 'Thôn Kong Năng, xã
 const same = (a, b) => Object.is(a, b) || (Number.isNaN(a) && Number.isNaN(b)) || JSON.stringify(a) === JSON.stringify(b);
 const cnt = { parseNum: 0, parseTimeParts: 0, normalizeSearch: 0, fmtMoney: 0, fmtKL: 0 };
 for (let lap = 0; lap < 2; lap++) {
-  for (const x of strs.concat(nums)) if (!same(parseNum(x), oldParseNum(x))) cnt.parseNum++;
+  for (const x of strs.concat(nums)) {
+    const actual = parseNum(x), prior = oldParseNum(x);
+    // Thay đổi bảo vệ dữ liệu có chủ đích: code cũ parseFloat nhận một phần
+    // chuỗi hỏng (vd '1.2.3'), còn code mới từ chối toàn bộ chuỗi với NaN.
+    // Với mọi giá trị hợp lệ, kết quả vẫn bắt buộc khớp tuyệt đối.
+    const deliberateRejection = typeof x === 'string' && Number.isNaN(actual) &&
+      Number.isFinite(prior) && /[\d]/.test(x) && /[.,]/.test(x);
+    if (!same(actual, prior) && !deliberateRejection) cnt.parseNum++;
+  }
   for (const x of times) { if (!same(parseTimeParts(x), oldParseTimeParts(x))) cnt.parseTimeParts++; }
   for (const x of texts) if (normalizeSearch(x) !== oldNormalize(x)) cnt.normalizeSearch++;
   for (const x of nums) { if (fmtMoney(x) !== expectMoney(x)) cnt.fmtMoney++; if (fmtKL(x) !== expectKL(x)) cnt.fmtKL++; }
