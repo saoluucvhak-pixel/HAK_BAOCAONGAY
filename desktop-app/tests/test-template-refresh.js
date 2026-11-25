@@ -99,6 +99,14 @@ fs.writeFileSync(path.join(appDir, 'app', 'index.html'), '<html>mau hong</html>'
 const opened2 = startApp();
 check('Mẫu mới lỗi: vẫn mở báo cáo đang có (không bị đẩy về màn hình cấu hình/mất báo cáo)', opened2 === reportPath && fs.readFileSync(reportPath, 'utf8').includes('CONG TY THU NGHIEM'), opened2);
 
+// Mở màn hình nguồn Google Sheets ngay từ mục Cấu hình trong báo cáo desktop.
+const trustedReportEvent = { senderFrame: { url: require('url').pathToFileURL(reportPath).toString() } };
+const beforeOpen = loaded.length;
+const forbiddenOpen = handlers['open-config'](untrustedEvent);
+check('Trang lạ không thể mở màn hình cấu hình qua IPC', forbiddenOpen.ok === false && loaded.length === beforeOpen);
+const allowedOpen = handlers['open-config'](trustedReportEvent);
+check('Màn hình báo cáo Desktop mở được trình quản lý nguồn', allowedOpen.ok === true && loaded[loaded.length - 1] === path.join(appDir, 'app', 'setup.html'));
+
 // Security regression: giới hạn protocol bên ngoài và chặn điều hướng cửa sổ tới URL lạ.
 windowOpenHandler({ url: 'javascript:alert(1)' });
 windowOpenHandler({ url: 'file:///etc/passwd' });
