@@ -222,10 +222,11 @@ ipcMain.handle('save-config', (event, data) => {
   // Nếu bước ghi/đổi tên thất bại, trả lại nguyên trạng từ snapshot.
   const tempReport = REPORT_HTML + '.pending';
   const tempConfig = CONFIG_JSON + '.pending';
-  const previousReport = fs.existsSync(REPORT_HTML) ? fs.readFileSync(REPORT_HTML) : null;
-  const previousConfig = fs.existsSync(CONFIG_JSON) ? fs.readFileSync(CONFIG_JSON) : null;
+  let previousReport = null, previousConfig = null;
   let reportReplaced = false, configReplaced = false;
   try {
+    previousReport = fs.existsSync(REPORT_HTML) ? fs.readFileSync(REPORT_HTML) : null;
+    previousConfig = fs.existsSync(CONFIG_JSON) ? fs.readFileSync(CONFIG_JSON) : null;
     buildReportHtml(cfg, tempReport);
     fs.writeFileSync(tempConfig, JSON.stringify(cfg, null, 2), 'utf8');
     fs.renameSync(tempReport, REPORT_HTML);
