@@ -58,6 +58,10 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [build-test, desktop-windows-tests]
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -72,13 +76,29 @@ jobs:
         working-directory: desktop-app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          WIN_CSC_LINK: ${{ secrets.HAK_WINDOWS_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.HAK_WINDOWS_CSC_PASSWORD }}
         run: |
           npm ci
           npm run dist
-      - name: Upload Windows installer
+      - name: Audit Authenticode, SHA-256 and optional Defender scan
+        shell: pwsh
+        env:
+          SIGNING_CERT_PRESENT: ${{ secrets.HAK_WINDOWS_CSC_LINK != '' }}
+        run: |
+          $requireSigned = $env:SIGNING_CERT_PRESENT -eq 'true'
+          ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature:$requireSigned
+      - name: Record GitHub build provenance for the EXE
+        uses: actions/attest@v4
+        with:
+          subject-path: desktop-app/release/*.exe
+      - name: Upload Windows installer and security manifest
         uses: actions/upload-artifact@v4
         with:
           name: HAK-BAOCAONGAY-Windows-Setup
-          path: desktop-app/release/*.exe
+          path: |
+            desktop-app/release/*.exe
+            desktop-app/release/SHA256SUMS.txt
+            desktop-app/release/INSTALLER_SECURITY.json
           if-no-files-found: error
           retention-days: 30
