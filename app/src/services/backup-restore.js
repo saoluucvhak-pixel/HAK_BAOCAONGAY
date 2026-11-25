@@ -66,7 +66,7 @@ export async function restoreData(file) {
       throw new Error('Phần khoản vay của file sao lưu không hợp lệ — chưa thay đổi dữ liệu.');
     }
     // Lưu bản gốc trước khi khôi phục để có thể hoàn nguyên localStorage nếu kho khoản vay lỗi.
-    var beforeRestore = storageService.exportAll();
+    var beforeRestore = storageService.snapshotRaw();
     pushUndoSnapshot();
     var result = storageService.importAll(backup);
     if (!result.ok) throw new Error(result.rollbackFailed
@@ -78,9 +78,9 @@ export async function restoreData(file) {
       var n;
       try { n = await restoreLoans(backup.khoanVay); }
       catch (loanError) {
-        var rollback = storageService.importAll(beforeRestore);
+        var rollback = storageService.restoreRaw(beforeRestore);
         throw new Error('Không thể khôi phục khoản vay: ' + loanError.message +
-          (rollback.ok ? ' Danh mục/cấu hình cũ đã được hoàn nguyên.' : ' CẢNH BÁO: không hoàn nguyên được đầy đủ danh mục/cấu hình.'));
+          (rollback ? ' Danh mục/cấu hình cũ đã được hoàn nguyên.' : ' CẢNH BÁO: không hoàn nguyên được đầy đủ danh mục/cấu hình.'));
       }
       await reloadLoans();
       await reloadOpening();
