@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const { SOURCES, validateUrl, csvHeaders, probeSource, checkAll } = require('../app/source-validator.js');
 
+(async function main() {
 const url = 'https://docs.google.com/spreadsheets/d/e/TEST_SOURCE/pub?gid=0&single=true&output=csv';
 const source = SOURCES.find((s) => s.key === 'PhieuCan');
 const okFetch = async (_url, opts) => {
@@ -49,3 +50,4 @@ const all = await checkAll({ PhieuCan: url, DNTT: '', HDNCC: '', Hosokeo: '' }, 
 assert.equal(all.length, 4);
 assert.equal(all.find((v) => v.key === 'DNTT').ok, false);
 console.log('PASS: secure URL, CSV schema, streaming, offline, required/optional sources');
+})().catch((error) => { console.error(error); process.exitCode = 1; });
