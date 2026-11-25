@@ -80,7 +80,7 @@ function replaceOnce(text, oldVal, newVal, label) {
 
 /** Sinh lại report.html từ ĐÚNG file mẫu gốc (app/index.html) + dữ liệu cấu hình đã lưu — không
  *  bao giờ thay-thế-chồng-lên-report.html-cũ, tránh lỗi thay 2 lần/tìm không thấy do đã bị đổi. */
-function buildReportHtml(cfg) {
+function buildReportHtml(cfg, dest = REPORT_HTML) {
   let html = fs.readFileSync(TEMPLATE_HTML, 'utf8');
   html = replaceOnce(html, DEFAULTS.TenCty, cfg.TenCty, 'Tên công ty');
   if (cfg.MaHS) html = replaceOnce(html, DEFAULTS.MaHS, cfg.MaHS, 'Mã HS');
@@ -95,7 +95,7 @@ function buildReportHtml(cfg) {
     html = replaceOnce(html, DEFAULTS.BANK_INFO_LITERAL, bankInfoNew, 'Thông tin mặc định biểu mẫu ngân hàng');
     html = replaceOnce(html, DEFAULTS.WO_INFO_LITERAL, woInfoNew, 'Thông tin mặc định biểu mẫu WO');
   }
-  fs.writeFileSync(REPORT_HTML, html, 'utf8');
+  fs.writeFileSync(dest, html, 'utf8');
 }
 
 /**
@@ -218,12 +218,38 @@ ipcMain.handle('save-config', (event, data) => {
     if (error) return { ok: false, error: key + ': ' + error };
   }
 
+  // Dựng 2 file mới trước khi thay bất kỳ cấu hình đang chạy nào.
+  // Nếu bước ghi/đổi tên thất bại, trả lại nguyên trạng từ snapshot.
+  const tempReport = REPORT_HTML + '.pending';
+  const tempConfig = CONFIG_JSON + '.pending';
+  const previousReport = fs.existsSync(REPORT_HTML) ? fs.readFileSync(REPORT_HTML) : null;
+  const previousConfig = fs.existsSync(CONFIG_JSON) ? fs.readFileSync(CONFIG_JSON) : null;
+  let reportReplaced = false, configReplaced = false;
   try {
-    buildReportHtml(cfg); // luôn sinh lại từ file mẫu gốc — không bao giờ thay chồng lên report.html cũ
-    fs.writeFileSync(CONFIG_JSON, JSON.stringify(cfg, null, 2), 'utf8');
+    buildReportHtml(cfg, tempReport);
+    fs.writeFileSync(tempConfig, JSON.stringify(cfg, null, 2), 'utf8');
+    fs.renameSync(tempReport, REPORT_HTML);
+    reportReplaced = true;
+    fs.renameSync(tempConfig, CONFIG_JSON);
+    configReplaced = true;
     try { writeStamp(templateHash()); } catch (e) { /* không chặn lưu cấu hình */ }
   } catch (e) {
-    return { ok: false, error: e.message };
+    let rollbackFailed = false;
+    try {
+      if (reportReplaced) {
+        if (previousReport) fs.writeFileSync(REPORT_HTML, previousReport);
+        else fs.rmSync(REPORT_HTML, { force: true });
+      }
+      if (configReplaced) {
+        if (previousConfig) fs.writeFileSync(CONFIG_JSON, previousConfig);
+        else fs.rmSync(CONFIG_JSON, { force: true });
+      }
+    } catch (rollbackError) { rollbackFailed = true; }
+    for (const tmp of [tempReport, tempConfig]) {
+      try { fs.rmSync(tmp, { force: true }); } catch (cleanupError) { /* không che lỗi chính */ }
+    }
+    return { ok: false, error: e.message +
+      (rollbackFailed ? ' — CẢNH BÁO: không thể hoàn nguyên đầy đủ, cần kiểm tra bộ nhớ.' : ' — cấu hình cũ đã được giữ lại.') };
   }
 
   if (mainWindow) mainWindow.loadFile(REPORT_HTML);
