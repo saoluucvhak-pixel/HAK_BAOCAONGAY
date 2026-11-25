@@ -47,6 +47,33 @@ class StorageService {
 
   remove(key) { try { localStorage.removeItem(key); } catch (e) { /* bỏ qua */ } }
 
+  /** Chụp nguyên trạng từng khoá, kể cả khoá chưa tồn tại (null), để hoàn nguyên sau sự cố. */
+  snapshotRaw() {
+    const snapshot = {};
+    for (const [name, key] of Object.entries(CONFIG.STORAGE_KEYS)) {
+      snapshot[name] = localStorage.getItem(key);
+    }
+    return snapshot;
+  }
+
+  /** Hoàn nguyên nguyên trạng các khoá đã chụp, gồm xoá khoá vốn không tồn tại. */
+  restoreRaw(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
+    let ok = true;
+    for (const [name, key] of Object.entries(CONFIG.STORAGE_KEYS)) {
+      if (!Object.prototype.hasOwnProperty.call(snapshot, name)) { ok = false; continue; }
+      try {
+        if (snapshot[name] === null) localStorage.removeItem(key);
+        else if (typeof snapshot[name] === 'string') localStorage.setItem(key, snapshot[name]);
+        else ok = false;
+      } catch (e) {
+        ok = false;
+        logger.error('Không hoàn nguyên được dữ liệu', name, e.message);
+      }
+    }
+    return ok;
+  }
+
   /** Xuất toàn bộ dữ liệu app đã lưu (theo CONFIG.STORAGE_KEYS) ra 1 object — dùng để tải file backup JSON. */
   exportAll() {
     const out = { appVersion: CONFIG.APP_VERSION, exportedAt: new Date().toISOString(), data: {} };
