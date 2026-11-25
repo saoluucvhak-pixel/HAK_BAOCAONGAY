@@ -31,4 +31,13 @@ assert.equal(ok.ok, true);
 assert.deepEqual(ok.restoredKeys, ['DM_DL', 'BANK_INFO']);
 assert.deepEqual(storageService.get(dm), ['new']);
 assert.deepEqual(storageService.get(bank), { name: 'new' });
+// Snapshot nguyên trạng phải nhớ cả khoá CHƯA TỒN TẠI, không chỉ giá trị != null.
+const wo = CONFIG.STORAGE_KEYS.WO_INFO;
+records.delete(wo);
+const snap = storageService.snapshotRaw();
+localStorage.setItem(wo, '"introduced-by-restore"');
+storageService.set(dm, ['changed-again']);
+assert.equal(storageService.restoreRaw(snap), true);
+assert.equal(localStorage.getItem(wo), null, 'khôi phục phải xoá khoá vốn không tồn tại');
+assert.deepEqual(storageService.get(dm), ['new'], 'khôi phục giá trị cũ byte-for-byte');
 console.log('PASS: restore validates backup, rolls back failed writes, preserves existing data');
