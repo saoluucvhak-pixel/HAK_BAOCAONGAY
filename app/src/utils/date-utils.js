@@ -52,6 +52,14 @@ export function parseDateParts(str) {
       }
     }
   }
+  // Ngày không tồn tại không được để Date.UTC tự cuộn sang tháng kế tiếp:
+  // 31/02 sẽ làm sai kỳ báo cáo, công nợ và ngày chứng từ.
+  if (result) {
+    const { y, mo, d } = result;
+    const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
+    const monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (y < 1 || mo < 1 || mo > 12 || d < 1 || d > monthDays[mo - 1]) result = null;
+  }
   _dateCache.set(str, result);
   return result;
 }

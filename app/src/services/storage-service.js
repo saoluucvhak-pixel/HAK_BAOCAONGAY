@@ -47,6 +47,33 @@ class StorageService {
 
   remove(key) { try { localStorage.removeItem(key); } catch (e) { /* bỏ qua */ } }
 
+  /** Chụp nguyên trạng từng khoá, kể cả khoá chưa tồn tại (null), để hoàn nguyên sau sự cố. */
+  snapshotRaw() {
+    const snapshot = {};
+    for (const [name, key] of Object.entries(CONFIG.STORAGE_KEYS)) {
+      snapshot[name] = localStorage.getItem(key);
+    }
+    return snapshot;
+  }
+
+  /** Hoàn nguyên nguyên trạng các khoá đã chụp, gồm xoá khoá vốn không tồn tại. */
+  restoreRaw(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
+    let ok = true;
+    for (const [name, key] of Object.entries(CONFIG.STORAGE_KEYS)) {
+      if (!Object.prototype.hasOwnProperty.call(snapshot, name)) { ok = false; continue; }
+      try {
+        if (snapshot[name] === null) localStorage.removeItem(key);
+        else if (typeof snapshot[name] === 'string') localStorage.setItem(key, snapshot[name]);
+        else ok = false;
+      } catch (e) {
+        ok = false;
+        logger.error('Không hoàn nguyên được dữ liệu', name, e.message);
+      }
+    }
+    return ok;
+  }
+
   /** Xuất toàn bộ dữ liệu app đã lưu (theo CONFIG.STORAGE_KEYS) ra 1 object — dùng để tải file backup JSON. */
   exportAll() {
     const out = { appVersion: CONFIG.APP_VERSION, exportedAt: new Date().toISOString(), data: {} };
@@ -61,14 +88,35 @@ class StorageService {
    * @returns {{ok:boolean, restoredKeys:string[]}}
    */
   importAll(backup) {
-    if (!backup || typeof backup.data !== 'object') return { ok: false, restoredKeys: [] };
+    // Không nhận mảng/null hoặc bản sao lưu bị hỏng. Lỗi ghi phải được báo, không được
+    // đếm một mục là "đã khôi phục" nếu localStorage.setItem thất bại.
+    if (!backup || !backup.data || typeof backup.data !== 'object' || Array.isArray(backup.data)) {
+      return { ok: false, restoredKeys: [] };
+    }
+    const entries = Object.entries(CONFIG.STORAGE_KEYS)
+      .filter(([name]) => Object.prototype.hasOwnProperty.call(backup.data, name) && backup.data[name] != null);
+    const previous = new Map();
     const restoredKeys = [];
-    Object.entries(CONFIG.STORAGE_KEYS).forEach(([name, key]) => {
-      if (Object.prototype.hasOwnProperty.call(backup.data, name) && backup.data[name] != null) {
-        this.set(key, backup.data[name]);
+    try {
+      // Chụp giá trị nguyên gốc (kể cả bản legacy) để hoàn nguyên nếu có lỗi ghi.
+      for (const [, key] of entries) previous.set(key, localStorage.getItem(key));
+      for (const [name, key] of entries) {
+        if (!this.set(key, backup.data[name])) throw new Error('Không thể ghi ' + name);
         restoredKeys.push(name);
       }
-    });
+    } catch (e) {
+      // localStorage không hỗ trợ transaction: cố gắng phục hồi tất cả giá trị cũ.
+      // Nếu quota/quyền truy cập tiếp tục chặn rollback, báo rõ thay vì nhận là thành công.
+      let rollbackFailed = false;
+      for (const [key, old] of previous) {
+        try {
+          if (old === null) localStorage.removeItem(key);
+          else localStorage.setItem(key, old);
+        } catch (rollbackError) { rollbackFailed = true; logger.error('Không hoàn nguyên được key', key, rollbackError.message); }
+      }
+      logger.error('Khôi phục localStorage thất bại:', e.message);
+      return { ok: false, restoredKeys: [], rollbackFailed };
+    }
     return { ok: true, restoredKeys };
   }
 }

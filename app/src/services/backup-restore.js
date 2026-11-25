@@ -59,15 +59,29 @@ export async function restoreData(file) {
   try {
     var text = await file.text();
     var backup = JSON.parse(text);
-    // Lưu lại trạng thái danh mục hiện tại vào lịch sử Hoàn tác TRƯỚC khi ghi đè — nếu khôi
-    // phục nhầm file, người dùng vẫn bấm "Hoàn tác" (Ctrl+Z) để quay lại được.
+    if (!backup || !backup.data || typeof backup.data !== 'object' || Array.isArray(backup.data)) {
+      throw new Error('File không đúng định dạng sao lưu (thiếu trường "data" hợp lệ).');
+    }
+    if (backup.khoanVay && (!Array.isArray(backup.khoanVay.rows) || ![1, 2, 3].includes(backup.khoanVay.schema))) {
+      throw new Error('Phần khoản vay của file sao lưu không hợp lệ — chưa thay đổi dữ liệu.');
+    }
+    // Lưu bản gốc trước khi khôi phục để có thể hoàn nguyên localStorage nếu kho khoản vay lỗi.
+    var beforeRestore = storageService.snapshotRaw();
     pushUndoSnapshot();
     var result = storageService.importAll(backup);
-    if (!result.ok) throw new Error('File không đúng định dạng sao lưu (thiếu trường "data").');
+    if (!result.ok) throw new Error(result.rollbackFailed
+      ? 'Không thể ghi và hoàn nguyên dữ liệu. Cần kiểm tra bộ nhớ trình duyệt và bản sao lưu trước khi tiếp tục.'
+      : 'Không thể ghi dữ liệu khôi phục vào bộ nhớ (đầy dung lượng hoặc bị chặn). Dữ liệu cũ đã được giữ lại.');
     // File sao lưu cũ (trước 29/10/2026) không có "khoanVay" ⇒ GIỮ NGUYÊN khoản vay đang có, không xoá.
     var loanNote = '';
     if (backup.khoanVay) {
-      var n = await restoreLoans(backup.khoanVay);
+      var n;
+      try { n = await restoreLoans(backup.khoanVay); }
+      catch (loanError) {
+        var rollback = storageService.restoreRaw(beforeRestore);
+        throw new Error('Không thể khôi phục khoản vay: ' + loanError.message +
+          (rollback ? ' Danh mục/cấu hình cũ đã được hoàn nguyên.' : ' CẢNH BÁO: không hoàn nguyên được đầy đủ danh mục/cấu hình.'));
+      }
       await reloadLoans();
       await reloadOpening();
       loanNote = ' Khoản vay: ' + n.toLocaleString('vi-VN') + ' khoản.';

@@ -31,6 +31,27 @@ const fs = require('fs');
 
 let mainWindow = null;
 
+/** Chỉ cho phép mở liên kết web thông thường, tránh file:, javascript:, custom protocols. */
+function openSafeExternalUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
+    if (!url.hostname || url.username || url.password) return false;
+    Promise.resolve(shell.openExternal(url.toString())).catch(() => {});
+    return true;
+  } catch (e) { return false; }
+}
+
+/** Renderer chỉ được điều hướng giữa trang setup và report đã được app quản lý. */
+function isTrustedAppUrl(value) {
+  try {
+    if (typeof value !== 'string' || !value.startsWith('file:')) return false;
+    const { fileURLToPath } = require('url');
+    const p = path.normalize(fileURLToPath(value));
+    return p === path.normalize(SETUP_HTML) || p === path.normalize(REPORT_HTML);
+  } catch (e) { return false; }
+}
+
 const TEMPLATE_HTML = path.join(__dirname, 'app', 'index.html');
 const SETUP_HTML = path.join(__dirname, 'app', 'setup.html');
 const CONFIG_JSON = path.join(app.getPath('userData'), 'company-config.json');
@@ -134,8 +155,12 @@ function createWindow() {
   loadSetupOrReport();
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openSafeExternalUrl(url);
     return { action: 'deny' };
+  });
+  // Không cho điều hướng cửa sổ chính tới website bên ngoài rồi dùng preload của app.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isTrustedAppUrl(url)) event.preventDefault();
   });
 
   // [Tinh chỉnh #1] Hộp thoại "Lưu file" khi xuất Excel/PDF/sao lưu JSON — thay vì âm thầm lưu
@@ -148,12 +173,27 @@ function createWindow() {
 }
 
 // ---- IPC: cầu nối với màn hình setup.html (qua preload.js) ----
-ipcMain.handle('get-config', () => {
+function isTrustedSetupSender(event) {
+  return !!(event && event.senderFrame && isTrustedSetupUrl(event.senderFrame.url));
+}
+
+function isTrustedSetupUrl(value) {
+  try {
+    const { fileURLToPath } = require('url');
+    return typeof value === 'string' && value.startsWith('file:') &&
+      path.normalize(fileURLToPath(value)) === path.normalize(SETUP_HTML);
+  } catch (e) { return false; }
+}
+
+ipcMain.handle('get-config', (event) => {
+  if (!isTrustedSetupSender(event)) return null;
   if (!fs.existsSync(CONFIG_JSON)) return null;
   try { return JSON.parse(fs.readFileSync(CONFIG_JSON, 'utf8')); } catch (e) { return null; }
 });
 
 ipcMain.handle('save-config', (event, data) => {
+  if (!isTrustedSetupSender(event)) return { ok: false, error: 'Yêu cầu thay đổi cấu hình không đến từ màn hình thiết lập.' };
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: 'Cấu hình gửi lên không hợp lệ.' };
   const cfg = {
     TenCty: String(data.TenCty || '').trim(),
     MaHS: String(data.MaHS || '').trim(),
@@ -231,5 +271,5 @@ app.on('window-all-closed', () => {
 });
 
 app.on('web-contents-created', (_event, contents) => {
-  contents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  contents.setWindowOpenHandler(({ url }) => { openSafeExternalUrl(url); return { action: 'deny' }; });
 });

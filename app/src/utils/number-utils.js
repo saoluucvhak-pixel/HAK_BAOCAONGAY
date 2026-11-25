@@ -41,16 +41,26 @@ function _parseNumUncached(v) {
   if (!/^[-+]?[\d.,]+$/.test(s)) return NaN;
   const hasDot = s.indexOf('.') >= 0, hasComma = s.indexOf(',') >= 0;
   if (hasDot && hasComma) {
-    if (s.lastIndexOf('.') > s.lastIndexOf(',')) s = s.replace(/,/g, '');
-    else s = s.replace(/\./g, '').replace(',', '.');
+    if (s.lastIndexOf('.') > s.lastIndexOf(',')) {
+      // 1,234.56 (US): dấu phẩy chỉ được dùng làm nhóm nghìn hợp lệ.
+      if (!/^[-+]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) return NaN;
+      s = s.replace(/,/g, '');
+    } else {
+      // 1.234,56 (VN): dấu chấm chỉ được dùng làm nhóm nghìn hợp lệ.
+      if (!/^[-+]?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) return NaN;
+      s = s.replace(/\./g, '').replace(',', '.');
+    }
   } else if (hasComma) {
     if (/^[-+]?\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, '');
     else s = s.replace(',', '.');
   } else if (hasDot) {
     if (/^[-+]?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
   }
-  const n = parseFloat(s);
-  if (isNaN(n)) return NaN;
+  // parseFloat('12.3,4') trả 12.3 dù số liệu sai. Không bao giờ lấy một phần
+  // của chuỗi tiền/khối lượng: hoặc đọc được toàn bộ, hoặc báo NaN.
+  if (!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(s)) return NaN;
+  const n = Number(s);
+  if (!Number.isFinite(n)) return NaN;
   return neg ? -n : n;
 }
 
