@@ -12,6 +12,7 @@ const appDir = path.join(tmp, 'appdir'); fs.mkdirSync(path.join(appDir, 'app'), 
 const realTemplate = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
 fs.writeFileSync(path.join(appDir, 'app', 'setup.html'), '<html>setup</html>');
 fs.copyFileSync(path.join(__dirname, '..', 'main.js'), path.join(appDir, 'main.js'));
+fs.copyFileSync(path.join(__dirname, '..', 'app', 'source-validator.js'), path.join(appDir, 'app', 'source-validator.js'));
 
 let loaded = [], readyCb = null, windowOpenHandler = null, navigationHandler = null, externalUrls = [];
 const switches = {};
@@ -44,8 +45,11 @@ const trustedSetupEvent = { senderFrame: { url: require('url').pathToFileURL(pat
 const untrustedEvent = { senderFrame: { url: 'https://untrusted.example/path' } };
 check('Không cho trang lạ lấy cấu hình', handlers['get-config'](untrustedEvent) === null);
 check('Không cho trang lạ sửa cấu hình', handlers['save-config'](untrustedEvent, { TenCty: 'HACK' }).ok === false);
-const res = handlers['save-config'](trustedSetupEvent, { TenCty: 'CONG TY THU NGHIEM', PhieuCan: 'https://example.com/pc.csv', DNTT: 'https://example.com/dn.csv' });
+const res = handlers['save-config'](trustedSetupEvent, { TenCty: 'CONG TY THU NGHIEM', PhieuCan: 'https://docs.google.com/spreadsheets/d/e/TEST_PC/pub?output=csv', DNTT: 'https://docs.google.com/spreadsheets/d/e/TEST_DN/pub?output=csv' });
 check('Cấu hình lần đầu thành công', res && res.ok, JSON.stringify(res));
+const badCfg = handlers['save-config'](trustedSetupEvent, { TenCty: 'FORGED', PhieuCan: 'http://localhost/private', DNTT: 'javascript:alert(1)' });
+check('Link sai/không bảo mật bị từ chối ngay tại IPC', badCfg.ok === false);
+check('Cấu hình đang dùng giữ nguyên khi đường dẫn không hợp lệ', handlers['get-config'](trustedSetupEvent).TenCty === 'CONG TY THU NGHIEM');
 const reportPath = path.join(userData, 'report.html');
 check('report.html sinh từ mẫu v1', fs.readFileSync(reportPath, 'utf8').includes('TEMPLATE-V1'));
 
@@ -55,7 +59,7 @@ const opened = startApp();
 const html = fs.readFileSync(reportPath, 'utf8');
 check('Sau khi cài bản mới: mở đúng report.html', opened === reportPath, opened);
 check('Sau khi cài bản mới: báo cáo đã dùng MẪU MỚI (v2), không còn mẫu cũ (v1)', html.includes('TEMPLATE-V2') && !html.includes('TEMPLATE-V1'));
-check('Sau khi cài bản mới: vẫn giữ đúng cấu hình công ty đã lưu', html.includes('CONG TY THU NGHIEM') && html.includes('https://example.com/pc.csv'));
+check('Sau khi cài bản mới: vẫn giữ đúng cấu hình công ty đã lưu', html.includes('CONG TY THU NGHIEM') && html.includes('https://docs.google.com/spreadsheets/d/e/TEST_PC/pub?output=csv'));
 
 // Lần mở 3: KHÔNG đổi mẫu → không cần sinh lại (không ghi file thừa)
 const mtime1 = fs.statSync(reportPath).mtimeMs;
