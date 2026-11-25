@@ -13,6 +13,10 @@
   ];
   const HEADER_LIMIT = 65536;
   function validateUrl(value) {
+    // URL sẽ được chèn vào JavaScript của báo cáo HTML; ký tự thoát chuỗi phải bị chặn.
+    if (typeof value !== 'string' || /['"`<>\\\r\n]/.test(value)) {
+      return 'Đường dẫn chứa ký tự không được phép.';
+    }
     let url;
     try { url = new URL(value); } catch (e) { return 'Đường dẫn không hợp lệ.'; }
     if (url.protocol !== 'https:' || url.hostname !== 'docs.google.com' || url.username || url.password || url.port) {
@@ -63,6 +67,14 @@
     try {
       const response = await (fetcher || fetch)(url, { signal: controller.signal, cache: 'no-store', redirect: 'follow' });
       if (!response.ok) return { key: source.key, ok: false, message: 'HTTP ' + response.status + ' — kiểm tra quyền chia sẻ và địa chỉ.' };
+      // Không xác nhận thành công nếu máy chủ Google chuyển tiếp tới trang ngoài không tin cậy.
+      if (response.url) {
+        const finalUrl = new URL(response.url);
+        const googleHost = finalUrl.hostname === 'docs.google.com' ||
+          finalUrl.hostname === 'googleusercontent.com' ||
+          finalUrl.hostname.endsWith('.googleusercontent.com');
+        if (finalUrl.protocol !== 'https:' || !googleHost) throw new Error('Nguồn CSV chuyển hướng ra ngoài Google.');
+      }
       let txt = '', bytes = 0;
       if (response.body && response.body.getReader) {
         reader = response.body.getReader();
