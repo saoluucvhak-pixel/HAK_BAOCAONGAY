@@ -49,7 +49,14 @@ function openDb() {
     if (!idbAvailable()) { resolve(null); return; }
     let settled = false;
     const finish = (db) => { if (!settled) { settled = true; resolve(db); } };
-    const timer = setTimeout(() => { logger.warn('[Offline] Mở IndexedDB quá lâu — tạm không dùng bộ nhớ offline.'); finish(null); }, OPEN_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      logger.warn('[Offline] Mở IndexedDB quá lâu — tạm không dùng bộ nhớ offline.');
+      // Không cache kết quả null mãi mãi: cho lần gọi sau thử mở lại khi kho hết bị khoá.
+      if (!settled) {
+        dbPromise = null;
+        finish(null);
+      }
+    }, OPEN_TIMEOUT_MS);
     let req;
     try { req = indexedDB.open(DB_NAME, DB_VERSION); } catch (e) { clearTimeout(timer); logger.warn('[Offline] Không mở được IndexedDB:', e.message); finish(null); return; }
     req.onupgradeneeded = (ev) => {
@@ -59,11 +66,16 @@ function openDb() {
     req.onsuccess = () => {
       clearTimeout(timer);
       const db = req.result;
+      // Kết nối đến sau timeout phải đóng lại: tránh rò rỉ kết nối / chặn nâng cấp schema.
+      if (settled) {
+        try { db.close(); } catch (e) { /* bỏ qua */ }
+        return;
+      }
       // Tab khác mở bản app mới hơn (nâng phiên bản kho) → đóng kết nối cũ để không chặn nâng cấp.
       db.onversionchange = () => { try { db.close(); } catch (e) { /* bỏ qua */ } dbPromise = null; };
       finish(db);
     };
-    req.onerror = () => { clearTimeout(timer); logger.warn('[Offline] Lỗi mở IndexedDB:', req.error && req.error.message); finish(null); };
+    req.onerror = () => { clearTimeout(timer); logger.warn('[Offline] Lỗi mở IndexedDB:', req.error && req.error.message); if (!settled) dbPromise = null; finish(null); };
     req.onblocked = () => { logger.warn('[Offline] IndexedDB đang bị tab khác giữ — tạm bỏ qua bộ nhớ offline.'); };
   });
   return dbPromise;
