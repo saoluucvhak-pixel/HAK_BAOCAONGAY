@@ -173,12 +173,27 @@ function createWindow() {
 }
 
 // ---- IPC: cầu nối với màn hình setup.html (qua preload.js) ----
-ipcMain.handle('get-config', () => {
+function isTrustedSetupSender(event) {
+  return !!(event && event.senderFrame && isTrustedSetupUrl(event.senderFrame.url));
+}
+
+function isTrustedSetupUrl(value) {
+  try {
+    const { fileURLToPath } = require('url');
+    return typeof value === 'string' && value.startsWith('file:') &&
+      path.normalize(fileURLToPath(value)) === path.normalize(SETUP_HTML);
+  } catch (e) { return false; }
+}
+
+ipcMain.handle('get-config', (event) => {
+  if (!isTrustedSetupSender(event)) return null;
   if (!fs.existsSync(CONFIG_JSON)) return null;
   try { return JSON.parse(fs.readFileSync(CONFIG_JSON, 'utf8')); } catch (e) { return null; }
 });
 
 ipcMain.handle('save-config', (event, data) => {
+  if (!isTrustedSetupSender(event)) return { ok: false, error: 'Yêu cầu thay đổi cấu hình không đến từ màn hình thiết lập.' };
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: 'Cấu hình gửi lên không hợp lệ.' };
   const cfg = {
     TenCty: String(data.TenCty || '').trim(),
     MaHS: String(data.MaHS || '').trim(),
