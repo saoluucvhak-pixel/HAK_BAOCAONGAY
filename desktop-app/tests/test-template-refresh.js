@@ -50,6 +50,26 @@ check('Cấu hình lần đầu thành công', res && res.ok, JSON.stringify(res
 const badCfg = handlers['save-config'](trustedSetupEvent, { TenCty: 'FORGED', PhieuCan: 'http://localhost/private', DNTT: 'javascript:alert(1)' });
 check('Link sai/không bảo mật bị từ chối ngay tại IPC', badCfg.ok === false);
 check('Cấu hình đang dùng giữ nguyên khi đường dẫn không hợp lệ', handlers['get-config'](trustedSetupEvent).TenCty === 'CONG TY THU NGHIEM');
+
+const oldReportBytes = fs.readFileSync(path.join(userData, 'report.html'));
+const oldConfigBytes = fs.readFileSync(path.join(userData, 'company-config.json'));
+const originalRename = fs.renameSync;
+fs.renameSync = function (src, dst) {
+  if (dst === path.join(userData, 'company-config.json')) throw new Error('Simulated locked config file');
+  return originalRename.apply(this, arguments);
+};
+let failedUpdate;
+try {
+  failedUpdate = handlers['save-config'](trustedSetupEvent, {
+    TenCty: 'KHÔNG ĐƯỢC LƯU',
+    PhieuCan: 'https://docs.google.com/spreadsheets/d/e/NEW_PC/pub?output=csv',
+    DNTT: 'https://docs.google.com/spreadsheets/d/e/NEW_DN/pub?output=csv'
+  });
+} finally { fs.renameSync = originalRename; }
+check('Lỗi ghi file config phải báo thất bại', failedUpdate && failedUpdate.ok === false);
+check('Lỗi ghi config phải giữ nguyên report.html', fs.readFileSync(path.join(userData, 'report.html')).equals(oldReportBytes));
+check('Lỗi ghi config phải giữ nguyên company-config.json', fs.readFileSync(path.join(userData, 'company-config.json')).equals(oldConfigBytes));
+
 const reportPath = path.join(userData, 'report.html');
 check('report.html sinh từ mẫu v1', fs.readFileSync(reportPath, 'utf8').includes('TEMPLATE-V1'));
 
