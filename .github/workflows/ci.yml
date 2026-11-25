@@ -23,6 +23,8 @@ jobs:
       # Các test trỏ cố định tới /opt/pw-browsers/chromium (môi trường phát triển) → trỏ về Chromium của Playwright.
       - run: sudo mkdir -p /opt/pw-browsers && sudo ln -sf "$(node -e "console.log(require('playwright').chromium.executablePath())")" /opt/pw-browsers/chromium
       - run: npm run build
+      # config.html lưu bản base64 của dist: phải đồng bộ sau build để tránh phát hành mẫu cũ.
+      - run: npm run build:config
       - run: npm run lint
       - run: npm test
       # Cảnh báo lỗ hổng thư viện (xlsx chưa có bản vá; jsPDF/autotable cần nâng major) — chưa chặn CI.
