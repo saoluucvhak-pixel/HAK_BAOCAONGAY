@@ -13,14 +13,14 @@ const realTemplate = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.ht
 fs.writeFileSync(path.join(appDir, 'app', 'setup.html'), '<html>setup</html>');
 fs.copyFileSync(path.join(__dirname, '..', 'main.js'), path.join(appDir, 'main.js'));
 
-let loaded = [], readyCb = null;
+let loaded = [], readyCb = null, windowOpenHandler = null, navigationHandler = null, externalUrls = [];
 const switches = {};
 const handlers = {};
 const electronMock = {
   app: { getPath: () => userData, whenReady: () => ({ then: (cb) => { readyCb = cb; } }), on: () => {}, quit: () => {}, commandLine: { appendSwitch: (k, v) => { switches[k] = v; } } },
-  BrowserWindow: Object.assign(function () { this.loadFile = (f) => loaded.push(f); this.webContents = { setWindowOpenHandler() {}, session: { on() {} } }; this.on = () => {}; }, { getAllWindows: () => [] }),
+  BrowserWindow: Object.assign(function () { this.loadFile = (f) => loaded.push(f); this.webContents = { setWindowOpenHandler(fn) { windowOpenHandler = fn; }, on(name, fn) { if (name === 'will-navigate') navigationHandler = fn; }, session: { on() {} } }; this.on = () => {}; }, { getAllWindows: () => [] }),
   Menu: { setApplicationMenu() {}, buildFromTemplate: () => ({}) },
-  shell: { openExternal() {} },
+  shell: { openExternal(url) { externalUrls.push(url); return Promise.resolve(); } },
   ipcMain: { handle: (n, fn) => { handlers[n] = fn; } },
 };
 const origLoad = Module._load;
@@ -70,6 +70,20 @@ check('Nâng cấp từ bản cũ (chưa có dấu vân tay): tự sinh lại th
 fs.writeFileSync(path.join(appDir, 'app', 'index.html'), '<html>mau hong</html>');
 const opened2 = startApp();
 check('Mẫu mới lỗi: vẫn mở báo cáo đang có (không bị đẩy về màn hình cấu hình/mất báo cáo)', opened2 === reportPath && fs.readFileSync(reportPath, 'utf8').includes('CONG TY THU NGHIEM'), opened2);
+
+// Security regression: giới hạn protocol bên ngoài và chặn điều hướng cửa sổ tới URL lạ.
+windowOpenHandler({ url: 'javascript:alert(1)' });
+windowOpenHandler({ url: 'file:///etc/passwd' });
+windowOpenHandler({ url: 'customapp://payload' });
+check('Không mở giao thức javascript/file/custom ra ngoài', externalUrls.length === 0);
+const openResult = windowOpenHandler({ url: 'https://example.org/help' });
+check('HTTPS được mở bằng trình duyệt mặc định, popup Electron bị từ chối', externalUrls.length === 1 && externalUrls[0] === 'https://example.org/help' && openResult.action === 'deny');
+let prevented = 0;
+navigationHandler({ preventDefault() { prevented++; } }, 'https://example.org/foreign');
+navigationHandler({ preventDefault() { prevented++; } }, 'file:///tmp/untrusted.html');
+check('Chặn điều hướng cửa sổ chính ra website và file lạ', prevented === 2);
+navigationHandler({ preventDefault() { prevented++; } }, require('url').pathToFileURL(reportPath).toString());
+check('Vẫn cho phép điều hướng tới báo cáo do app quản lý', prevented === 2);
 
 Module._load = origLoad;
 fs.rmSync(tmp, { recursive: true, force: true });
