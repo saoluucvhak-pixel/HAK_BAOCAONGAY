@@ -621,6 +621,12 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
 
       <section class="section" id="sec-cauhinh">
         <div class="pageHead"><h1>Cấu hình</h1></div>
+        <!-- Chỉ hiện khi chạy trong Electron Desktop có preload API; Web vẫn ẩn. -->
+        <div class="dmCard" id="desktopSheetSourceCard" style="display:none;margin-bottom:16px">
+          <h3>Nguồn dữ liệu Google Sheets</h3>
+          <p style="color:var(--muted);font-size:13px;margin:8px 0 14px">Quản lý 4 nguồn Phiếu cân, Đề nghị thanh toán, Hợp đồng NCC và Hồ sơ keo. Kiểm tra kết nối và cột dữ liệu trước khi áp dụng. Nguồn hiện tại được giữ lại nếu kiểm tra thất bại.</p>
+          <button class="btn primary small" id="btnDesktopSheetSources" type="button">⚙ Quản lý nguồn Google Sheets</button>
+        </div>
         <div class="dmCard">
           <h3>Sao lưu / Khôi phục dữ liệu đã lưu trên trình duyệt này</h3>
           <div style="color:var(--muted);font-size:13px;margin-bottom:8px">Xuất toàn bộ dữ liệu bạn đã tự nhập (danh mục Đại lý/Hỗ trợ, thông tin ngân hàng/WO đã lưu) ra 1 file JSON để lưu trữ hoặc chuyển sang máy khác. Không bao gồm dữ liệu Google Sheet (luôn tải lại từ nguồn).</div>
