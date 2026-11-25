@@ -16,7 +16,6 @@ import { parseCSV, csvToObjects } from '../utils/csv-utils.js';
 import { runReport } from '../store/report-runtime.js';
 import { logger } from './logger.js';
 import { saveSheetText, loadSheetText } from './offline-cache.js';
-import { getSheetSourceUrl } from './source-settings.js';
 
 /**
  * [SỬA 2026-09-23 — xử lý lỗi] Thời gian chờ tối đa cho 1 lần tải 1 Google Sheet. Trước đây
@@ -147,10 +146,10 @@ export async function loadAllData() {
   var offlineUsed = [];
   try {
     var results = await Promise.all([
-      loadSheet('PHIEUCAN', getSheetSourceUrl('PHIEUCAN'), offlineUsed).catch(function (e) { throw new Error('PHIEUCAN: ' + e.message); }),
-      loadSheet('DNTT_CT', getSheetSourceUrl('DNTT_CT'), offlineUsed).catch(function (e) { throw new Error('DNTT_CT: ' + e.message); }),
-      loadSheet('HD_NCC', getSheetSourceUrl('HD_NCC'), offlineUsed).catch(function (e) { warnings.push('không tải được HD_NCC (địa chỉ/CCCD người bán sẽ trống): ' + e.message); return []; }),
-      loadSheet('HOSOKEO', getSheetSourceUrl('HOSOKEO'), offlineUsed).catch(function (e) { warnings.push('không tải được HOSOKEO (Bảng kê lâm sản sẽ trống): ' + e.message); return []; })
+      loadSheet('PHIEUCAN', CONFIG.PHIEUCAN, offlineUsed).catch(function (e) { throw new Error('PHIEUCAN: ' + e.message); }),
+      loadSheet('DNTT_CT', CONFIG.DNTT_CT, offlineUsed).catch(function (e) { throw new Error('DNTT_CT: ' + e.message); }),
+      loadSheet('HD_NCC', CONFIG.HD_NCC, offlineUsed).catch(function (e) { warnings.push('không tải được HD_NCC (địa chỉ/CCCD người bán sẽ trống): ' + e.message); return []; }),
+      loadSheet('HOSOKEO', CONFIG.HOSOKEO, offlineUsed).catch(function (e) { warnings.push('không tải được HOSOKEO (Bảng kê lâm sản sẽ trống): ' + e.message); return []; })
     ]);
     [['PHIEUCAN', results[0]], ['DNTT_CT', results[1]], ['HD_NCC', results[2]], ['HOSOKEO', results[3]]].forEach(function (p) {
       var miss = missingColumns(p[1], REQUIRED_COLUMNS[p[0]]);
