@@ -28,6 +28,7 @@ const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 app.commandLine.appendSwitch('lang', 'vi');
 const path = require('path');
 const fs = require('fs');
+const { validateUrl } = require('./app/source-validator.js');
 
 let mainWindow = null;
 
@@ -210,6 +211,12 @@ ipcMain.handle('save-config', (event, data) => {
   if (!cfg.TenCty) return { ok: false, error: 'Cần nhập Tên công ty.' };
   if (!cfg.PhieuCan) return { ok: false, error: 'Cần nhập link Google Sheet "Phiếu cân" (bắt buộc).' };
   if (!cfg.DNTT) return { ok: false, error: 'Cần nhập link Google Sheet "Đề nghị thanh toán" (bắt buộc).' };
+  // Kiểm tra lần nữa tại main process: không tin tưởng dữ liệu renderer gửi qua IPC.
+  for (const key of ['PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo']) {
+    if (!cfg[key]) continue; // nguồn tùy chọn bỏ trống: giữ logic mặc định cũ.
+    const error = validateUrl(cfg[key]);
+    if (error) return { ok: false, error: key + ': ' + error };
+  }
 
   try {
     buildReportHtml(cfg); // luôn sinh lại từ file mẫu gốc — không bao giờ thay chồng lên report.html cũ
