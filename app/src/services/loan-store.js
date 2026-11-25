@@ -61,20 +61,32 @@ function openDb() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined' || !indexedDB) { reject(new Error('Trình duyệt không hỗ trợ lưu dữ liệu trên máy (IndexedDB).')); return; }
-    const timer = setTimeout(() => reject(new Error('Không mở được kho dữ liệu khoản vay (quá thời gian chờ) — đóng bớt cửa sổ app rồi thử lại.')), OPEN_TIMEOUT_MS);
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('Không mở được kho dữ liệu khoản vay (quá thời gian chờ) — đóng bớt cửa sổ app rồi thử lại.'));
+      }
+    }, OPEN_TIMEOUT_MS);
+    let req;
+    try { req = indexedDB.open(DB_NAME, DB_VERSION); }
+    catch (e) { clearTimeout(timer); settled = true; reject(e); return; }
     req.onupgradeneeded = (ev) => {
       for (let v = (ev.oldVersion || 0) + 1; v <= DB_VERSION; v++) if (MIGRATIONS[v]) MIGRATIONS[v](req.result, req.transaction);
     };
     req.onsuccess = () => {
       clearTimeout(timer);
       const db = req.result;
+      // Nếu kết nối xuất hiện sau timeout thì không sử dụng; phải đóng để tránh kho bị khoá.
+      if (settled) { try { db.close(); } catch (e) { /* đã đóng */ } return; }
+      settled = true;
       db.onversionchange = () => { try { db.close(); } catch (e) { /* đã đóng */ } dbPromise = null; };
       resolve(db);
     };
-    req.onerror = () => { clearTimeout(timer); reject(new Error('Lỗi mở kho khoản vay: ' + (req.error && req.error.message))); };
+    req.onerror = () => { clearTimeout(timer); if (!settled) { settled = true; reject(new Error('Lỗi mở kho khoản vay: ' + (req.error && req.error.message))); } };
   });
-  dbPromise.catch(() => { dbPromise = null; }); // lần sau thử mở lại, không giữ lỗi cũ mãi
+  const current = dbPromise;
+  dbPromise.catch(() => { if (dbPromise === current) dbPromise = null; }); // chỉ xoá promise của lần mở lỗi
   return dbPromise;
 }
 
