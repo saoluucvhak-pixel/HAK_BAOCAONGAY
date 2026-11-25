@@ -40,6 +40,7 @@ jobs:
           node-version: 22
       # Test Electron main bằng mock, không cần khởi chạy GUI.
       - run: node desktop-app/tests/test-template-refresh.js
+      - run: node desktop-app/tests/test-source-validator.js
 
   desktop-windows-tests:
     runs-on: windows-latest
@@ -49,3 +50,4 @@ jobs:
         with:
           node-version: 22
       - run: node desktop-app/tests/test-template-refresh.js
+      - run: node desktop-app/tests/test-source-validator.js
