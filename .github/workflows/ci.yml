@@ -28,3 +28,13 @@ jobs:
       # Cảnh báo lỗ hổng thư viện (xlsx chưa có bản vá; jsPDF/autotable cần nâng major) — chưa chặn CI.
       - run: npm audit --omit=dev
         continue-on-error: true
+
+  desktop-security-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Test Electron main bằng mock, không cần khởi chạy GUI.
+      - run: node desktop-app/tests/test-template-refresh.js
