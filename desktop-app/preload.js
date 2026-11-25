@@ -10,5 +10,7 @@ contextBridge.exposeInMainWorld('api', {
   /** Lấy cấu hình đã lưu trước đó (để điền sẵn lại form khi bấm "Đổi cấu hình công ty"). */
   getConfig: () => ipcRenderer.invoke('get-config'),
   /** Lưu cấu hình mới — main.js sẽ tự sinh lại báo cáo đúng công ty rồi báo kết quả. */
-  saveConfig: (data) => ipcRenderer.invoke('save-config', data)
+  saveConfig: (data) => ipcRenderer.invoke('save-config', data),
+  /** Mở màn hình quản lý Google Sheets trong cùng cửa sổ Desktop. */
+  openConfig: () => ipcRenderer.invoke('open-config')
 });

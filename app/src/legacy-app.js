@@ -171,6 +171,17 @@ function initEvents(){
   on('#sideToggle', 'click', function(){ $('#side').classList.toggle('open'); });
   on('#btnLapBC', 'click', runReport);
   on('#btnReload', 'click', loadAllData);
+  // Chỉ bản Desktop có cầu nối Electron mới mở được trình quản lý nguồn.
+  if (typeof window !== 'undefined' && window.api && typeof window.api.openConfig === 'function') {
+    var sourceCard = $('#desktopSheetSourceCard');
+    if (sourceCard) sourceCard.style.display = '';
+    on('#btnDesktopSheetSources', 'click', function () {
+      window.api.openConfig().catch(function (err) {
+        logger.error('[Nguồn dữ liệu] Không mở được cấu hình:', err.message);
+        setStatus('Không mở được màn hình cấu hình nguồn: ' + err.message, 'err');
+      });
+    });
+  }
   // [2026-09-22] Tách "Xuất tất cả Excel" thành 2 nút riêng (trước đó gộp 1 nút ra 2 file, nay
   // theo yêu cầu người dùng tách hẳn 2 nút bấm riêng): "BÁO CÁO TỔNG HỢP THÁNG" = đúng
   // exportAllExcel() cũ (Từ ngày→Đến ngày, không đổi gì); "BÁO CÁO TỔNG HỢP NGÀY" = exportNgayExcel().
