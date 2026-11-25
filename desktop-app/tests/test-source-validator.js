@@ -14,7 +14,8 @@ assert.equal(validateUrl('https://docs.google.com/spreadsheets/d/ABC/export?form
 for (const bad of ['http://docs.google.com/spreadsheets/d/e/x/pub?output=csv',
   'https://evil.example/spreadsheets/d/e/x/pub?output=csv',
   'javascript:alert(1)', 'file:///etc/passwd', 'https://docs.google.com/spreadsheets/d/e/x/pub',
-  'https://docs.google.com@evil.example/spreadsheets/d/e/x/pub?output=csv']) {
+  'https://docs.google.com@evil.example/spreadsheets/d/e/x/pub?output=csv',
+  "https://docs.google.com/spreadsheets/d/e/x/pub?output=csv&x=';alert(1)//"]) {
   assert.notEqual(validateUrl(bad), '', 'unsafe URL must be rejected: ' + bad);
 }
 assert.deepEqual(csvHeaders('\uFEFF"So,CT","Tên ""đại lý""",Ngày'), ['So,CT', 'Tên "đại lý"', 'Ngày']);
@@ -23,6 +24,11 @@ assert.equal(good.ok, true, JSON.stringify(good));
 assert.equal((await probeSource(source, url, async () => ({
   ok: true, body: null, text: async () => 'So_CT,Khách hàng\n1,A'
 }), 100)).ok, false, 'missing required columns must block save');
+const externalRedirect = await probeSource(source, url, async () => ({
+  ok: true, url: 'https://outside.example/unsafe.csv',
+  body: null, text: async () => source.columns.join(',') + '\n1,2'
+}), 100);
+assert.equal(externalRedirect.ok, false, 'redirect off Google must be rejected');
 const notCsv = await probeSource(source, url, async () => ({
   ok: true, body: null, text: async () => '<!DOCTYPE html><html>Login</html>'
 }), 100);
