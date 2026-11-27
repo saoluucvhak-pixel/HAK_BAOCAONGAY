@@ -1,5 +1,5 @@
 const DAY_MS = 86400000;
-const MODELS = new Set(['M04_14', 'M', 'Q', '6T', 'Y', 'CUSTOM']);
+const MODELS = new Set(['M04_14', 'M04', 'M14', 'M', 'Q', '6T', 'Y', 'CUSTOM']);
 
 function isDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -18,7 +18,7 @@ export function closingStock(reports) {
   const daily = reports.find(report => report.name === 'RP_MAU04');
   if (daily?.rows.length) return daily.rows.at(-1)[15];
   const periodic = reports.find(report => report.name.startsWith('RP_MAU29_'));
-  return periodic?.rows.at(-1)?.[8] ?? null;
+  return periodic?.rows.at(-1)?.[8] ?? reports.find(report => report.name === 'RP_MAU14')?.closing ?? null;
 }
 
 export function latestForestryClosing(history, from, { source, company, intake }) {

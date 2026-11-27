@@ -116,9 +116,15 @@ export function buildForestryReports({ calendar, settings, intake, dispatch, ord
     orderByDeclaration, opening,
   );
   const exportParameters = parameters.find(row => row['Mẫu'] === 'MAU14') ?? applicable[0];
-  return selected.flatMap(key => key === 'M04_14'
-    ? [dailyReport(ledger), exportReport(orders, exportParameters, from, to, commodityCode)]
-    : [periodReport(ledger, key, to)]);
+  const models = selected.flatMap(key => key === 'M04_14' ? ['M04', 'M14'] : [key]);
+  return [...new Set(models)].map(key => {
+    if (key === 'M04') return dailyReport(ledger);
+    if (key === 'M14') return {
+      ...exportReport(orders, exportParameters, from, to, commodityCode),
+      closing: ledger.at(-1).closing,
+    };
+    return periodReport(ledger, key, to);
+  });
 }
 
 // QR_NHAP / QR_XUAT / QR_CLKHO / QR_TONKHO. Giữ số gốc trong sổ tính và

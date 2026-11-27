@@ -113,7 +113,7 @@ const dateTime = new Intl.DateTimeFormat('vi-VN', {
   dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
 });
 const dateLabel = date => date.split('-').reverse().join('/');
-const reportLabels = { M04_14: '04, 14', M: '29 tháng', Q: '29 quý', '6T': '29 sáu tháng', Y: '29 năm', CUSTOM: '29 kỳ tùy chọn' };
+const reportLabels = { M04_14: '04, 14', M04: '04', M14: '14', M: '29 tháng', Q: '29 quý', '6T': '29 sáu tháng', Y: '29 năm', CUSTOM: '29 kỳ tùy chọn' };
 
 const periodChoices = {
   M: { label: 'Tháng', options: Array.from({ length: 12 }, (_, i) => 'Tháng ' + (i + 1)) },

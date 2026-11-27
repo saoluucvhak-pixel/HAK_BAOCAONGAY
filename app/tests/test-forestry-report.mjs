@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { isForestryHistoryEntry, latestForestryClosing } from '../src/services/forestry-history.js';
+import { closingStock, isForestryHistoryEntry, latestForestryClosing } from '../src/services/forestry-history.js';
 import { forestryPrintPages } from '../src/services/export/forestry-layout.js';
 import { FORESTRY_SOURCES, buildForestryReports, forestryPeriodRange, normalizeForestrySheet } from '../src/services/forestry-report.js';
 
@@ -109,3 +109,11 @@ assert.throws(() => buildForestryReports(data, { ...options, from: options.to, t
 const legacySettings = [{ 'Mẫu': 'MAU07', 'Tiêu hao SX': 0.05 }, { 'Mẫu': 'MAU14' }];
 const legacyCalendar = [options.from, options.to].map(date => ({ 'Ngày trong năm': date, 'Mẫu': 'MAU07' }));
 assert.deepEqual(buildForestryReports({ ...data, calendar: legacyCalendar, settings: legacySettings }, options)[0], m04);
+
+for (const [key, model] of [['M04', m04], ['M14', m14]]) {
+  const single = buildForestryReports(data, { ...options, selected: [key] });
+  assert.deepEqual(single, [model]);
+  assert.equal(forestryPrintPages(single, options).length, 1);
+  assert.equal(closingStock(single), 81);
+  assert.equal(isForestryHistoryEntry({ ...history, selected: [key] }), true);
+}
