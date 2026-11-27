@@ -68,18 +68,18 @@ Nếu cố ý thay đổi file xuất: `node tests/test-export-golden.mjs --upda
 
 ## Kích hoạt và cấu hình công ty trên Windows
 
-1. **Máy cần cài** mở bộ cài rồi bấm **Sao chép** để gửi mã yêu cầu `HAK-R1.…` cho HAK.
+1. **Máy cần cài** mở bộ cài rồi bấm **Sao chép** để gửi mã yêu cầu `HAK-R1.…` cho HAK. Giữ cửa sổ mở trong khi chờ phản hồi.
 2. **Quản trị viên HAK** mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html), mở khóa bằng file khóa riêng và mật khẩu, rồi dán mã yêu cầu. Mở **Thông tin công ty và nguồn Google Sheets**, điền tên công ty và các thông tin cần dùng. Dán liên kết CSV cho **Phiếu cân** và **Đề nghị thanh toán**. Có thể để trống **Hợp đồng NCC** và **Hồ sơ keo** khi không dùng hai nguồn này. Chọn ngày hết hạn rồi bấm **Tạo file cài đặt HAK**.
-3. **Máy cần cài** bấm **Nạp file HAK…** rồi chọn `HAK-CaiDat.haksetup`. Có thể đặt nguyên tên file cạnh bộ cài để bộ cài đọc tự động. Nếu ứng dụng đang hoạt động, dùng **Nạp file cài đặt HAK…** trong menu ứng dụng. Sau khi xác minh chữ ký, thời hạn và đúng máy được duyệt, ứng dụng tự đưa cấu hình vào báo cáo.
+3. **Máy cần cài** bấm **Nạp file HAK…** rồi chọn `HAK-CaiDat.haksetup`. Nếu ứng dụng đang hoạt động, dùng **Nạp file cài đặt HAK…** trong menu ứng dụng. Sau khi xác minh chữ ký, thời hạn và đúng máy được duyệt, ứng dụng tự đưa cấu hình vào báo cáo.
 
-Mỗi file chỉ kích hoạt cho máy và tài khoản Windows đã tạo yêu cầu. HAK có thể tạo file và người nhận có thể nạp file khi offline. Ứng dụng cần Internet để lấy dữ liệu mới từ Google Sheets. File có chứa thông tin công ty và liên kết CSV, vì vậy gửi riêng cho đầu mối được duyệt.
+Mỗi lần mở bộ cài sinh một mã ngẫu nhiên mới. Phản hồi chỉ có hiệu lực cho lần cài, máy và tài khoản Windows tạo yêu cầu. Mở lại ứng dụng đã cài dùng giấy phép đang còn hạn. HAK có thể tạo file và người nhận có thể nạp file khi offline. Ứng dụng cần Internet để lấy dữ liệu mới từ Google Sheets. File có chứa thông tin công ty và liên kết CSV, vì vậy gửi riêng cho đầu mối được duyệt.
 
-### Cấp lại sau khi cài Windows
+### Cấp lại khi cài lại ứng dụng hoặc Windows
 
-Nếu chỉ cài lại ứng dụng trên cùng tài khoản Windows và khóa máy vẫn còn, dùng lại file `HAK-CaiDat.haksetup` còn hạn. Nếu cài lại Windows làm mất khóa máy, thực hiện cấp lại:
+Khi cài lại ứng dụng hoặc Windows, dùng mã yêu cầu mới để cấp phản hồi mới.
 
-1. Máy vừa cài Windows mở bộ cài, sao chép mã yêu cầu mới `HAK-R1.…` và gửi HAK.
-2. Quản trị viên mở `HAK-CapPhep.html` bằng Chrome hoặc Edge. Chọn khóa riêng đã mã hóa dùng để cấp file cũ và nhập mật khẩu. Trong **Cấp lại sau khi cài Windows**, chọn file `.haksetup` cũ và bấm **Nạp cấu hình từ file cũ**. Công cụ xác minh chữ ký và điền lại thông tin công ty cùng các liên kết Google Sheets, kể cả khi giấy phép cũ đã hết hạn.
+1. Máy mở lại bộ cài, sao chép mã yêu cầu mới `HAK-R1.…` và gửi HAK.
+2. Quản trị viên mở `HAK-CapPhep.html` bằng Chrome hoặc Edge. Chọn khóa riêng đã mã hóa dùng để cấp file cũ và nhập mật khẩu. Trong **Dùng lại cấu hình khi cài lại**, chọn file `.haksetup` cũ và bấm **Nạp cấu hình từ file cũ**. Công cụ xác minh chữ ký và điền lại thông tin công ty cùng các liên kết Google Sheets, kể cả khi giấy phép cũ đã hết hạn.
 3. Kiểm tra thông tin, dán mã yêu cầu mới, chọn ngày hết hạn rồi bấm **Tạo file cài đặt HAK**. Gửi file mới cho người dùng để chọn **Nạp file HAK…**.
 
 Khi không còn file cũ, điền lại cấu hình theo hồ sơ công ty đã duyệt. Giữ một bản file cấp phép ở nơi quản trị viên được phép truy cập để thuận tiện cấp lại.
@@ -94,30 +94,10 @@ Mỗi lần mở trang quản trị, chỉ cần mở khóa một lần để x�
 
 ### Đóng bộ cài trên máy quản trị HAK
 
-- Lần đầu, mở `HAK-CapPhep.html` bằng Chrome hoặc Edge. Chọn **Tạo khóa**. Tải `public.jwk` và file khóa riêng đã mã hóa. Giữ khóa riêng và mật khẩu trên máy quản trị. Chỉ chọn `public.jwk` khi đóng bộ cài.
-- Máy đóng gói dùng Windows với Node.js 22.12 trở lên, .NET SDK có bộ tham chiếu .NET Framework 4.8 và phụ thuộc desktop đã chuẩn bị. Chạy `npm ci` trong thư mục `desktop-app` khi chuẩn bị máy. Bộ đóng gói sử dụng bản HTML đã build sẵn trong dự án.
-- Mở `desktop-app/Dong-Bo-Cai-HAK.cmd`. Chọn `public.jwk`, chọn chứng thư ký Windows dạng PFX/P12 của HAK rồi nhập mật khẩu. Bản cài và công cụ quản trị nằm trong `desktop-app/release` sau khi xác minh chữ ký.
-- Quy trình chạy trên máy Windows của HAK và dùng dấu thời gian Authenticode. Lần đầu cần chuẩn bị phụ thuộc và các công cụ đóng gói. Trao mã yêu cầu, nhận file cài đặt HAK và xác minh giấy phép có thể làm offline.
-
-**Dùng dòng lệnh:** ví dụ sau tạo định dạng khóa riêng PEM cho công cụ Node.js. Chạy ở gốc repo trên máy quản trị và lưu khóa riêng vào thư mục có quyền truy cập giới hạn.
-
-```powershell
-$secret = Read-Host 'Mat khau khoa cap phep HAK' -AsSecureString
-$address = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
-try {
-  $env:HAK_LICENSE_KEY_PASSPHRASE = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($address)
-  # Chạy một lần để khởi tạo đơn vị:
-  node desktop-app/licensing/admin.mjs keygen 'C:\HAK-Keys\private.pem' 'C:\HAK-Keys\public.jwk'
-  # Chạy sau khi duyệt mỗi yêu cầu, với hạn sử dụng do HAK chọn:
-  node desktop-app/licensing/admin.mjs issue 'C:\HAK-Keys\private.pem' '.\HAK-YeuCau.hakreq' '.\HAK-GiayPhep.haklic' 'HAK-KT-023' '2027-02-28'
-}
-finally {
-  Remove-Item Env:HAK_LICENSE_KEY_PASSPHRASE -ErrorAction SilentlyContinue
-  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($address)
-}
-```
-
-Giấy phép kiểm tra offline theo đồng hồ Windows. Việc thu hồi ngay qua mạng cần một dịch vụ riêng. Cài lại Windows, xóa TPM hoặc đổi tài khoản có thể cần đăng ký lại. Bản HTML web và quyền truy cập nguồn Google Sheets do chính sách phân phối dữ liệu của HAK quản lý riêng.
+- Máy đóng gói dùng Windows với Node.js 22.12 trở lên và .NET SDK có bộ tham chiếu .NET Framework 4.8.
+- Mở `desktop-app/Dong-Bo-Cai-HAK.cmd` và đặt mật khẩu quản trị khi được hỏi. Công cụ lưu khóa riêng đã mã hóa tại `%LOCALAPPDATA%\HAK\Issuer\HAK-KhoaRieng.hakkey`, tự đưa phần khóa công khai vào bộ cài và xuất bộ cài cùng `HAK-CapPhep.html` trong `desktop-app/release`.
+- Khi cần đóng lại bộ cài, nhập mật khẩu đã dùng. Khi duyệt máy, mở `HAK-CapPhep.html`, chọn cùng file `.hakkey` và cấp file phản hồi như trên. Sao lưu file khóa đã mã hóa để giữ khả năng cấp phép nếu máy quản trị được cài lại.
+- Bộ cài đóng cục bộ theo cách này dùng xác minh giấy phép HAK theo máy và được kiểm tra SHA-256. Bộ cài có thể hiện cảnh báo nhà phát hành chưa xác định trên Windows.
 
 ### Phát hành có chữ ký Authenticode
 

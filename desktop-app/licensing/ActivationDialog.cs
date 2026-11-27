@@ -78,7 +78,7 @@ internal static class ActivationDialog
                 }
             };
             dialog.Controls.AddRange(new Control[] {
-                new Label { Text = "1. Gửi mã yêu cầu này cho quản trị viên HAK", AutoSize = true, Location = new Point(20, 20) },
+                new Label { Text = "1. Gửi mã này cho HAK và giữ cửa sổ mở khi chờ phản hồi", AutoSize = true, Location = new Point(20, 20) },
                 request, copy,
                 new Label { Text = "2. Nạp file HAK gửi lại hoặc dán mã trả lời (Ctrl+V)", AutoSize = true, Location = new Point(20, 108) },
                 response, status, importFile, confirm, cancel

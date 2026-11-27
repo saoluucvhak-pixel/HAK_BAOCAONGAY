@@ -13,7 +13,7 @@ internal static class Program
     private const string ResponsePrefix = "HAK-A1.";
     private const string KeyName = "HAK BaoCaoNgay Device v1";
     private const int MaxFileBytes = 16384;
-    private static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = MaxFileBytes };
+    private static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = MaxFileBytes * 2 };
     private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
     private static readonly string LicensePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HAK", "BaoCaoNgay", "license.haklic");
@@ -28,8 +28,10 @@ internal static class Program
             {
                 try
                 {
-                    return ActivationDialog.Run(CreateRequestCode(policy), text => AcceptCode(text, policy),
-                        file => AcceptFile(file, policy, true)) ? 0 : 1;
+                    var nonce = NewNonce();
+                    var request = RequestForInstall(policy, nonce);
+                    return ActivationDialog.Run(RequestPrefix + EncodeBase64Url(Convert.FromBase64String(request.device)),
+                        text => AcceptCode(text, policy, nonce), file => AcceptFile(file, policy, nonce, true)) ? 0 : 1;
                 }
                 catch (Exception error)
                 {
@@ -39,46 +41,49 @@ internal static class Program
                     return 1;
                 }
             }
-            if (args.Length == 2 && args[0] == "request-code")
-            {
-                File.WriteAllText(args[1], CreateRequestCode(policy), Utf8);
-                return 0;
-            }
-            if (args.Length == 2 && args[0] == "request")
-            {
-                using (var key = OpenDeviceKey(policy, true))
-                {
-                    var request = new Request { product = Product, device = DeviceFingerprint(key), provider = key.Provider.Provider };
-                    File.WriteAllText(args[1], Json.Serialize(request), Utf8);
-                }
-                return 0;
-            }
 
             if (args.Length == 1 && args[0] == "check")
             {
-                var blob = ReadLimited(LicensePath);
-                var content = Utf8.GetString(blob);
+                var installed = ReadInstalledAuthorization();
+                var authorization = Convert.FromBase64String(installed.authorization);
+                var nonce = Convert.FromBase64String(installed.nonce);
+                var content = Utf8.GetString(authorization);
                 if (content.StartsWith(ResponsePrefix, StringComparison.Ordinal))
-                    VerifyCode(content, policy);
+                    VerifyCode(content, policy, nonce);
                 else
                 {
-                    var license = Verify(blob, policy);
+                    var license = Verify(authorization, policy, nonce);
                     if (license.company != null)
                         Console.WriteLine(Convert.ToBase64String(Utf8.GetBytes(Json.Serialize(license.company))));
                 }
                 return 0;
             }
-            if (args.Length == 2 && (args[0] == "accept" || args[0] == "accept-kit"))
+            if (args.Length == 2 && args[0] == "accept-kit")
             {
-                AcceptFile(args[1], policy, args[0] == "accept-kit");
+                var installed = ReadInstalledAuthorization();
+                AcceptFile(args[1], policy, Convert.FromBase64String(installed.nonce), true);
                 return 0;
             }
-            if (args.Length == 2 && args[0] == "accept-code")
+
+            // Only the isolated Windows CI build accepts unattended test input.
+            if (policy.qa && args.Length == 2 && args[0] == "prepare-install-qa")
             {
-                AcceptCode(Utf8.GetString(ReadLimited(args[1])), policy);
+                var nonce = NewNonce();
+                var request = RequestForInstall(policy, nonce);
+                Directory.CreateDirectory(Path.GetDirectoryName(LicensePath));
+                File.WriteAllBytes(LicensePath + ".pending-qa", nonce);
+                File.WriteAllText(args[1], Json.Serialize(request), Utf8);
                 return 0;
             }
-            Console.Error.WriteLine("Usage: HAK-License request <file.hakreq> | accept <file.haklic> | accept-kit <file.haksetup> | check | enroll | request-code <file> | accept-code <file>");
+            if (policy.qa && args.Length == 2 && args[0] == "accept-install-qa")
+            {
+                string pending = LicensePath + ".pending-qa";
+                var nonce = ReadLimited(pending);
+                File.Delete(pending);
+                AcceptFile(args[1], policy, nonce, false);
+                return 0;
+            }
+            Console.Error.WriteLine("Usage: HAK-License check | enroll | accept-kit <file.haksetup>");
             return 2;
         }
         catch (Exception error)
@@ -112,16 +117,28 @@ internal static class Program
         return CngKey.Create(CngAlgorithm.Rsa, name, parameters);
     }
 
-    private static string DeviceFingerprint(CngKey key)
+    private static byte[] NewNonce()
     {
-        using (var digest = SHA256.Create())
-            return Convert.ToBase64String(digest.ComputeHash(key.Export(CngKeyBlobFormat.GenericPublicBlob)));
+        var nonce = new byte[32];
+        using (var rng = RandomNumberGenerator.Create()) rng.GetBytes(nonce);
+        return nonce;
     }
 
-    private static string CreateRequestCode(Policy policy)
+    private static string InstallFingerprint(CngKey key, byte[] nonce)
+    {
+        if (nonce.Length != 32) throw new InvalidDataException("Mã yêu cầu của lần cài không hợp lệ.");
+        var publicKey = key.Export(CngKeyBlobFormat.GenericPublicBlob);
+        var scope = new byte[publicKey.Length + nonce.Length];
+        Buffer.BlockCopy(publicKey, 0, scope, 0, publicKey.Length);
+        Buffer.BlockCopy(nonce, 0, scope, publicKey.Length, nonce.Length);
+        using (var digest = SHA256.Create())
+            return Convert.ToBase64String(digest.ComputeHash(scope));
+    }
+
+    private static Request RequestForInstall(Policy policy, byte[] nonce)
     {
         using (var key = OpenDeviceKey(policy, true))
-            return RequestPrefix + EncodeBase64Url(Convert.FromBase64String(DeviceFingerprint(key)));
+            return new Request { product = Product, device = InstallFingerprint(key, nonce), provider = key.Provider.Provider };
     }
 
     private static string EncodeBase64Url(byte[] bytes)
@@ -135,33 +152,33 @@ internal static class Program
         return Convert.FromBase64String(text.PadRight((text.Length + 3) / 4 * 4, '='));
     }
 
-    private static byte[] ReadLimited(string file)
+    private static byte[] ReadLimited(string file, int limit = MaxFileBytes)
     {
         using (var stream = File.OpenRead(file))
         {
-            if (stream.Length <= 0 || stream.Length > MaxFileBytes)
+            if (stream.Length <= 0 || stream.Length > limit)
                 throw new InvalidDataException("Invalid HAK license file length.");
             using (var reader = new BinaryReader(stream))
                 return reader.ReadBytes((int)stream.Length);
         }
     }
 
-    private static void AcceptFile(string file, Policy policy, bool requireCompany)
+    private static void AcceptFile(string file, Policy policy, byte[] nonce, bool requireCompany)
     {
         var blob = ReadLimited(file);
-        var license = Verify(blob, policy);
+        var license = Verify(blob, policy, nonce);
         if (requireCompany && license.company == null)
             throw new InvalidDataException("File này thiếu cấu hình công ty do HAK cấp.");
-        SaveLicense(blob);
+        SaveLicense(blob, nonce);
     }
 
-    private static License Verify(byte[] blob, Policy policy)
+    private static License Verify(byte[] blob, Policy policy, byte[] nonce)
     {
         var envelope = Json.Deserialize<Envelope>(Utf8.GetString(blob));
         var payload = Convert.FromBase64String(envelope.body);
         VerifyIssuerSignature(payload, Convert.FromBase64String(envelope.signature), policy);
         var license = Json.Deserialize<License>(Utf8.GetString(payload));
-        VerifyDeviceAndValidity(license, policy);
+        VerifyDeviceAndValidity(license, policy, nonce);
         if (license.company != null) ValidateCompany(license.company);
         return license;
     }
@@ -201,14 +218,14 @@ internal static class Program
         }
     }
 
-    private static void AcceptCode(string text, Policy policy)
+    private static void AcceptCode(string text, Policy policy, byte[] nonce)
     {
         string code = Regex.Replace(text, @"\s+", "");
-        VerifyCode(code, policy);
-        SaveLicense(Utf8.GetBytes(code));
+        VerifyCode(code, policy, nonce);
+        SaveLicense(Utf8.GetBytes(code), nonce);
     }
 
-    private static void VerifyCode(string code, Policy policy)
+    private static void VerifyCode(string code, Policy policy, byte[] nonce)
     {
         if (code.Length > 4096 || !code.StartsWith(ResponsePrefix, StringComparison.Ordinal))
             throw new InvalidDataException("Hãy dán đầy đủ mã trả lời bắt đầu bằng HAK-A1.");
@@ -229,7 +246,7 @@ internal static class Program
                     product = Product, version = 1, issuedAt = reader.ReadInt64(), expiresAt = reader.ReadInt64(),
                     device = Convert.ToBase64String(reader.ReadBytes(32))
                 };
-                VerifyDeviceAndValidity(license, policy);
+                VerifyDeviceAndValidity(license, policy, nonce);
             }
         }
         catch (FormatException)
@@ -238,7 +255,7 @@ internal static class Program
         }
     }
 
-    private static void VerifyDeviceAndValidity(License license, Policy policy)
+    private static void VerifyDeviceAndValidity(License license, Policy policy, byte[] nonce)
     {
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         if (license.product != Product || license.version != 1 || license.issuedAt > now ||
@@ -246,8 +263,8 @@ internal static class Program
             throw new InvalidDataException("Giấy phép đã hết hạn, chưa có hiệu lực hoặc thuộc sản phẩm khác.");
         using (var key = OpenDeviceKey(policy, false))
         {
-            if (license.device != DeviceFingerprint(key))
-                throw new CryptographicException("Mã trả lời này thuộc máy hoặc tài khoản Windows khác.");
+            if (license.device != InstallFingerprint(key, nonce))
+                throw new CryptographicException("Phản hồi này thuộc mã yêu cầu khác. Gửi mã đang hiển thị cho HAK.");
             var challenge = new byte[32];
             using (var rng = RandomNumberGenerator.Create()) rng.GetBytes(challenge);
             using (var rsa = new RSACng(key))
@@ -259,20 +276,37 @@ internal static class Program
         }
     }
 
-    private static void SaveLicense(byte[] blob)
+    private static InstalledAuthorization ReadInstalledAuthorization()
+    {
+        var stored = Json.Deserialize<InstalledAuthorization>(Utf8.GetString(ReadLimited(LicensePath, MaxFileBytes * 2)));
+        if (stored == null || string.IsNullOrEmpty(stored.nonce) || string.IsNullOrEmpty(stored.authorization))
+            throw new InvalidDataException("Cần mã phản hồi cho lần cài này.");
+        return stored;
+    }
+
+    private static void SaveLicense(byte[] blob, byte[] nonce)
     {
         string directory = Path.GetDirectoryName(LicensePath);
         Directory.CreateDirectory(directory);
         string temp = Path.Combine(directory, Path.GetRandomFileName());
         try
         {
-            File.WriteAllBytes(temp, blob);
+            var installed = new InstalledAuthorization
+            {
+                nonce = Convert.ToBase64String(nonce), authorization = Convert.ToBase64String(blob)
+            };
+            File.WriteAllText(temp, Json.Serialize(installed), Utf8);
             if (File.Exists(LicensePath)) File.Replace(temp, LicensePath, null);
             else File.Move(temp, LicensePath);
         }
         finally { File.Delete(temp); }
     }
 
+    public sealed class InstalledAuthorization
+    {
+        public string nonce { get; set; }
+        public string authorization { get; set; }
+    }
     public sealed class Policy { public string n { get; set; } public string e { get; set; } public bool qa { get; set; } }
     public sealed class Request { public string product { get; set; } public string device { get; set; } public string provider { get; set; } }
     public sealed class Envelope { public string body { get; set; } public string signature { get; set; } }

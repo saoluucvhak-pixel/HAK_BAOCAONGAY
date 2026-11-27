@@ -1,17 +1,5 @@
 ﻿$ErrorActionPreference = 'Stop'
 
-function Select-File([string]$Title, [string]$Filter) {
-  $picker = New-Object System.Windows.Forms.OpenFileDialog
-  try {
-    $picker.Title = $Title
-    $picker.Filter = $Filter
-    if ($picker.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return $null }
-    return $picker.FileName
-  } finally {
-    $picker.Dispose()
-  }
-}
-
 function Run-Tool([string]$Command, [string[]]$Arguments) {
   & $Command @Arguments
   if ($LASTEXITCODE -ne 0) { throw "$Command kết thúc với lỗi $LASTEXITCODE." }
@@ -30,39 +18,56 @@ try {
     Get-Command $tool -ErrorAction Stop | Out-Null
   }
   if (-not (Test-Path -LiteralPath (Join-Path $root 'node_modules/.bin/electron-builder.cmd'))) {
-    throw 'Máy này chưa được chuẩn bị công cụ đóng gói. IT cần cài trước phụ thuộc Windows theo README.'
+    Push-Location $root
+    try { Run-Tool 'npm.cmd' @('ci') }
+    finally { Pop-Location }
   }
   Run-Tool 'node.exe' @((Join-Path $root '../app/scripts/verify-build.mjs'))
-  Add-Type -AssemblyName System.Windows.Forms
-  $publicPath = Select-File 'Chọn khóa công khai HAK' 'Khóa công khai (*.jwk)|*.jwk'
-  if (-not $publicPath) { exit 0 }
-  $certificatePath = Select-File 'Chọn chứng thư ký bộ cài của công ty' 'Chứng thư PFX/P12 (*.pfx;*.p12)|*.pfx;*.p12'
-  if (-not $certificatePath) { exit 0 }
-
-  $password = Read-Host 'Mật khẩu chứng thư ký bộ cài' -AsSecureString
+  $issuerFile = Join-Path $env:LOCALAPPDATA 'HAK\Issuer\HAK-KhoaRieng.hakkey'
+  $firstRun = -not (Test-Path -LiteralPath $issuerFile)
+  if ($firstRun) {
+    $password = Read-Host 'Đặt mật khẩu quản trị HAK (ít nhất 12 ký tự)' -AsSecureString
+  } else {
+    $password = Read-Host 'Nhập mật khẩu quản trị HAK' -AsSecureString
+  }
   $passwordPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
+  $repeatPtr = [IntPtr]::Zero
   try {
-    $env:WIN_CSC_LINK = $certificatePath
-    $env:WIN_CSC_KEY_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPtr)
-    $env:HAK_LICENSE_PUBLIC_KEY = [IO.File]::ReadAllText($publicPath)
+    $env:HAK_LOCAL_ISSUER_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPtr)
+    if ($firstRun) {
+      $repeated = Read-Host 'Nhập lại mật khẩu quản trị HAK' -AsSecureString
+      $repeatPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($repeated)
+      if (-not [string]::Equals($env:HAK_LOCAL_ISSUER_PASSWORD, [Runtime.InteropServices.Marshal]::PtrToStringBSTR($repeatPtr), [StringComparison]::Ordinal)) {
+        throw 'Hai mật khẩu chưa khớp.'
+      }
+    }
+    $publicKey = & node.exe (Join-Path $PSScriptRoot 'local-issuer.mjs') $issuerFile
+    if ($LASTEXITCODE -ne 0 -or -not $publicKey) { throw 'Không mở được khóa quản trị HAK.' }
+  } finally {
+    Remove-Item Env:HAK_LOCAL_ISSUER_PASSWORD -ErrorAction SilentlyContinue
+    if ($repeatPtr -ne [IntPtr]::Zero) {
+      [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($repeatPtr)
+    }
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPtr)
+  }
+
+  try {
+    $env:HAK_LICENSE_PUBLIC_KEY = $publicKey
     $env:HAK_LICENSE_QA = '0'
-    $env:HAK_REQUIRE_SIGNING = '1'
+    $env:HAK_REQUIRE_SIGNING = '0'
     $env:CSC_IDENTITY_AUTO_DISCOVERY = 'false'
+    Remove-Item Env:WIN_CSC_LINK, Env:WIN_CSC_KEY_PASSWORD, Env:CSC_LINK, Env:CSC_KEY_PASSWORD -ErrorAction SilentlyContinue
     Push-Location $root
     try {
       Run-Tool 'npm.cmd' @('run', 'release')
-      & (Join-Path $PSScriptRoot 'audit-installer.ps1') -ReleaseDir $releaseDir -RequireSignature -RequireTimestamp
-      $registration = Get-AuthenticodeSignature -LiteralPath (Join-Path $releaseDir 'registration/HAK-License.exe')
-      if ($registration.Status -ne 'Valid' -or -not $registration.TimeStamperCertificate) {
-        throw 'Công cụ đăng ký HAK thiếu chữ ký Authenticode hoặc dấu thời gian hợp lệ.'
-      }
-      Write-Host "Xong. Bộ cài và công cụ cấp phép nằm tại $releaseDir"
+      & (Join-Path $PSScriptRoot 'audit-installer.ps1') -ReleaseDir $releaseDir
+      Write-Host "Bộ cài và HAK-CapPhep.html: $releaseDir"
+      Write-Host "Khóa dùng để duyệt máy: $issuerFile"
     } finally {
       Pop-Location
     }
   } finally {
-    Remove-Item Env:WIN_CSC_LINK, Env:WIN_CSC_KEY_PASSWORD, Env:HAK_LICENSE_PUBLIC_KEY, Env:HAK_LICENSE_QA, Env:HAK_REQUIRE_SIGNING, Env:CSC_IDENTITY_AUTO_DISCOVERY -ErrorAction SilentlyContinue
-    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPtr)
+    Remove-Item Env:HAK_LICENSE_PUBLIC_KEY, Env:HAK_LICENSE_QA, Env:HAK_REQUIRE_SIGNING, Env:CSC_IDENTITY_AUTO_DISCOVERY -ErrorAction SilentlyContinue
   }
 } catch {
   Write-Host $_.Exception.Message -ForegroundColor Red

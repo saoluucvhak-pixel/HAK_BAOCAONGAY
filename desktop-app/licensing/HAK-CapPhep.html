@@ -76,7 +76,7 @@
       <button type="submit" value="kit">Tạo file cài đặt HAK</button>
       <button class="secondary" type="submit" value="code">Tạo mã trả lời</button>
       <details>
-        <summary>Cấp lại sau khi cài Windows</summary>
+        <summary>Dùng lại cấu hình khi cài lại</summary>
         <label>File cài đặt HAK cũ <input id="previousSetup" type="file" accept=".haksetup"></label>
         <button class="secondary" type="submit" value="restore" formnovalidate>Nạp cấu hình từ file cũ</button>
         <p>Sau khi nạp, kiểm tra cấu hình, dán mã yêu cầu mới và bấm Tạo file cài đặt HAK.</p>
@@ -192,7 +192,7 @@ submit($('createForm'), $('createStatus'), async () => {
   };
   $('createForm').reset();
   $('keyDownloads').hidden = false;
-  report($('createStatus'), 'Đã tạo khóa. Gửi public.jwk để đóng bộ cài. Giữ file khóa riêng trên máy quản trị HAK.');
+  report($('createStatus'), 'Đã tạo khóa. Giữ file khóa riêng và mật khẩu trên máy quản trị HAK.');
 });
 $('downloadPublic').addEventListener('click', () => download('public.jwk', generatedKeys.publicKey));
 $('downloadPrivate').addEventListener('click', () => download('HAK-KhoaRieng.hakkey', generatedKeys.privateKey));
