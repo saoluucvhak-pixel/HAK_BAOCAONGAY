@@ -289,6 +289,39 @@ function initManagedCompanySettings() {
   });
 }
 
+function initDesktopAccountSettings() {
+  if (!MANAGED_COMPANY || typeof window.api?.getAccountMode !== 'function' ||
+      typeof window.api.configureAccount !== 'function') return;
+  const card = $('#desktopAccountSettings');
+  const button = $('#btnConfigureAccount');
+  const status = $('#desktopAccountStatus');
+  let mode;
+  card.hidden = false;
+
+  function showMode(result) {
+    if (!result?.ok) throw new Error(result?.error || 'Không đọc được chế độ đăng nhập.');
+    if (result.canceled) return;
+    mode = result.mode;
+    const enabled = mode === 'account';
+    button.textContent = enabled ? 'Tắt đăng nhập' : 'Bật đăng nhập';
+    status.textContent = enabled ? 'Ứng dụng yêu cầu tài khoản và mật khẩu khi mở.' :
+      'Chế độ một người sử dụng. Mở ứng dụng trực tiếp.';
+    button.disabled = false;
+  }
+
+  window.api.getAccountMode().then(showMode).catch((error) => { status.textContent = error.message; });
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      showMode(await window.api.configureAccount(mode === 'account' ? 'disable' : 'enable'));
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 function initEvents(){
   $$('.item', $('#navList')).forEach(function(it){ it.addEventListener('click', function(){ showSection(it.dataset.target); }); });
   $$('.rtab[data-rtab]').forEach(function(b){ b.addEventListener('click', function(){ showReportTab(b.dataset.rtab); }); });
@@ -296,6 +329,7 @@ function initEvents(){
   on('#btnLapBC', 'click', runReport);
   on('#btnReload', 'click', loadAllData);
   initManagedCompanySettings();
+  initDesktopAccountSettings();
   // [2026-09-22] Tách "Xuất tất cả Excel" thành 2 nút riêng (trước đó gộp 1 nút ra 2 file, nay
   // theo yêu cầu người dùng tách hẳn 2 nút bấm riêng): "BÁO CÁO TỔNG HỢP THÁNG" = đúng
   // exportAllExcel() cũ (Từ ngày→Đến ngày, không đổi gì); "BÁO CÁO TỔNG HỢP NGÀY" = exportNgayExcel().

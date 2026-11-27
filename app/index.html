@@ -253,6 +253,11 @@ if(t.mode==='light'||t.mode==='dark')h.setAttribute('data-theme',t.mode);}catch(
           <h3>Định dạng số trên báo cáo</h3>
           <button class="btn small" id="btnPrecisionSettings" type="button">Cài đặt định dạng số</button>
         </div>
+        <div class="dmCard" id="desktopAccountSettings" style="margin-bottom:16px" hidden>
+          <h3>Tài khoản đăng nhập</h3>
+          <p id="desktopAccountStatus" role="status">Đang kiểm tra chế độ sử dụng…</p>
+          <button class="btn small" id="btnConfigureAccount" type="button" aria-describedby="desktopAccountStatus" disabled>Đổi chế độ đăng nhập</button>
+        </div>
         <div class="dmCard">
           <h3>Sao lưu / Khôi phục dữ liệu đã lưu trên trình duyệt này</h3>
           <div style="color:var(--muted);font-size:13px;margin-bottom:8px">Xuất toàn bộ dữ liệu bạn đã tự nhập (danh mục Đại lý/Hỗ trợ, thông tin ngân hàng/WO đã lưu) ra 1 file JSON để lưu trữ hoặc chuyển sang máy khác. Không bao gồm dữ liệu Google Sheet (luôn tải lại từ nguồn).</div>

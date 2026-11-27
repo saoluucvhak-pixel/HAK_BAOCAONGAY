@@ -78,6 +78,14 @@ File `.haksetup` chứa hồ sơ đã mã hóa AES-256 và được kiểm tra H
 
 Trong HTML quản trị, bấm **Thêm công ty**, nhập thông tin và link CSV rồi bấm **Lưu công ty**. **Phiếu cân** và **Đề nghị thanh toán** là hai nguồn bắt buộc. Khi đổi HTML hoặc máy quản trị, chọn **Sao lưu danh sách công ty → Tải danh sách** rồi nạp file JSON ở HTML mới. File sao lưu chỉ dùng trong nhóm quản trị.
 
+### Tài khoản đăng nhập trên Windows
+
+Sau bước nạp file cấu hình ở lần cài đầu tiên, chọn **Một người sử dụng · Bỏ qua** để mở ứng dụng trực tiếp, hoặc **Sử dụng tài khoản đăng nhập** để tạo tên người dùng và mật khẩu. Nếu đã chọn ở bản trước, cài lại hoặc nâng cấp dùng lại chế độ hiện có.
+
+Trong ứng dụng, vào **Cấu hình → Cài đặt chung → Tài khoản đăng nhập**. Chọn **Bật đăng nhập** để đặt tài khoản và mật khẩu. Chọn **Tắt đăng nhập** rồi nhập tài khoản và mật khẩu hiện tại để quay về chế độ một người sử dụng. Mật khẩu cần ít nhất 8 ký tự.
+
+Tài khoản dùng cục bộ trong hồ sơ Windows hiện tại. Ứng dụng lưu thông tin xác minh mật khẩu bằng DPAPI của Windows và dùng chung hồ sơ báo cáo hiện có khi đổi chế độ.
+
 ### Phát hành bản nâng cấp
 
 Workflow **Release installer** trên nhánh `main` tự tạo một bộ tính mã ngẫu nhiên cho mỗi lần đóng gói. Chọn `publish=true` để đưa Setup lên GitHub Releases. HTML quản trị cùng bộ tính được lưu trong một bản nháp riêng tên **HAK quản trị nội bộ**. Dùng đúng cặp Setup và HTML cùng số phát hành. Giữ HTML trong nhóm quản trị HAK. Cơ chế này ngăn cài tùy tiện vì bộ cài chứa cùng bộ tính mã.

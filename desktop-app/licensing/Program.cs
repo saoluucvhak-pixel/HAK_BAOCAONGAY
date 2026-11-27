@@ -18,6 +18,8 @@ internal static class Program
     private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
     private static readonly string LicensePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HAK", "BaoCaoNgay", "license.haklic");
+    private static readonly AccountStore Accounts = new AccountStore(
+        Path.Combine(Path.GetDirectoryName(LicensePath), "account.hakaccount"));
 
     [STAThread]
     private static int Main(string[] args)
@@ -27,6 +29,34 @@ internal static class Program
             var policy = ReadPolicy();
             if (args.Length == 1 && args[0] == "enroll")
                 return Enroll(policy, LicensePath, false);
+            if (args.Length == 1 && args[0] == "enroll-install")
+                return EnrollInstall(policy);
+            if (args.Length == 1 && args[0] == "login")
+            {
+                var mode = Accounts.Read();
+                if (mode == null) return AccountDialog.ChooseMode(Accounts) ? 0 : 1;
+                if (!mode.Enabled) return 0;
+                return AccountDialog.Credentials("Đăng nhập Báo cáo ngày", "Đăng nhập", Accounts.Verify) ? 0 : 1;
+            }
+            if (args.Length == 1 && args[0] == "account-mode")
+            {
+                WriteAccountMode();
+                return 0;
+            }
+            if (args.Length == 2 && args[0] == "configure-account")
+            {
+                bool enabled = Accounts.Read()?.Enabled == true;
+                bool saved;
+                if (args[1] == "enable" && !enabled)
+                    saved = AccountDialog.Credentials("Bật đăng nhập", "Tạo tài khoản", Accounts.Enable, true);
+                else if (args[1] == "disable" && enabled)
+                    saved = AccountDialog.Credentials("Tắt đăng nhập", "Xác nhận tắt", Accounts.Disable);
+                else
+                    throw new InvalidOperationException("Chế độ tài khoản đã thay đổi. Mở lại Cấu hình.");
+                if (!saved) return 1;
+                WriteAccountMode();
+                return 0;
+            }
             if (args.Length == 2 && Regex.IsMatch(args[1], @"\A[0-9a-f]{32}\z"))
             {
                 string pending = LicensePath + ".pending-" + args[1];
@@ -66,9 +96,10 @@ internal static class Program
                 File.Delete(pending);
                 VerifyCode(Utf8.GetString(ReadLimited(args[2])).Trim(), policy, request);
                 AcceptFile(args[1], policy, request);
+                if (Accounts.Read() == null) Accounts.InitializeDirect();
                 return 0;
             }
-            Console.Error.WriteLine("Usage: HAK-License check | enroll");
+            Console.Error.WriteLine("Usage: HAK-License check | enroll | enroll-install | login | account-mode");
             return 2;
         }
         catch (Exception error)
@@ -76,6 +107,30 @@ internal static class Program
             Console.Error.WriteLine(error.Message);
             return 1;
         }
+    }
+
+    private static void WriteAccountMode()
+    {
+        var mode = Accounts.Read();
+        if (mode == null) throw new InvalidOperationException("Chưa chọn chế độ tài khoản.");
+        Console.WriteLine(mode.Enabled ? "account" : "direct");
+    }
+
+    private static bool EnsureAccountMode()
+    {
+        return Accounts.Read() != null || AccountDialog.ChooseMode(Accounts);
+    }
+
+    private static int EnrollInstall(Policy policy)
+    {
+        string pending = LicensePath + ".install-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            if (Enroll(policy, pending, false) != 0 || !EnsureAccountMode()) return 1;
+            ReplaceFile(pending, LicensePath);
+            return 0;
+        }
+        finally { if (File.Exists(pending)) File.Delete(pending); }
     }
 
     private static int Enroll(Policy policy, string path, bool reportCompany)
