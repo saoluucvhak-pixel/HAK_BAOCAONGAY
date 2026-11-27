@@ -30,11 +30,35 @@
     <h1>Quản trị giấy phép HAK</h1>
     <p>Dùng trên máy quản trị HAK. Công cụ chạy offline.</p>
   </header>
+  <section aria-labelledby="issuerTitle">
+    <h2 id="issuerTitle">Khóa cấp phép chung HAK</h2>
+    <p id="issuerStatus" class="status" role="status"></p>
+    <details id="issuerDetails">
+      <summary>Tạo hoặc khôi phục khóa</summary>
+      <form id="initializeIssuer">
+        <label>Mật khẩu bảo vệ khóa <input id="newIssuerPassword" type="password" autocomplete="new-password" minlength="12" required></label>
+        <label>Nhập lại mật khẩu <input id="repeatIssuerPassword" type="password" autocomplete="new-password" minlength="12" required></label>
+        <button type="submit">Tạo khóa chung</button>
+      </form>
+      <form id="restoreIssuerForm">
+        <label>Nạp bản sao khóa HAK <input id="restoreIssuer" type="file" accept=".hakkey" required></label>
+        <label>Mật khẩu bản sao <input id="restoreIssuerPassword" type="password" autocomplete="off" required></label>
+        <button class="secondary" type="submit">Khôi phục khóa</button>
+      </form>
+      <button class="secondary" id="exportIssuer" type="button" hidden>Tải bản sao khóa đã mã hóa</button>
+      <button class="secondary" id="exportVerificationKey" type="button" hidden>Tải khóa công khai để đóng bộ cài</button>
+    </details>
+    <label id="unlockIssuerLabel" hidden>Mật khẩu mở khóa cấp phép
+      <input id="unlockIssuerPassword" type="password" autocomplete="off">
+    </label>
+  </section>
   <section aria-labelledby="issue-title">
     <h2 id="issue-title">Tạo phản hồi cho máy cần cài</h2>
     <form id="issueForm">
-      <label>Mã yêu cầu từ máy cần cài <input id="requestCode" type="text" spellcheck="false" autocomplete="off" inputmode="numeric" placeholder="12345678" maxlength="16"></label>
-      <div class="profiles">
+      <label>Mã yêu cầu từ máy cần cài <input id="requestCode" type="text" spellcheck="false" autocomplete="off" placeholder="HAK4.…" maxlength="1024"></label>
+      <p id="requestSummary" class="status" hidden></p>
+      <label>Ngày hết hạn của file phản hồi <input id="expiry" type="date" required></label>
+      <div class="profiles" id="companyChooser">
         <label>Công ty đã lưu
           <select id="savedCompany"></select>
         </label>
@@ -42,7 +66,6 @@
       </div>
       <details id="companyDetails">
         <summary>Thông tin công ty và nguồn Google Sheets</summary>
-        <label>Ngày hết hạn của file phản hồi <input id="expiry" type="date"></label>
         <label>Tên công ty <input id="TenCty" maxlength="200"></label>
         <label>Địa chỉ công ty <input id="DiaChi" maxlength="300"></label>
         <label>Mã số thuế <input id="MST" maxlength="40"></label>
@@ -57,12 +80,6 @@
         <button class="secondary" id="saveCompany" type="button">Lưu công ty</button>
       </details>
       <button type="submit" value="kit">Tạo mã và file HAK</button>
-      <details>
-        <summary>Dùng lại cấu hình khi cài lại</summary>
-        <label>File cài đặt HAK cũ <input id="previousSetup" type="file" accept=".haksetup"></label>
-        <button class="secondary" type="submit" value="restore" formnovalidate>Nạp cấu hình từ file cũ</button>
-        <p>Sau khi nạp, kiểm tra cấu hình, dán mã yêu cầu mới và bấm Tạo file cài đặt HAK.</p>
-      </details>
     </form>
     <details class="profiles">
       <summary>Sao lưu danh sách công ty</summary>
@@ -72,7 +89,7 @@
       </label>
     </details>
     <div id="replyPanel" hidden>
-      <label>Mã trả lời <input id="replyCode" readonly inputmode="numeric"></label>
+      <label>Mã trả lời <input id="replyCode" readonly></label>
       <button class="secondary" id="copyReply" type="button">Sao chép mã trả lời</button>
     </div>
     <p id="issueStatus" class="status" role="status"></p>
@@ -81,70 +98,197 @@
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
-const product = 'com.hakgroup.baocaongay';
-const seed = '__HAK_BUILD_SEED__';
 const companyFields = ['TenCty', 'DiaChi', 'MST', 'SDT', 'DiaChiThuMua', 'MaHS', 'NhaMay', 'PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo'];
 const profilesFormat = 'hak-company-profiles-v1';
-const setupFormat = 'haksetup-aes256-v1';
+const setupFormat = 'haksetup-ed25519-v4';
+const reportingProduct = 'com.hakgroup.baocaongay';
+const vaultFormat = 'hak-ed25519-issuer-v1';
 const encoder = new TextEncoder();
-const hmac = { name: 'HMAC', hash: 'SHA-256' };
-let macKey;
+let issuerKey;
 $('expiry').value = new Date(Date.now() + 90 * 86400000 + 7 * 3600000).toISOString().slice(0, 10);
 
-function toBase64(bytes) {
-  return btoa(String.fromCharCode(...new Uint8Array(bytes)));
+function toBase64Url(bytes) {
+  return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
-function fromBase64(text) {
-  return Uint8Array.from(atob(text), (character) => character.charCodeAt(0));
-}
-async function mac(domain, bytes) {
-  if (!/^[A-Za-z0-9+/]{43}=$/.test(seed))
-    throw new Error('Mở HTML quản trị đi kèm bộ cài đã đóng gói.');
-  macKey ||= crypto.subtle.importKey('raw', fromBase64(seed), hmac, false, ['sign', 'verify']);
-  const prefix = encoder.encode(product + '\n' + domain + '\n');
-  const message = new Uint8Array(prefix.length + bytes.length);
-  message.set(prefix);
-  message.set(bytes, prefix.length);
-  return { key: await macKey, message };
-}
-async function sign(domain, bytes) {
-  const { key, message } = await mac(domain, bytes);
-  return new Uint8Array(await crypto.subtle.sign(hmac.name, key, message));
-}
-function joinBytes(first, second) {
-  const bytes = new Uint8Array(first.length + second.length);
-  bytes.set(first);
-  bytes.set(second, first.length);
+function fromBase64Url(text, expectedLength) {
+  if (typeof text !== 'string' || !/^[A-Za-z0-9_-]+$/.test(text)) throw new Error('Dữ liệu HAK không hợp lệ.');
+  const bytes = Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), (character) => character.charCodeAt(0));
+  if (toBase64Url(bytes) !== text || (expectedLength && bytes.length !== expectedLength))
+    throw new Error('Dữ liệu HAK không hợp lệ.');
   return bytes;
 }
-async function setupKey() {
-  const key = await sign('setup-encryption-v1', new Uint8Array());
-  return crypto.subtle.importKey('raw', key, 'AES-CBC', false, ['encrypt', 'decrypt']);
+function parseRequest(wire) {
+  if (!wire.startsWith('HAK4.') || wire.length > 1024) throw new Error('Dán mã yêu cầu HAK4 trên máy cần cài.');
+  const request = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(fromBase64Url(wire.slice(5))));
+  if (!/^com\.hakgroup\.[a-z0-9][a-z0-9.-]{0,63}$/.test(request?.product))
+    throw new Error('Mã ứng dụng không thuộc HAK.');
+  fromBase64Url(request.machine, 16);
+  fromBase64Url(request.nonce, 16);
+  fromBase64Url(request.key, 32);
+  return request;
 }
-async function buildSetup(payload) {
-  const iv = crypto.getRandomValues(new Uint8Array(16));
-  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, await setupKey(), payload));
-  const tag = await sign('setup-tag-v1', joinBytes(iv, ciphertext));
-  return { format: setupFormat, iv: toBase64(iv), body: toBase64(ciphertext), signature: toBase64(tag) };
+async function passwordKey(password, salt) {
+  const material = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600000 },
+    material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
-async function readSetup(envelope) {
-  if (envelope?.format !== setupFormat) throw new Error('Chọn file phản hồi mã hóa của bản cài này.');
-  const iv = fromBase64(envelope.iv);
-  const body = fromBase64(envelope.body);
-  const tag = fromBase64(envelope.signature);
-  if (iv.length !== 16 || body.length === 0 || body.length % 16 || tag.length !== 32)
-    throw new Error('Cấu trúc file phản hồi HAK không hợp lệ.');
-  const { key, message } = await mac('setup-tag-v1', joinBytes(iv, body));
-  if (!(await crypto.subtle.verify(hmac.name, key, tag, message)))
-    throw new Error('File cũ thuộc bộ cài khác hoặc đã bị sửa.');
-  return crypto.subtle.decrypt({ name: 'AES-CBC', iv }, await setupKey(), body);
+function validateVault(vault) {
+  if (vault?.format !== vaultFormat || vault.publicKey?.kty !== 'OKP' || vault.publicKey.crv !== 'Ed25519' ||
+      Object.hasOwn(vault.publicKey, 'd')) throw new Error('File sao lưu khóa HAK không hợp lệ.');
+  fromBase64Url(vault.publicKey.x, 32);
+  fromBase64Url(vault.iv, 12);
+  fromBase64Url(vault.salt, 16);
+  fromBase64Url(vault.encrypted);
+  return vault;
 }
-async function calculateResponse(request) {
-  const digest = await sign('code-v1', encoder.encode(request));
-  let number = 0;
-  for (const byte of digest.subarray(0, 6)) number = number * 256 + byte;
-  return String(number % 1000000000000).padStart(12, '0');
+function readVault() {
+  const data = localStorage.getItem(vaultFormat);
+  return data === null ? null : validateVault(JSON.parse(data));
 }
+function showVault() {
+  const vault = readVault();
+  $('initializeIssuer').hidden = Boolean(vault);
+  $('restoreIssuerForm').hidden = Boolean(vault);
+  $('exportIssuer').hidden = !vault;
+  $('exportVerificationKey').hidden = !vault;
+  $('unlockIssuerLabel').hidden = !vault || Boolean(issuerKey);
+  report($('issuerStatus'), vault
+    ? (issuerKey ? 'Khóa HAK đã mở cho phiên này.' : 'Đã lưu khóa chung HAK trên máy này.')
+    : 'Tạo khóa một lần hoặc nạp bản sao để cấp phép cho các app HAK.');
+}
+function issuerAction(handler) {
+  return async (event) => {
+    try { await handler(event); }
+    catch (error) { report($('issuerStatus'), error.message, true); }
+  };
+}
+$('initializeIssuer').addEventListener('submit', issuerAction(async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button');
+  button.disabled = true;
+  try {
+    if (readVault()) throw new Error('Máy đã lưu khóa HAK.');
+    const password = $('newIssuerPassword').value;
+    if (password.length < 12 || password !== $('repeatIssuerPassword').value)
+      throw new Error('Mật khẩu cần ít nhất 12 ký tự và hai ô phải khớp.');
+    const pair = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+    const { kty, crv, x } = await crypto.subtle.exportKey('jwk', pair.publicKey);
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const privateBytes = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+    try {
+      const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode(x) },
+        await passwordKey(password, salt), privateBytes);
+      if (readVault()) throw new Error('Máy đã lưu khóa HAK.');
+      const vault = { format: vaultFormat, publicKey: { kty, crv, x },
+        salt: toBase64Url(salt), iv: toBase64Url(iv), encrypted: toBase64Url(encrypted) };
+      localStorage.setItem(vaultFormat, JSON.stringify(vault));
+      issuerKey = pair.privateKey;
+      form.reset();
+      showVault();
+      download('HAK-KhoaChung.hakkey', vault);
+    } finally {
+      privateBytes.fill(0);
+    }
+  } finally {
+    button.disabled = false;
+  }
+}));
+$('restoreIssuerForm').addEventListener('submit', issuerAction(async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button');
+  button.disabled = true;
+  try {
+    const file = $('restoreIssuer').files[0];
+    if (!file || file.size > 8192 || readVault()) throw new Error('Chỉ nạp bản sao hợp lệ trên máy chưa lưu khóa HAK.');
+    const vault = validateVault(JSON.parse(await file.text()));
+    const key = await decryptVault(vault, $('restoreIssuerPassword').value);
+    if (readVault()) throw new Error('Máy đã lưu khóa HAK.');
+    localStorage.setItem(vaultFormat, JSON.stringify(vault));
+    issuerKey = key;
+    form.reset();
+    showVault();
+  } finally {
+    button.disabled = false;
+  }
+}));
+$('exportIssuer').addEventListener('click', issuerAction(() => download('HAK-KhoaChung.hakkey', readVault())));
+$('exportVerificationKey').addEventListener('click', issuerAction(() => download('HAK-PublicKey.jwk', readVault().publicKey)));
+
+async function decryptVault(vault, password) {
+  let privateBytes;
+  try {
+    privateBytes = new Uint8Array(await crypto.subtle.decrypt({
+      name: 'AES-GCM', iv: fromBase64Url(vault.iv, 12), additionalData: encoder.encode(vault.publicKey.x)
+    }, await passwordKey(password, fromBase64Url(vault.salt, 16)), fromBase64Url(vault.encrypted)));
+    const key = await crypto.subtle.importKey('pkcs8', privateBytes, 'Ed25519', false, ['sign']);
+    const publicKey = await crypto.subtle.importKey('jwk', vault.publicKey, 'Ed25519', false, ['verify']);
+    const proof = encoder.encode(vaultFormat);
+    if (!(await crypto.subtle.verify('Ed25519', publicKey, await crypto.subtle.sign('Ed25519', key, proof), proof)))
+      throw new Error();
+    return key;
+  } catch {
+    throw new Error('Sai mật khẩu hoặc file sao lưu khóa HAK bị lỗi.');
+  } finally {
+    privateBytes?.fill(0);
+  }
+}
+
+async function unlockIssuer() {
+  if (issuerKey) return issuerKey;
+  const vault = readVault();
+  if (!vault) throw new Error('Tạo khóa chung HAK hoặc nạp bản sao trước khi cấp phép.');
+  const password = $('unlockIssuerPassword').value;
+  if (!password) throw new Error('Nhập mật khẩu mở khóa HAK.');
+  issuerKey = await decryptVault(vault, password);
+  $('unlockIssuerPassword').value = '';
+  showVault();
+  return issuerKey;
+}
+
+$('requestCode').addEventListener('input', () => {
+  const summary = $('requestSummary');
+  let needsProfile = true;
+  try {
+    const request = parseRequest($('requestCode').value.replace(/\s+/g, ''));
+    summary.textContent = 'Ứng dụng ' + request.product + ' · Máy ' + request.machine;
+    summary.hidden = false;
+    needsProfile = request.product === reportingProduct;
+  } catch {
+    summary.hidden = true;
+  }
+  $('companyChooser').hidden = !needsProfile;
+  $('companyDetails').hidden = !needsProfile;
+});
+
+async function createSetup(wire, request, company, issuedAt, expiresAt, key) {
+  const ephemeral = await crypto.subtle.generateKey('X25519', true, ['deriveBits']);
+  const recipient = await crypto.subtle.importKey('raw', fromBase64Url(request.key, 32), 'X25519', false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'X25519', public: recipient }, ephemeral.privateKey, 256));
+  const context = encoder.encode(wire);
+  try {
+    const material = await crypto.subtle.importKey('raw', shared, 'HKDF', false, ['deriveKey']);
+    const cipher = await crypto.subtle.deriveKey({
+      name: 'HKDF', hash: 'SHA-256', salt: context, info: encoder.encode('hak-company-v4')
+    }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: context },
+      cipher, encoder.encode(JSON.stringify(company)));
+    const body = toBase64Url(encoder.encode(JSON.stringify({
+      request: wire, issuedAt, expiresAt, ephemeral: toBase64Url(await crypto.subtle.exportKey('raw', ephemeral.publicKey)),
+      iv: toBase64Url(iv), ciphertext: toBase64Url(ciphertext)
+    })));
+    const signature = toBase64Url(await crypto.subtle.sign('Ed25519', key, encoder.encode('hak-setup-v4\n' + body)));
+    return { format: setupFormat, body, signature };
+  } finally {
+    shared.fill(0);
+  }
+}
+try { showVault(); }
+catch (error) { report($('issuerStatus'), error.message, true); }
+
 function download(filename, value) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(value)], { type: 'application/json' }));
   const link = document.createElement('a');
@@ -301,23 +445,6 @@ try {
   report($('issueStatus'), 'Chưa đọc được danh sách công ty đã lưu trong trình duyệt.', true);
 }
 
-async function restoreCompanyProfile() {
-  const file = $('previousSetup').files[0];
-  if (!file || file.size > 16384) throw new Error('Chọn file cài đặt HAK cũ (.haksetup) hợp lệ.');
-  const body = await readSetup(JSON.parse(await file.text()));
-  const previous = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body));
-  if (previous?.product !== product || previous.version !== 3 ||
-      !previous.company || typeof previous.company !== 'object' || Array.isArray(previous.company))
-    throw new Error('File cũ thiếu cấu hình công ty của Báo cáo ngày HAK.');
-
-  const company = Object.fromEntries(companyFields.map((field) => [field, previous.company[field] ?? '']));
-  validateCompanyProfile(company);
-  $('savedCompany').value = '';
-  showCompany(company);
-  $('previousSetup').value = '';
-  report($('issueStatus'), 'Đã nạp cấu hình cũ. Kiểm tra thông tin rồi tạo file bằng mã yêu cầu mới.');
-}
-
 $('issueForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const status = $('issueStatus');
@@ -327,25 +454,20 @@ $('issueForm').addEventListener('submit', async (event) => {
   $('replyCode').value = '';
   try {
     if (!crypto.subtle) throw new Error('Mở công cụ bằng Chrome hoặc Edge đã cập nhật.');
-    const mode = event.submitter?.value;
-    if (mode === 'restore') {
-      await restoreCompanyProfile();
-      return;
-    }
-
-    const request = $('requestCode').value.replace(/\s+/g, '');
-    if (!/^[0-9]{8}$/.test(request)) throw new Error('Nhập đủ 8 chữ số trên bộ cài.');
+    const wire = $('requestCode').value.replace(/\s+/g, '');
+    const request = parseRequest(wire);
     const issuedAt = Math.floor(Date.now() / 1000);
     const expiresAt = Math.floor(Date.parse($('expiry').value + 'T23:59:59+07:00') / 1000);
     if (!Number.isFinite(expiresAt) || expiresAt <= issuedAt)
       throw new Error('Ngày hết hạn phải ở trong tương lai.');
-    const company = companyFromForm();
-    validateCompanyProfile(company);
-    const body = encoder.encode(JSON.stringify({ product, version: 3, device: request, issuedAt, expiresAt, company }));
-    const kit = await buildSetup(body);
-    if (encoder.encode(JSON.stringify(kit)).length > 16384)
-      throw new Error('File cài đặt vượt quá 16 KB. Hãy rút gọn thông tin trước khi tạo lại.');
-    $('replyCode').value = await calculateResponse(request);
+    const company = request.product === reportingProduct ? companyFromForm() : {};
+    if (request.product === reportingProduct) validateCompanyProfile(company);
+    const key = await unlockIssuer();
+    const kit = await createSetup(wire, request, company, issuedAt, expiresAt, key);
+    if (encoder.encode(JSON.stringify(kit)).length > 32768)
+      throw new Error('File cài đặt vượt quá 32 KB. Hãy rút gọn thông tin trước khi tạo lại.');
+    const response = await crypto.subtle.sign('Ed25519', key, encoder.encode('hak-unlock-v4\n' + wire));
+    $('replyCode').value = 'HAKA4.' + toBase64Url(response);
     $('replyPanel').hidden = false;
     download('HAK-CaiDat.haksetup', kit);
     report(status, 'Gửi mã trả lời và file HAK-CaiDat.haksetup cho người cài.');

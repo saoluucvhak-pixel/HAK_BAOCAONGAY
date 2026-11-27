@@ -1,132 +1,96 @@
 import assert from 'node:assert/strict';
-import { createDecipheriv, createHmac, randomBytes } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { createPublicKey, randomBytes, verify } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { launchChromium } from './browser-launcher.mjs';
+import { newRequest, openCompany } from '../../desktop-app/tests/ed25519-fixtures.mjs';
 
-const template = await readFile(new URL('../../desktop-app/licensing/HAK-CapPhep.html', import.meta.url), 'utf8');
 const browser = await launchChromium();
-const dir = await mkdtemp(path.join(tmpdir(), 'hak-decoder-'));
-const context = await browser.newContext({ offline: true, acceptDownloads: true });
-const request = '01234567';
-const product = 'com.hakgroup.baocaongay';
-const seed = randomBytes(32);
-function mac(key, domain, bytes) {
-  return createHmac('sha256', key).update(product + '\n' + domain + '\n').update(bytes).digest();
-}
-function response(key, code) {
-  return String(mac(key, 'code-v1', code).readUIntBE(0, 6) % 1000000000000).padStart(12, '0');
-}
-function decryptSetup(key, contents) {
-  const envelope = JSON.parse(contents);
-  assert.equal(envelope.format, 'haksetup-aes256-v1');
-  const iv = Buffer.from(envelope.iv, 'base64');
-  const ciphertext = Buffer.from(envelope.body, 'base64');
-  assert.equal(envelope.signature, mac(key, 'setup-tag-v1', Buffer.concat([iv, ciphertext])).toString('base64'));
-  const decipher = createDecipheriv('aes-256-cbc', mac(key, 'setup-encryption-v1', ''), iv);
-  return JSON.parse(Buffer.concat([decipher.update(ciphertext), decipher.final()]));
-}
-async function openDecoder(name, key) {
-  const file = path.join(dir, name + '.html');
-  await writeFile(file, template.replace('__HAK_BUILD_SEED__', key.toString('base64')));
-  const page = await context.newPage();
-  await page.goto(pathToFileURL(file).href);
-  return page;
-}
-async function downloadSetup(page, requestCode) {
-  await page.locator('#requestCode').fill(requestCode);
+const location = new URL('../../desktop-app/licensing/HAK-CapPhep.html', import.meta.url).href;
+const password = randomBytes(16).toString('hex');
+const url = 'https://docs.google.com/spreadsheets/d/e/HAK_TEST/pub?output=csv';
+async function download(page, name, expected) {
   const [file] = await Promise.all([
-    page.waitForEvent('download'),
-    page.getByRole('button', { name: 'Tạo mã và file HAK' }).click()
+    page.waitForEvent('download'), page.getByRole('button', { name, exact: true }).click()
   ]);
-  assert.equal(file.suggestedFilename(), 'HAK-CaiDat.haksetup');
+  assert.equal(file.suggestedFilename(), expected);
   return readFile(await file.path());
+}
+async function issue(page, request, publicKey) {
+  await page.locator('#requestCode').fill(request.wire);
+  const file = await download(page, 'Tạo mã và file HAK', 'HAK-CaiDat.haksetup');
+  const code = await page.locator('#replyCode').inputValue();
+  assert.match(code, /^HAKA4\.[A-Za-z0-9_-]{86}$/);
+  assert(verify(null, Buffer.from('hak-unlock-v4\n' + request.wire), publicKey, Buffer.from(code.slice(6), 'base64url')));
+  return file;
 }
 
 try {
-  const page = await openDecoder('first', seed);
-  const issue = page.getByRole('button', { name: 'Tạo mã và file HAK' });
-  await page.locator('#requestCode').fill('123');
-  await issue.click();
-  await page.waitForFunction(() => document.querySelector('#issueStatus').classList.contains('error'));
-  assert.equal(await page.locator('#replyCode').isVisible(), false);
+  const context = await browser.newContext({ offline: true, acceptDownloads: true });
+  const page = await context.newPage();
+  await page.goto(location);
+  await page.getByText('Tạo hoặc khôi phục khóa', { exact: true }).click();
+  await page.locator('#newIssuerPassword').fill(password);
+  await page.locator('#repeatIssuerPassword').fill(password);
+  const backup = await download(page, 'Tạo khóa chung', 'HAK-KhoaChung.hakkey');
+  const jwk = JSON.parse(await download(page, 'Tải khóa công khai để đóng bộ cài', 'HAK-PublicKey.jwk'));
+  assert.equal(jwk.crv, 'Ed25519');
+  assert(!Object.hasOwn(jwk, 'd'));
+  assert(!backup.includes(Buffer.from(password)));
+  const publicKey = createPublicKey({ key: jwk, format: 'jwk' });
+  const recipient = newRequest();
 
   await page.getByRole('button', { name: 'Thêm công ty' }).click();
-  const url = 'https://docs.google.com/spreadsheets/d/e/HAK_TEST/pub?output=csv';
   await page.locator('#TenCty').fill('Công ty Thử nghiệm');
   await page.locator('#DiaChi').fill('Đắk Lắk');
   await page.locator('#PhieuCan').fill(url);
   await page.locator('#DNTT').fill(url);
-  const file = await downloadSetup(page, request);
-  assert.equal(await page.locator('#replyCode').inputValue(), response(seed, request));
-  const kit = decryptSetup(seed, file);
-  assert.equal(kit.device, request);
-  assert.equal(kit.company.TenCty, 'Công ty Thử nghiệm');
-  assert.equal(kit.company.DiaChi, 'Đắk Lắk');
-  assert.equal(kit.company.PhieuCan, url);
-  assert(kit.expiresAt > kit.issuedAt);
-  assert(!file.includes(Buffer.from(url)));
-  assert(!file.includes(Buffer.from('Công ty Thử nghiệm')));
-  const repeated = await downloadSetup(page, request);
-  assert.notEqual(JSON.parse(repeated).iv, JSON.parse(file).iv);
-
-  await page.getByText('Dùng lại cấu hình khi cài lại', { exact: true }).click();
-  await page.locator('#DiaChi').fill('');
-  const envelope = JSON.parse(file);
-  const altered = Buffer.from(envelope.body, 'base64');
-  altered[0] ^= 1;
-  await page.locator('#previousSetup').setInputFiles({
-    name: 'HAK-CaiDat.haksetup', mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify({ ...envelope, body: altered.toString('base64') }))
-  });
-  await page.getByRole('button', { name: 'Nạp cấu hình từ file cũ' }).click();
-  await page.waitForFunction(() => document.querySelector('#issueStatus').textContent.includes('đã bị sửa'));
-  assert.equal(await page.locator('#DiaChi').inputValue(), '');
-  await page.locator('#previousSetup').setInputFiles({
-    name: 'HAK-CaiDat.haksetup', mimeType: 'application/json', buffer: file
-  });
-  await page.getByRole('button', { name: 'Nạp cấu hình từ file cũ' }).click();
-  await page.waitForFunction(() => document.querySelector('#issueStatus').textContent.includes('Đã nạp cấu hình cũ'));
-  assert.equal(await page.locator('#DiaChi').inputValue(), kit.company.DiaChi);
-
   await page.getByRole('button', { name: 'Lưu công ty' }).click();
-  await page.waitForFunction(() => document.querySelector('#issueStatus').textContent.includes('Đã lưu Công ty Thử nghiệm'));
   await page.getByRole('button', { name: 'Thêm công ty' }).click();
-  assert.equal(await page.locator('#PhieuCan').inputValue(), '');
   await page.locator('#TenCty').fill('Công ty thứ hai');
-  await page.locator('#PhieuCan').fill(url.replace('HAK_TEST', 'HAK_SECOND_PC'));
-  await page.locator('#DNTT').fill(url.replace('HAK_TEST', 'HAK_SECOND_DNTT'));
+  await page.locator('#PhieuCan').fill(url.replace('HAK_TEST', 'HAK_SECOND'));
+  await page.locator('#DNTT').fill(url);
   await page.getByRole('button', { name: 'Lưu công ty' }).click();
-  await page.waitForFunction(() => document.querySelector('#savedCompany').options.length === 3);
-  await page.reload();
-  const companies = page.locator('#savedCompany');
-  await companies.selectOption({ label: 'Công ty Thử nghiệm' });
-  assert.equal(await page.locator('#DiaChi').inputValue(), 'Đắk Lắk');
-  assert.equal(await page.locator('#PhieuCan').inputValue(), url);
-  await companies.selectOption({ label: 'Công ty thứ hai' });
-  const second = decryptSetup(seed, await downloadSetup(page, '12345678'));
-  assert.equal(second.company.TenCty, 'Công ty thứ hai');
-  assert.equal(second.company.DNTT, url.replace('HAK_TEST', 'HAK_SECOND_DNTT'));
+  await page.locator('#savedCompany').selectOption({ label: 'Công ty Thử nghiệm' });
 
+  const file = await issue(page, recipient, publicKey);
+  const company = openCompany(file, publicKey, recipient);
+  assert.equal(company.TenCty, 'Công ty Thử nghiệm');
+  assert.equal(company.DiaChi, 'Đắk Lắk');
+  assert.equal(company.PhieuCan, url);
+  assert(!file.includes(Buffer.from(url)));
+  assert.throws(() => openCompany(file, publicKey, newRequest()), /Wrong recipient/);
+  const envelope = JSON.parse(file);
+  const altered = { ...envelope, body: (envelope.body[0] === 'A' ? 'B' : 'A') + envelope.body.slice(1) };
+  assert.throws(() => openCompany(JSON.stringify(altered), publicKey, recipient), /Invalid signature/);
   await page.getByText('Sao lưu danh sách công ty', { exact: true }).click();
-  const [backup] = await Promise.all([
-    page.waitForEvent('download'), page.getByRole('button', { name: 'Tải danh sách' }).click()
-  ]);
-  assert.equal(backup.suggestedFilename(), 'HAK-DanhSachCongTy.json');
-  const nextSeed = randomBytes(32);
-  const other = await openDecoder('upgrade', nextSeed);
-  await other.getByText('Sao lưu danh sách công ty', { exact: true }).click();
-  await other.locator('#importCompanies').setInputFiles(await backup.path());
-  await other.locator('#savedCompany').selectOption({ label: 'Công ty thứ hai' });
-  assert.equal(await other.locator('#DNTT').inputValue(), url.replace('HAK_TEST', 'HAK_SECOND_DNTT'));
-  const upgraded = await downloadSetup(other, request);
-  assert.equal(await other.locator('#replyCode').inputValue(), response(nextSeed, request));
-  assert.notEqual(response(nextSeed, request), response(seed, request));
-  assert.throws(() => decryptSetup(seed, upgraded));
-  console.log('PASS: paired offline code and encrypted profile, tamper detection, multiple companies and backup transfer.');
+  const profiles = await download(page, 'Tải danh sách', 'HAK-DanhSachCongTy.json');
+
+  // Restore the single HAK key and the company list in a fresh offline browser.
+  const recovered = await (await browser.newContext({ offline: true, acceptDownloads: true })).newPage();
+  await recovered.goto(location);
+  await recovered.getByText('Tạo hoặc khôi phục khóa', { exact: true }).click();
+  await recovered.locator('#restoreIssuer').setInputFiles({
+    name: 'HAK-KhoaChung.hakkey', mimeType: 'application/json', buffer: backup
+  });
+  await recovered.locator('#restoreIssuerPassword').fill('wrong-password');
+  await recovered.getByRole('button', { name: 'Khôi phục khóa' }).click();
+  await recovered.waitForFunction(() => document.querySelector('#issuerStatus').textContent.includes('Sai mật khẩu'));
+  await recovered.locator('#restoreIssuerPassword').fill(password);
+  await recovered.getByRole('button', { name: 'Khôi phục khóa' }).click();
+  await recovered.waitForFunction(() => document.querySelector('#issuerStatus').textContent.includes('đã mở'));
+  await recovered.getByText('Sao lưu danh sách công ty', { exact: true }).click();
+  await recovered.locator('#importCompanies').setInputFiles({
+    name: 'HAK-DanhSachCongTy.json', mimeType: 'application/json', buffer: profiles
+  });
+  await recovered.locator('#savedCompany').selectOption({ label: 'Công ty thứ hai' });
+  const anotherReport = newRequest();
+  const restoredProfile = await issue(recovered, anotherReport, publicKey);
+  assert.equal(openCompany(restoredProfile, publicKey, anotherReport).TenCty, 'Công ty thứ hai');
+  const anotherApp = newRequest('com.hakgroup.quan-ly-kho');
+  const newFile = await issue(recovered, anotherApp, publicKey);
+  assert.deepEqual(openCompany(newFile, publicKey, anotherApp), {});
+  assert.throws(() => openCompany(newFile, publicKey, recipient), /Wrong recipient/);
+  console.log('PASS: one offline issuer, encrypted key recovery, multiple apps and device-specific encrypted profiles.');
 } finally {
   await browser.close();
-  await rm(dir, { recursive: true, force: true });
 }

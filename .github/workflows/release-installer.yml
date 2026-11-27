@@ -3,6 +3,10 @@ name: Release installer
 on:
   workflow_dispatch:
     inputs:
+      issuer_public_key:
+        description: Ed25519 public JWK (defaults to repository variable HAK_LICENSE_PUBLIC_KEY)
+        type: string
+        required: false
       publish:
         description: Publish Setup and keep the companion HTML in a separate draft
         type: boolean
@@ -37,6 +41,7 @@ jobs:
         working-directory: desktop-app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          HAK_LICENSE_PUBLIC_KEY: ${{ inputs.issuer_public_key || vars.HAK_LICENSE_PUBLIC_KEY }}
         run: |
           npm ci
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
@@ -80,4 +85,4 @@ jobs:
             desktop-app/release/GHEP_FILE.bat desktop-app/release/HUONG_DAN_GHEP_FILE.txt \
             desktop-app/release/SHA256SUMS.txt desktop-app/release/INSTALLER_SECURITY.json \
             --target "$GITHUB_SHA" --title "Bộ cài Báo cáo ngày ${PAIR}" \
-            --notes "Bộ cài Windows x64 từ commit ${GITHUB_SHA}, có SHA-256 và kiểm tra nguồn gốc bản dựng. Bộ cài chưa ký Authenticode. Mỗi lần cài có mã yêu cầu mới. Quản trị viên dùng HTML đúng đợt phát hành để tạo phản hồi."
+            --notes "Bộ cài Windows x64 từ commit ${GITHUB_SHA}, có SHA-256 và kiểm tra nguồn gốc bản dựng. Bộ cài chưa ký Authenticode. App kiểm tra chữ ký Ed25519 và định danh thiết bị khi mở. Mỗi lần cài có mã yêu cầu mới."

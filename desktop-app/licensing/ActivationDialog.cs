@@ -24,7 +24,7 @@ internal static class ActivationDialog
             var response = new TextBox
             {
                 Location = new Point(20, 137), Size = new Size(510, 102), Multiline = true,
-                MaxLength = 4096, ScrollBars = ScrollBars.Vertical, AccessibleName = "Mã trả lời"
+                MaxLength = 256, ScrollBars = ScrollBars.Vertical, AccessibleName = "Mã trả lời"
             };
             var importFile = new Button { Text = "Nạp file HAK…", Enabled = false, Location = new Point(20, 308), Size = new Size(145, 29) };
             var status = new Label { Location = new Point(20, 249), Size = new Size(510, 47), ForeColor = Color.DarkRed };

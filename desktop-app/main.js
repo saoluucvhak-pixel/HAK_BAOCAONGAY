@@ -225,9 +225,12 @@ const execLicense = promisify(execFile);
 function runLicense(command, args = []) {
   const reference = path.join(__dirname, 'app', 'license-verifier.json');
   const helper = path.join(process.resourcesPath, 'HAK-License-runtime.exe');
-  const { sha256 } = JSON.parse(fs.readFileSync(reference, 'utf8'));
-  if (createHash('sha256').update(fs.readFileSync(helper)).digest('hex') !== sha256) {
-    throw new Error('Công cụ xác minh giấy phép không khớp với bản đóng gói.');
+  const { sha256, cryptoSha256 } = JSON.parse(fs.readFileSync(reference, 'utf8'));
+  const cryptoLibrary = path.join(process.resourcesPath, 'BouncyCastle.Cryptography.dll');
+  for (const [file, digest] of [[helper, sha256], [cryptoLibrary, cryptoSha256]]) {
+    if (createHash('sha256').update(fs.readFileSync(file)).digest('hex') !== digest) {
+      throw new Error('Công cụ xác minh giấy phép không khớp với bản đóng gói.');
+    }
   }
   return execLicense(helper, [command, ...args], { windowsHide: true, timeout: /^(enroll|login$|configure-account$)/.test(command) ? 0 : 45000 });
 }
