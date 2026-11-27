@@ -5,7 +5,7 @@
   nsExec::ExecToStack '"$PLUGINSDIR\HAK-License.exe" enroll'
   Goto hakVerifyResponse
 hakSilent:
-  nsExec::ExecToStack /TIMEOUT=45000 '"$PLUGINSDIR\HAK-License.exe" accept-install-qa "$EXEDIR\HAK-CaiDat.haksetup"'
+  nsExec::ExecToStack /TIMEOUT=45000 '"$PLUGINSDIR\HAK-License.exe" accept-install-qa "$EXEDIR\HAK-CaiDat.haksetup" "$EXEDIR\HAK-PhanHoi.txt"'
 hakVerifyResponse:
   Pop $0
   Pop $1

@@ -14,7 +14,7 @@
 // [PERF-06] ExcelJS/jsPDF/jspdf-autotable nạp KHI CẦN (lần đầu bấm xuất file) — xem services/export-libs.js.
 // Mọi nút xuất đi qua runExport() (services/export-runner.js), nơi đã bảo đảm thư viện sẵn sàng trước khi gọi.
 import { ensureExportLibs } from './services/export-libs.js';
-import { CONFIG } from './config/config.js';
+import { CONFIG, MANAGED_COMPANY } from './config/config.js';
 
 import { NHAPKEO_COLS, XECHO_COLS, THANHTOAN_COLS, CONGNO_COLS, HOTRO_COLS, TROGIA_COLS, TONGHOPTRO_COLS, HOAHONG_COLS, BKLSCT_COLS, BKLSTH_COLS, TAUTONGHOP_COLS, BANKVAY_COLS, BANKTHTT_COLS, BANKTNDN_COLS, BANKPNK_COLS } from './constants/columns.js';
 import { pad2, toKeyFromInput, dateKeyToday } from './utils/date-utils.js';
@@ -246,23 +246,56 @@ function redoDM() {
   return applyHistoryChange(redo, 'Đã làm lại thay đổi danh mục.', 'Không còn thay đổi để làm lại.');
 }
 
+function initManagedCompanySettings() {
+  if (!MANAGED_COMPANY || typeof window.api?.openConfig !== 'function') return;
+  const tabs = $('#configurationTabs');
+  const general = $('#settingsGeneral');
+  const companyPanel = $('#settingsCompany');
+  const generalTab = $('#settingsGeneralTab');
+  const companyTab = $('#settingsCompanyTab');
+  tabs.hidden = false;
+  $('#webConfigInstructions').hidden = true;
+  general.setAttribute('role', 'tabpanel');
+  general.setAttribute('aria-labelledby', generalTab.id);
+  $$('[data-company-field]', companyPanel).forEach(function (field) {
+    field.textContent = MANAGED_COMPANY[field.dataset.companyField] || '—';
+  });
+  function select(tab) {
+    const showCompany = tab === companyTab;
+    general.hidden = showCompany;
+    companyPanel.hidden = !showCompany;
+    for (const button of [generalTab, companyTab]) {
+      const selected = button === tab;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-selected', String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
+  }
+  generalTab.addEventListener('click', () => select(generalTab));
+  companyTab.addEventListener('click', () => select(companyTab));
+  tabs.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tab = event.key === 'Home' || (event.key !== 'End' && event.target === companyTab) ? generalTab : companyTab;
+    event.preventDefault();
+    select(tab);
+    tab.focus();
+  });
+  on('#btnDesktopSheetSources', 'click', function () {
+    window.api.openConfig().then(function (result) {
+      if (!result?.ok) throw new Error(result?.error || 'Không mở được xác minh của HAK.');
+    }).catch(function (error) {
+      setStatus(error.message, 'err');
+    });
+  });
+}
+
 function initEvents(){
   $$('.item', $('#navList')).forEach(function(it){ it.addEventListener('click', function(){ showSection(it.dataset.target); }); });
-  $$('.rtab').forEach(function(b){ b.addEventListener('click', function(){ showReportTab(b.dataset.rtab); }); });
+  $$('.rtab[data-rtab]').forEach(function(b){ b.addEventListener('click', function(){ showReportTab(b.dataset.rtab); }); });
   on('#sideToggle', 'click', function(){ $('#side').classList.toggle('open'); });
   on('#btnLapBC', 'click', runReport);
   on('#btnReload', 'click', loadAllData);
-  // Chỉ bản Desktop có cầu nối Electron mới mở được trình quản lý nguồn.
-  if (typeof window !== 'undefined' && window.api && typeof window.api.openConfig === 'function') {
-    var sourceCard = $('#desktopSheetSourceCard');
-    if (sourceCard) sourceCard.style.display = '';
-    on('#btnDesktopSheetSources', 'click', function () {
-      window.api.openConfig().catch(function (err) {
-        logger.error('[Nguồn dữ liệu] Không mở được cấu hình:', err.message);
-        setStatus('Không mở được màn hình cấu hình nguồn: ' + err.message, 'err');
-      });
-    });
-  }
+  initManagedCompanySettings();
   // [2026-09-22] Tách "Xuất tất cả Excel" thành 2 nút riêng (trước đó gộp 1 nút ra 2 file, nay
   // theo yêu cầu người dùng tách hẳn 2 nút bấm riêng): "BÁO CÁO TỔNG HỢP THÁNG" = đúng
   // exportAllExcel() cũ (Từ ngày→Đến ngày, không đổi gì); "BÁO CÁO TỔNG HỢP NGÀY" = exportNgayExcel().

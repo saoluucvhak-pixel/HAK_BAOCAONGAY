@@ -1,48 +1,48 @@
-// Playwright: cấu hình nguồn Google Sheets trong màn hình desktop setup (không gửi dữ liệu thật).
-import { launchChromium } from './browser-launcher.mjs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { launchChromium } from './browser-launcher.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const setup = path.resolve(__dirname, '../../desktop-app/app/setup.html');
+const dir = await mkdtemp(path.join(tmpdir(), 'hak-company-settings-'));
 const browser = await launchChromium();
 try {
+  const company = {
+    _hakCompanyProfile: true, TenCty: 'CÔNG TY TEST', DiaChi: 'Đắk Lắk', MST: '1234567890',
+    PhieuCan: 'https://docs.google.com/spreadsheets/d/e/PRIVATE_PC/pub?output=csv',
+    DNTT: 'https://docs.google.com/spreadsheets/d/e/PRIVATE_DN/pub?output=csv'
+  };
+  const file = path.join(dir, 'report.html');
+  const template = await readFile(new URL('../dist/index.html', import.meta.url), 'utf8');
+  await writeFile(file, template.replace(
+    '<script id="hak-company-config" type="application/json">{}</script>',
+    () => '<script id="hak-company-config" type="application/json">' + JSON.stringify(company) + '</script>'
+  ));
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', e => errors.push(e.message));
+  page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
-    window.__saved = [];
-    window.__scenario = 'invalid';
-    const PC = 'https://docs.google.com/spreadsheets/d/e/TEST_PC/pub?output=csv';
-    const DN = 'https://docs.google.com/spreadsheets/d/e/TEST_DN/pub?output=csv';
-    window.api = {
-      getConfig: async () => ({
-        TenCty: 'CÔNG TY TEST', PhieuCan: PC, DNTT: DN, HDNCC: '', Hosokeo: ''
-      }),
-      saveConfig: async data => { window.__saved.push(data); return { ok: true }; }
-    };
-    window.fetch = async (url) => {
-      const pcHeader = 'So_CT,Khách hàng,Ngày cân 1,Giờ cân 1,Ngày cân 2,Giờ cân 2,Biển số 1,KL hàng (KG),Đơn giá_TC,Thành tiền,ĐL,NG';
-      const dnHeader = 'Ngày thanh toán,Số hợp đồng,Họ tên Chủ rừng,Số CT,Khối lượng,Đơn giá thanh toán,Thành tiền';
-      const header = String(url).includes('TEST_PC') ? pcHeader : window.__scenario === 'invalid' ? 'Số hợp đồng,Số CT' : dnHeader;
-      return new Response(header + '\n1,ABC', { status: 200, headers: { 'Content-Type': 'text/csv' } });
-    };
+    window.__opened = 0;
+    window.api = { openConfig: async () => { window.__opened++; return { ok: true, canceled: true }; } };
+    window.fetch = async (url) => { throw new Error('Failed to fetch ' + url); };
+    window.__bcFetchTimeoutMs = 200;
   });
-  await page.goto('file://' + setup);
-  await page.waitForSelector('#fPhieuCan');
-  await page.click('#btnSave');
-  await page.waitForFunction(() => /Không thể lưu khi có nguồn lỗi/.test(document.querySelector('#msg').textContent));
-  assert.equal(await page.evaluate(() => window.__saved.length), 0, 'lỗi thiếu cột không được gọi lưu cấu hình');
-  assert.match(await page.textContent('#statusDNTT'), /Thiếu cột/);
-  await page.evaluate(() => { window.__scenario = 'valid'; });
-  await page.click('#btnCheck');
-  await page.waitForFunction(() => /Cả 4 nguồn đã được kiểm tra/.test(document.querySelector('#msg').textContent));
-  await page.click('#btnSave');
-  await page.waitForFunction(() => window.__saved.length === 1);
-  assert.equal(await page.evaluate(() => window.__saved[0].TenCty), 'CÔNG TY TEST');
-  assert.deepEqual(errors, [], 'setup.html không phát sinh lỗi JavaScript');
-  console.log('PASS: setup blocks invalid Sheets and saves validated sources only');
+  await page.goto(pathToFileURL(file).href);
+  await page.locator('[data-target="cauhinh"]').click();
+  await page.getByRole('tab', { name: 'Thông tin công ty' }).click();
+  const panel = page.getByRole('tabpanel', { name: 'Thông tin công ty' });
+  assert.match(await panel.innerText(), /CÔNG TY TEST/);
+  assert.match(await panel.innerText(), /Đắk Lắk/);
+  assert.equal(await panel.locator('input, textarea, select, [contenteditable], a').count(), 0);
+  await page.getByRole('button', { name: 'Đổi cấu hình công ty…' }).click();
+  await page.waitForFunction(() => window.__opened === 1);
+  await page.waitForFunction(() => document.querySelector('#statusText').textContent.includes('Lỗi tải dữ liệu'));
+  assert.doesNotMatch(await page.locator('body').innerText(), /PRIVATE_PC|PRIVATE_DN|docs\.google\.com/);
+  assert.doesNotMatch(await page.locator('#statusText').getAttribute('title'), /docs\.google\.com/);
+  assert.deepEqual(errors, []);
+  console.log('PASS: read-only company tab, hidden Sheets addresses, approved import action.');
 } finally {
   await browser.close();
+  await rm(dir, { recursive: true, force: true });
 }

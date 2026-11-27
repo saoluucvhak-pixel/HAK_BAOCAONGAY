@@ -199,6 +199,10 @@ a{color:var(--accent)}
 .rtab{padding:8px 16px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:all .15s}
 .rtab:hover{background:var(--hover);color:var(--ink)}
 .rtab.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+#configurationTabs[hidden]{display:none}
+.companyInfoFields{display:grid;grid-template-columns:minmax(130px,180px) minmax(0,1fr);gap:10px 16px;margin:0 0 18px}
+.companyInfoFields dt{font-weight:600;color:var(--muted)}
+.companyInfoFields dd{margin:0;overflow-wrap:anywhere}
 .reportPanel{display:none}
 .reportPanel.active{display:block}
 

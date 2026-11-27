@@ -178,29 +178,37 @@ try {
 const licenses = process.env.HAK_QA_LICENSE_DIR;
 assert(licenses, 'Thiếu bộ fixture cấp phép.');
 const besideKit = path.join(path.dirname(candidate), 'HAK-CaiDat.haksetup');
+const besideCode = path.join(path.dirname(candidate), 'HAK-PhanHoi.txt');
 const prepare = fileURLToPath(new URL('../../desktop-app/tests/prepare-license-fixtures.mjs', import.meta.url));
 const requestFile = path.join(licenses, 'device.hakreq');
-function stageApproval() {
+async function stageApproval() {
   const result = spawnSync(process.execPath, [prepare], { stdio: 'inherit', timeout: 60_000 });
   if (result.error) throw result.error;
   assert.equal(result.status, 0, 'Tạo yêu cầu ngẫu nhiên cho lần cài thử.');
+  await copyFile(path.join(licenses, 'approved-response.txt'), besideCode);
 }
 
 console.log('Từ chối cài khi thiếu phản hồi hoặc phản hồi lỗi.');
 install(candidate, 31);
+await stageApproval();
+install(candidate, 31); // A correct reply without an encrypted file is insufficient.
+await stageApproval();
+await copyFile(path.join(licenses, 'approved.haksetup'), besideKit);
+await unlink(besideCode);
+install(candidate, 31); // A correct file without the reply is insufficient.
 for (const kind of ['wrong-device', 'tampered', 'expired']) {
-  stageApproval();
+  await stageApproval();
   await copyFile(path.join(licenses, kind + '.haklic'), besideKit);
   install(candidate, 31);
 }
 
 console.log('Cài đè cùng thư mục và mở báo cáo ở chế độ offline.');
-stageApproval();
+await stageApproval();
 const previousRequest = JSON.parse(await readFile(requestFile, 'utf8')).device;
-await copyFile(path.join(licenses, 'approved.haklic'), besideKit);
+await copyFile(path.join(licenses, 'approved-upgrade.haksetup'), besideKit);
 install(candidate);
 install(candidate, 31);
-stageApproval();
+await stageApproval();
 assert.notEqual(JSON.parse(await readFile(requestFile, 'utf8')).device, previousRequest);
 install(candidate, 31); // The previous approval fails for the new request on the same machine.
 const registeredExe = await installedExecutable();
@@ -251,14 +259,14 @@ const licensePath = path.join(process.env.LOCALAPPDATA, 'HAK', 'BaoCaoNgay', 'li
 verifyRun(registeredExe, 0);
 await unlink(licensePath);
 verifyRun(registeredExe, 31);
-stageApproval();
+await stageApproval();
 await copyFile(path.join(licenses, 'tampered.haksetup'), besideKit);
 install(candidate, 31);
-stageApproval();
+await stageApproval();
 await copyFile(path.join(licenses, 'approved.haksetup'), besideKit);
 install(candidate);
 verifyRun(await installedExecutable(), 0);
-stageApproval();
+await stageApproval();
 install(candidate, 31); // A previously accepted company file also fails for the next installation.
 const configured = await openInstalled(false, path.join(dir, 'company-file-profile'));
 try {
@@ -269,6 +277,12 @@ try {
   assert.equal(config.DNTT, Object.keys(sheets)[1]);
   assert.equal(config.HDNCC, '');
   assert(configured.page.url().endsWith('/report.html'));
+  await configured.page.locator('[data-target="cauhinh"]').click();
+  await configured.page.getByRole('tab', { name: 'Thông tin công ty' }).click();
+  const companyTab = configured.page.getByRole('tabpanel', { name: 'Thông tin công ty' });
+  assert.match(await companyTab.innerText(), /Công ty HAK QA/);
+  assert.doesNotMatch(await companyTab.innerText(), /docs\.google\.com/);
+  assert.equal(await companyTab.locator('input, select, textarea').count(), 0);
 } finally {
   await configured.electron.close();
 }

@@ -18,6 +18,18 @@ function readCompanyConfig() {
 
 const company = readCompanyConfig();
 
+export const MANAGED_COMPANY = company._hakCompanyProfile
+  ? Object.freeze({
+    TenCty: company.TenCty,
+    DiaChi: company.DiaChi,
+    MST: company.MST,
+    SDT: company.SDT,
+    DiaChiThuMua: company.DiaChiThuMua,
+    MaHS: company.MaHS,
+    NhaMay: company.NhaMay
+  })
+  : null;
+
 export const CONFIG = Object.freeze({
   PHIEUCAN: company.PhieuCan || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTj7PHtJtv1iBaF9tCKJ9zgnTyc4j6Hbt9CEYX36sVIDXwJDQUvMGd-O_bc8E-N6iEh5JqH9tytjQLj/pub?output=csv',
   DNTT_CT: company.DNTT || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqRW3Yk2MBgXp1qi29tQZQyn1R-opTUjE5PqBFIH7knAOcr1YvthP_AuXa_10knbaprgtM4i_zPk2i/pub?gid=1612289204&single=true&output=csv',

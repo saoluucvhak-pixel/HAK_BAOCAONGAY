@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHmac, randomBytes } from 'node:crypto';
+import { createDecipheriv, createHmac, randomBytes } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -19,6 +19,15 @@ function mac(key, domain, bytes) {
 function response(key, code) {
   return String(mac(key, 'code-v1', code).readUIntBE(0, 6) % 1000000000000).padStart(12, '0');
 }
+function decryptSetup(key, contents) {
+  const envelope = JSON.parse(contents);
+  assert.equal(envelope.format, 'haksetup-aes256-v1');
+  const iv = Buffer.from(envelope.iv, 'base64');
+  const ciphertext = Buffer.from(envelope.body, 'base64');
+  assert.equal(envelope.signature, mac(key, 'setup-tag-v1', Buffer.concat([iv, ciphertext])).toString('base64'));
+  const decipher = createDecipheriv('aes-256-cbc', mac(key, 'setup-encryption-v1', ''), iv);
+  return JSON.parse(Buffer.concat([decipher.update(ciphertext), decipher.final()]));
+}
 async function openDecoder(name, key) {
   const file = path.join(dir, name + '.html');
   await writeFile(file, template.replace('__HAK_BUILD_SEED__', key.toString('base64')));
@@ -26,54 +35,51 @@ async function openDecoder(name, key) {
   await page.goto(pathToFileURL(file).href);
   return page;
 }
-async function calculate(page, requestCode) {
+async function downloadSetup(page, requestCode) {
   await page.locator('#requestCode').fill(requestCode);
-  await page.getByRole('button', { name: 'Tạo mã trả lời' }).click();
-  await page.locator('#replyCode').waitFor({ state: 'visible' });
-  return page.locator('#replyCode').inputValue();
+  const [file] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Tạo mã và file HAK' }).click()
+  ]);
+  assert.equal(file.suggestedFilename(), 'HAK-CaiDat.haksetup');
+  return readFile(await file.path());
 }
 
 try {
   const page = await openDecoder('first', seed);
+  const issue = page.getByRole('button', { name: 'Tạo mã và file HAK' });
   await page.locator('#requestCode').fill('123');
-  await page.getByRole('button', { name: 'Tạo mã trả lời' }).click();
+  await issue.click();
   await page.waitForFunction(() => document.querySelector('#issueStatus').classList.contains('error'));
-  assert.equal(await calculate(page, request), response(seed, request));
-  assert.notEqual(await calculate(page, '01234568'), response(seed, request));
+  assert.equal(await page.locator('#replyCode').isVisible(), false);
 
-  const nextSeed = randomBytes(32);
-  const other = await openDecoder('upgrade', nextSeed);
-  assert.equal(await calculate(other, request), response(nextSeed, request));
-  assert.notEqual(response(nextSeed, request), response(seed, request));
-
-  await page.locator('#requestCode').fill(request);
-  await page.getByText('Thông tin công ty và nguồn Google Sheets', { exact: true }).click();
+  await page.getByRole('button', { name: 'Thêm công ty' }).click();
   const url = 'https://docs.google.com/spreadsheets/d/e/HAK_TEST/pub?output=csv';
   await page.locator('#TenCty').fill('Công ty Thử nghiệm');
   await page.locator('#DiaChi').fill('Đắk Lắk');
   await page.locator('#PhieuCan').fill(url);
   await page.locator('#DNTT').fill(url);
-  const [download] = await Promise.all([
-    page.waitForEvent('download'), page.getByRole('button', { name: 'Tạo file cài đặt HAK' }).click()
-  ]);
-  assert.equal(download.suggestedFilename(), 'HAK-CaiDat.haksetup');
-  const file = await readFile(await download.path());
-  const { body, signature } = JSON.parse(file);
-  const payload = Buffer.from(body, 'base64');
-  const kit = JSON.parse(payload);
+  const file = await downloadSetup(page, request);
+  assert.equal(await page.locator('#replyCode').inputValue(), response(seed, request));
+  const kit = decryptSetup(seed, file);
   assert.equal(kit.device, request);
   assert.equal(kit.company.TenCty, 'Công ty Thử nghiệm');
   assert.equal(kit.company.DiaChi, 'Đắk Lắk');
   assert.equal(kit.company.PhieuCan, url);
   assert(kit.expiresAt > kit.issuedAt);
-  assert.equal(signature, mac(seed, 'setup-v1', payload).toString('base64'));
-  assert.notEqual(signature, mac(nextSeed, 'setup-v1', payload).toString('base64'));
+  assert(!file.includes(Buffer.from(url)));
+  assert(!file.includes(Buffer.from('Công ty Thử nghiệm')));
+  const repeated = await downloadSetup(page, request);
+  assert.notEqual(JSON.parse(repeated).iv, JSON.parse(file).iv);
 
   await page.getByText('Dùng lại cấu hình khi cài lại', { exact: true }).click();
   await page.locator('#DiaChi').fill('');
+  const envelope = JSON.parse(file);
+  const altered = Buffer.from(envelope.body, 'base64');
+  altered[0] ^= 1;
   await page.locator('#previousSetup').setInputFiles({
     name: 'HAK-CaiDat.haksetup', mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify({ body, signature: mac(seed, 'setup-v1', 'changed').toString('base64') }))
+    buffer: Buffer.from(JSON.stringify({ ...envelope, body: altered.toString('base64') }))
   });
   await page.getByRole('button', { name: 'Nạp cấu hình từ file cũ' }).click();
   await page.waitForFunction(() => document.querySelector('#issueStatus').textContent.includes('đã bị sửa'));
@@ -84,6 +90,7 @@ try {
   await page.getByRole('button', { name: 'Nạp cấu hình từ file cũ' }).click();
   await page.waitForFunction(() => document.querySelector('#issueStatus').textContent.includes('Đã nạp cấu hình cũ'));
   assert.equal(await page.locator('#DiaChi').inputValue(), kit.company.DiaChi);
+
   await page.getByRole('button', { name: 'Lưu công ty' }).click();
   await page.waitForFunction(() => document.querySelector('#issueStatus').textContent.includes('Đã lưu Công ty Thử nghiệm'));
   await page.getByRole('button', { name: 'Thêm công ty' }).click();
@@ -99,25 +106,26 @@ try {
   assert.equal(await page.locator('#DiaChi').inputValue(), 'Đắk Lắk');
   assert.equal(await page.locator('#PhieuCan').inputValue(), url);
   await companies.selectOption({ label: 'Công ty thứ hai' });
-  assert.equal(await page.locator('#PhieuCan').inputValue(), url.replace('HAK_TEST', 'HAK_SECOND_PC'));
-  await page.locator('#requestCode').fill('12345678');
-  const [secondKit] = await Promise.all([
-    page.waitForEvent('download'), page.getByRole('button', { name: 'Tạo file cài đặt HAK' }).click()
-  ]);
-  const saved = JSON.parse(await readFile(await secondKit.path()));
-  assert.equal(JSON.parse(Buffer.from(saved.body, 'base64')).company.TenCty, 'Công ty thứ hai');
+  const second = decryptSetup(seed, await downloadSetup(page, '12345678'));
+  assert.equal(second.company.TenCty, 'Công ty thứ hai');
+  assert.equal(second.company.DNTT, url.replace('HAK_TEST', 'HAK_SECOND_DNTT'));
 
   await page.getByText('Sao lưu danh sách công ty', { exact: true }).click();
   const [backup] = await Promise.all([
     page.waitForEvent('download'), page.getByRole('button', { name: 'Tải danh sách' }).click()
   ]);
   assert.equal(backup.suggestedFilename(), 'HAK-DanhSachCongTy.json');
+  const nextSeed = randomBytes(32);
+  const other = await openDecoder('upgrade', nextSeed);
   await other.getByText('Sao lưu danh sách công ty', { exact: true }).click();
   await other.locator('#importCompanies').setInputFiles(await backup.path());
   await other.locator('#savedCompany').selectOption({ label: 'Công ty thứ hai' });
   assert.equal(await other.locator('#DNTT').inputValue(), url.replace('HAK_TEST', 'HAK_SECOND_DNTT'));
-  assert.equal(await calculate(other, request), response(nextSeed, request));
-  console.log('PASS: offline two-code workflow, new build mapping, company profiles, backup transfer, configuration file and tamper detection.');
+  const upgraded = await downloadSetup(other, request);
+  assert.equal(await other.locator('#replyCode').inputValue(), response(nextSeed, request));
+  assert.notEqual(response(nextSeed, request), response(seed, request));
+  assert.throws(() => decryptSetup(seed, upgraded));
+  console.log('PASS: paired offline code and encrypted profile, tamper detection, multiple companies and backup transfer.');
 } finally {
   await browser.close();
   await rm(dir, { recursive: true, force: true });

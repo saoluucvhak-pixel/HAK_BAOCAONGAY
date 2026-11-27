@@ -56,8 +56,7 @@
         <label>Link CSV hồ sơ keo (tùy chọn) <input id="Hosokeo" maxlength="2000" inputmode="url"></label>
         <button class="secondary" id="saveCompany" type="button">Lưu công ty</button>
       </details>
-      <button type="submit" value="code">Tạo mã trả lời</button>
-      <button class="secondary" type="submit" value="kit">Tạo file cài đặt HAK</button>
+      <button type="submit" value="kit">Tạo mã và file HAK</button>
       <details>
         <summary>Dùng lại cấu hình khi cài lại</summary>
         <label>File cài đặt HAK cũ <input id="previousSetup" type="file" accept=".haksetup"></label>
@@ -86,6 +85,7 @@ const product = 'com.hakgroup.baocaongay';
 const seed = '__HAK_BUILD_SEED__';
 const companyFields = ['TenCty', 'DiaChi', 'MST', 'SDT', 'DiaChiThuMua', 'MaHS', 'NhaMay', 'PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo'];
 const profilesFormat = 'hak-company-profiles-v1';
+const setupFormat = 'haksetup-aes256-v1';
 const encoder = new TextEncoder();
 const hmac = { name: 'HMAC', hash: 'SHA-256' };
 let macKey;
@@ -110,6 +110,40 @@ async function mac(domain, bytes) {
 async function sign(domain, bytes) {
   const { key, message } = await mac(domain, bytes);
   return new Uint8Array(await crypto.subtle.sign(hmac.name, key, message));
+}
+function joinBytes(first, second) {
+  const bytes = new Uint8Array(first.length + second.length);
+  bytes.set(first);
+  bytes.set(second, first.length);
+  return bytes;
+}
+async function setupKey() {
+  const key = await sign('setup-encryption-v1', new Uint8Array());
+  return crypto.subtle.importKey('raw', key, 'AES-CBC', false, ['encrypt', 'decrypt']);
+}
+async function buildSetup(payload) {
+  const iv = crypto.getRandomValues(new Uint8Array(16));
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, await setupKey(), payload));
+  const tag = await sign('setup-tag-v1', joinBytes(iv, ciphertext));
+  return { format: setupFormat, iv: toBase64(iv), body: toBase64(ciphertext), signature: toBase64(tag) };
+}
+async function readSetup(envelope) {
+  if (envelope?.format !== setupFormat) throw new Error('Chọn file phản hồi mã hóa của bản cài này.');
+  const iv = fromBase64(envelope.iv);
+  const body = fromBase64(envelope.body);
+  const tag = fromBase64(envelope.signature);
+  if (iv.length !== 16 || body.length === 0 || body.length % 16 || tag.length !== 32)
+    throw new Error('Cấu trúc file phản hồi HAK không hợp lệ.');
+  const { key, message } = await mac('setup-tag-v1', joinBytes(iv, body));
+  if (!(await crypto.subtle.verify(hmac.name, key, tag, message)))
+    throw new Error('File cũ thuộc bộ cài khác hoặc đã bị sửa.');
+  return crypto.subtle.decrypt({ name: 'AES-CBC', iv }, await setupKey(), body);
+}
+async function calculateResponse(request) {
+  const digest = await sign('code-v1', encoder.encode(request));
+  let number = 0;
+  for (const byte of digest.subarray(0, 6)) number = number * 256 + byte;
+  return String(number % 1000000000000).padStart(12, '0');
 }
 function download(filename, value) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(value)], { type: 'application/json' }));
@@ -268,28 +302,11 @@ try {
 }
 
 async function restoreCompanyProfile() {
-  let envelope, body;
-  try {
-    if (!$('previousSetup').files.length) throw new Error();
-    const file = $('previousSetup').files[0];
-    if (file.size > 16384) throw new Error();
-    envelope = JSON.parse(await file.text());
-    if (typeof envelope.body !== 'string' || typeof envelope.signature !== 'string') throw new Error();
-    body = fromBase64(envelope.body);
-  } catch {
-    throw new Error('Chọn file cài đặt HAK cũ (.haksetup) hợp lệ.');
-  }
-
-  const { key, message } = await mac('setup-v1', body);
-  if (!(await crypto.subtle.verify(hmac.name, key, fromBase64(envelope.signature), message)))
-    throw new Error('File cũ thuộc bộ cài khác hoặc đã bị sửa.');
-  let previous;
-  try {
-    previous = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body));
-  } catch {
-    throw new Error('Nội dung file cài đặt HAK cũ không hợp lệ.');
-  }
-  if (previous?.product !== product || previous.version !== 2 ||
+  const file = $('previousSetup').files[0];
+  if (!file || file.size > 16384) throw new Error('Chọn file cài đặt HAK cũ (.haksetup) hợp lệ.');
+  const body = await readSetup(JSON.parse(await file.text()));
+  const previous = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body));
+  if (previous?.product !== product || previous.version !== 3 ||
       !previous.company || typeof previous.company !== 'object' || Array.isArray(previous.company))
     throw new Error('File cũ thiếu cấu hình công ty của Báo cáo ngày HAK.');
 
@@ -318,28 +335,20 @@ $('issueForm').addEventListener('submit', async (event) => {
 
     const request = $('requestCode').value.replace(/\s+/g, '');
     if (!/^[0-9]{8}$/.test(request)) throw new Error('Nhập đủ 8 chữ số trên bộ cài.');
-    if (mode !== 'kit') {
-      const digest = await sign('code-v1', encoder.encode(request));
-      let number = 0;
-      for (const byte of digest.subarray(0, 6)) number = number * 256 + byte;
-      $('replyCode').value = String(number % 1000000000000).padStart(12, '0');
-      $('replyPanel').hidden = false;
-      report(status, 'Gửi mã trả lời về máy đang cài.');
-      return;
-    }
-
     const issuedAt = Math.floor(Date.now() / 1000);
     const expiresAt = Math.floor(Date.parse($('expiry').value + 'T23:59:59+07:00') / 1000);
     if (!Number.isFinite(expiresAt) || expiresAt <= issuedAt)
       throw new Error('Ngày hết hạn phải ở trong tương lai.');
     const company = companyFromForm();
     validateCompanyProfile(company);
-    const body = encoder.encode(JSON.stringify({ product, version: 2, device: request, issuedAt, expiresAt, company }));
-    const kit = { body: toBase64(body), signature: toBase64(await sign('setup-v1', body)) };
+    const body = encoder.encode(JSON.stringify({ product, version: 3, device: request, issuedAt, expiresAt, company }));
+    const kit = await buildSetup(body);
     if (encoder.encode(JSON.stringify(kit)).length > 16384)
       throw new Error('File cài đặt vượt quá 16 KB. Hãy rút gọn thông tin trước khi tạo lại.');
+    $('replyCode').value = await calculateResponse(request);
+    $('replyPanel').hidden = false;
     download('HAK-CaiDat.haksetup', kit);
-    report(status, 'Gửi file HAK-CaiDat.haksetup về máy đang cài.');
+    report(status, 'Gửi mã trả lời và file HAK-CaiDat.haksetup cho người cài.');
   } catch (error) {
     report(status, error.message, true);
   } finally {
