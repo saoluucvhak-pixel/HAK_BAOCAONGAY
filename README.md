@@ -68,9 +68,9 @@ Nếu cố ý thay đổi file xuất: `node tests/test-export-golden.mjs --upda
 
 ## Cấp phép Báo cáo ngày cho từng máy Windows
 
-1. Trên máy quản trị, mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html) bằng Chrome hoặc Edge cập nhật. Mở **Tạo hoặc khôi phục khóa**, đặt mật khẩu rồi bấm **Tạo khóa chung**. Giữ bản sao mã hóa `HAK-KhoaChung.hakkey` và mật khẩu ở nơi an toàn. Trên máy quản trị mới, chọn **Khôi phục khóa** với bản sao đó.
+1. Trên máy quản trị, mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html) bằng Chrome hoặc Edge cập nhật. Dùng khóa HAK đã tạo lúc phát hành bản 2.6.0. Nếu trang chưa hiện khóa đã lưu, mở **Quản lý khóa và hồ sơ công ty**, rồi chọn **Khôi phục khóa** với file `HAK-KhoaChung.hakkey` và mật khẩu đã đặt.
 2. Dùng cùng bộ cài Báo cáo ngày cho các máy cần cài. Bộ cài 2.6.0 đã có khóa công khai HAK. Mỗi máy được cấp phản hồi riêng theo mã yêu cầu của lần cài.
-3. Người cài sao chép mã yêu cầu `HAK4.…`. HTML hiển thị mã ứng dụng và mã máy. Chọn hoặc nhập công ty rồi bấm **Tạo mã và file HAK**. Gửi lại mã và file `.haksetup`. Người dùng giữ cửa sổ mở, kiểm tra mã rồi nạp file.
+3. Người cài sao chép mã yêu cầu `HAK4.…`. HTML hiển thị mã ứng dụng và mã máy. Chọn hoặc nhập công ty rồi bấm **Tạo mã và file HAK**. Bấm **Sao chép mã phản hồi** và **Tải file .haksetup**, rồi gửi cả hai cho người cài. Người dùng giữ cửa sổ mở, kiểm tra mã rồi nạp file.
 
 Mỗi lần cài lại hoặc đổi cấu hình có mã ngẫu nhiên mới. HAK ký bằng Ed25519. App xác minh chữ ký, hạn dùng, mã ứng dụng và mã máy trước khi mở. Mã máy dùng `MachineGuid` và serial mainboard nếu đọc được. Dự phòng lần lượt dùng UUID phần cứng, serial ổ đĩa đầu tiên rồi `MachineGuid` nếu Windows không cung cấp thông tin phần cứng. Cài lại Windows hoặc thay phần cứng ảnh hưởng đến mã định danh có thể cần HAK cấp lại.
 

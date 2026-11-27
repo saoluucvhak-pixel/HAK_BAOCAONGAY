@@ -48,7 +48,14 @@ fs.mkdirSync(registration, { recursive: true });
 fs.copyFileSync(path.join(REL, 'win-unpacked', 'HAK-License.exe'), path.join(registration, 'HAK-License.exe'));
 fs.copyFileSync(path.join(ROOT, 'licensing', 'Register-HAK.cmd'), path.join(registration, 'Register-HAK.cmd'));
 fs.copyFileSync(cryptoLibrary, path.join(registration, 'BouncyCastle.Cryptography.dll'));
-fs.copyFileSync(path.join(ROOT, 'licensing', 'HAK-CapPhep.html'), path.join(REL, 'HAK-CapPhep.html'));
+const { publicKey } = JSON.parse(fs.readFileSync(path.join(ROOT, 'build', 'license-policy.json'), 'utf8'));
+const adminHtml = fs.readFileSync(path.join(ROOT, 'licensing', 'HAK-CapPhep.html'), 'utf8');
+const issuerMeta = /(<meta name="hak-issuer-key" content=")[A-Za-z0-9_-]{43}(">)/;
+if (!/^[A-Za-z0-9_-]{43}$/.test(publicKey) || !issuerMeta.test(adminHtml)) {
+  throw new Error('Không thể đồng bộ khóa công khai của HTML với bộ cài.');
+}
+fs.writeFileSync(path.join(REL, 'HAK-CapPhep.html'),
+  adminHtml.replace(issuerMeta, (_, start, end) => start + publicKey + end));
 const exe = fs.readFileSync(path.join(REL, exeName));
 const hash = sha256(exe);
 const parts = [];
