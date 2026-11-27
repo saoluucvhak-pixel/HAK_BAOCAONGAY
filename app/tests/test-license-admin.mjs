@@ -84,7 +84,40 @@ try {
   await page.getByRole('button', { name: 'Nạp cấu hình từ file cũ' }).click();
   await page.waitForFunction(() => document.querySelector('#issueStatus').textContent.includes('Đã nạp cấu hình cũ'));
   assert.equal(await page.locator('#DiaChi').inputValue(), kit.company.DiaChi);
-  console.log('PASS: offline two-code workflow, new build mapping, configuration file, restore and tamper detection.');
+  await page.getByRole('button', { name: 'Lưu công ty' }).click();
+  await page.waitForFunction(() => document.querySelector('#issueStatus').textContent.includes('Đã lưu Công ty Thử nghiệm'));
+  await page.getByRole('button', { name: 'Thêm công ty' }).click();
+  assert.equal(await page.locator('#PhieuCan').inputValue(), '');
+  await page.locator('#TenCty').fill('Công ty thứ hai');
+  await page.locator('#PhieuCan').fill(url.replace('HAK_TEST', 'HAK_SECOND_PC'));
+  await page.locator('#DNTT').fill(url.replace('HAK_TEST', 'HAK_SECOND_DNTT'));
+  await page.getByRole('button', { name: 'Lưu công ty' }).click();
+  await page.waitForFunction(() => document.querySelector('#savedCompany').options.length === 3);
+  await page.reload();
+  const companies = page.locator('#savedCompany');
+  await companies.selectOption({ label: 'Công ty Thử nghiệm' });
+  assert.equal(await page.locator('#DiaChi').inputValue(), 'Đắk Lắk');
+  assert.equal(await page.locator('#PhieuCan').inputValue(), url);
+  await companies.selectOption({ label: 'Công ty thứ hai' });
+  assert.equal(await page.locator('#PhieuCan').inputValue(), url.replace('HAK_TEST', 'HAK_SECOND_PC'));
+  await page.locator('#requestCode').fill('12345678');
+  const [secondKit] = await Promise.all([
+    page.waitForEvent('download'), page.getByRole('button', { name: 'Tạo file cài đặt HAK' }).click()
+  ]);
+  const saved = JSON.parse(await readFile(await secondKit.path()));
+  assert.equal(JSON.parse(Buffer.from(saved.body, 'base64')).company.TenCty, 'Công ty thứ hai');
+
+  await page.getByText('Sao lưu danh sách công ty', { exact: true }).click();
+  const [backup] = await Promise.all([
+    page.waitForEvent('download'), page.getByRole('button', { name: 'Tải danh sách' }).click()
+  ]);
+  assert.equal(backup.suggestedFilename(), 'HAK-DanhSachCongTy.json');
+  await other.getByText('Sao lưu danh sách công ty', { exact: true }).click();
+  await other.locator('#importCompanies').setInputFiles(await backup.path());
+  await other.locator('#savedCompany').selectOption({ label: 'Công ty thứ hai' });
+  assert.equal(await other.locator('#DNTT').inputValue(), url.replace('HAK_TEST', 'HAK_SECOND_DNTT'));
+  assert.equal(await calculate(other, request), response(nextSeed, request));
+  console.log('PASS: offline two-code workflow, new build mapping, company profiles, backup transfer, configuration file and tamper detection.');
 } finally {
   await browser.close();
   await rm(dir, { recursive: true, force: true });

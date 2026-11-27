@@ -74,6 +74,8 @@ Nếu cố ý thay đổi file xuất: `node tests/test-export-golden.mjs --upda
 
 Để tự điền thông tin công ty và các nguồn Google Sheets CSV, HAK mở **Thông tin công ty và nguồn Google Sheets** rồi bấm **Tạo file cài đặt HAK**. Người nhận chọn **Nạp file HAK…** trong bộ cài. Hai nguồn **Phiếu cân** và **Đề nghị thanh toán** là bắt buộc. HAK có thể nạp lại cấu hình từ file phản hồi cũ thuộc cùng bản dựng. Tạo mã, xuất file và cài đặt có thể làm offline. Ứng dụng cần Internet để tải dữ liệu mới.
 
+Trong HTML quản trị, bấm **Thêm công ty**, nhập thông tin rồi bấm **Lưu công ty**. Sau này chọn công ty đã lưu để tự điền các nguồn CSV. Danh sách nằm trong trình duyệt đang dùng. Khi đổi HTML hoặc máy, chọn **Sao lưu danh sách công ty → Tải danh sách** rồi nạp file JSON ở HTML mới.
+
 ### Phát hành bản nâng cấp
 
 Workflow **Release installer** trên nhánh `main` tự tạo một bộ tính mã ngẫu nhiên cho mỗi lần đóng gói. Chọn `publish=true` để đưa Setup lên GitHub Releases. HTML quản trị cùng bộ tính được lưu trong một bản nháp riêng tên **HAK quản trị nội bộ**. Dùng đúng cặp Setup và HTML cùng số phát hành. Giữ HTML trong nhóm quản trị HAK. Cơ chế này ngăn cài tùy tiện vì bộ cài chứa cùng bộ tính mã.
