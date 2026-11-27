@@ -28,6 +28,11 @@ try {
   const context = await browser.newContext({ offline: true, acceptDownloads: true });
   const page = await context.newPage();
   await page.goto(location);
+  const guide = page.locator('#issuerGuide');
+  await guide.getByText('Hướng dẫn cấp phép nhiều app', { exact: true }).click();
+  assert(await guide.getByText('Chuẩn bị một lần tại HAK', { exact: false }).isVisible());
+  assert(await guide.getByText('Dùng cùng file', { exact: false }).isVisible());
+  assert(await guide.getByText('Chuyển máy quản trị hoặc khôi phục sau sự cố', { exact: false }).isVisible());
   await page.getByText('Tạo hoặc khôi phục khóa', { exact: true }).click();
   await page.locator('#newIssuerPassword').fill(password);
   await page.locator('#repeatIssuerPassword').fill(password);
