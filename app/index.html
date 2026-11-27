@@ -253,7 +253,8 @@ a{color:var(--accent)}
 .side .item .ic{width:20px;text-align:center;font-size:14px}
 .side .foot{padding:14px 16px 18px;font-size:11px;color:var(--side-ink);opacity:.7;border-top:1px solid rgba(255,255,255,.08)}
 .side-toggle,.side-close{display:none}
-[data-rpanel="config-appearance"] select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:0}
+.backup-actions{align-items:center;margin-bottom:10px}
+.backup-actions input,[data-rpanel="config-appearance"] select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:0}
 
 /* ---------- Main ---------- */
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -432,6 +433,9 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
 .modalBox h3{margin:0 0 6px;font-size:16px;font-weight:700}
 .modalNote{font-size:12.5px;color:var(--muted);margin:0 0 14px}
 #forestryForm fieldset,#forestrySettings fieldset{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+.forestry-delete-warning{margin:12px 0;padding:12px;background:var(--head);border:1px solid var(--err);border-radius:8px;color:var(--err)}
+.forestry-delete-warning p{margin:0 0 8px}
+#forestrySettings input:read-only,#forestrySettings select:disabled{color:var(--ink);background:var(--head);opacity:1}
 #forestryUpdatedLabel{font-size:11.5px;font-weight:600;color:var(--muted)}
 #forestryUpdated{font-variant-numeric:tabular-nums}
 #forestryForm fieldset>label{display:inline-block;margin:4px 12px 4px 0}
@@ -777,7 +781,7 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
         <div class="pageHead"><h1>Cấu hình</h1></div>
         <div class="reportTabs" aria-label="Mục cấu hình">
           <button class="rtab active" type="button" data-rtab="config-general">Chung</button>
-          <button class="rtab" type="button" data-rtab="config-appearance">Giao diện</button>
+          <button class="rtab" type="button" data-rtab="config-appearance">Giao diện và định dạng</button>
           <button class="rtab" type="button" data-rtab="config-forestry">Tham số báo cáo lâm sản</button>
         </div>
         <div class="reportPanel active" data-rpanel="config-general">
@@ -790,10 +794,15 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
         <div class="dmCard">
           <h3>Sao lưu / Khôi phục dữ liệu đã lưu trên trình duyệt này</h3>
           <div style="color:var(--muted);font-size:13px;margin-bottom:8px">Xuất toàn bộ dữ liệu bạn đã tự nhập (danh mục Đại lý/Hỗ trợ, thông tin ngân hàng/WO đã lưu) ra 1 file JSON để lưu trữ hoặc chuyển sang máy khác. Không bao gồm dữ liệu Google Sheet (luôn tải lại từ nguồn).</div>
+          <div class="backup-actions tools">
+            <label for="backupYear">Năm sao lưu</label>
+            <input id="backupYear" type="number" inputmode="numeric" min="1900" max="9999" step="1" placeholder="Toàn bộ dữ liệu">
           <button class="btn small" id="btnBackupData">💾 Sao lưu dữ liệu</button>
           <label class="btn small" for="btnRestoreDataInput" style="display:inline-block;cursor:pointer;margin-left:8px">📂 Khôi phục dữ liệu</label>
           <input type="file" id="btnRestoreDataInput" accept=".json" style="display:none">
-          <span id="backupRestoreStatus" style="margin-left:10px;color:#666;font-size:13px;"></span>
+          </div>
+          <p id="backupYearHelp" class="loanSourceNote">Sao lưu theo năm gồm khoản vay theo ngày hạch toán và lịch sử kiểm lâm theo ngày kết thúc kỳ. Để trống năm để kèm danh mục và cấu hình chung.</p>
+          <p id="backupRestoreStatus" role="status" aria-live="polite"></p>
         </div>
         <div class="dmCard" style="margin-top:16px">
           <h3>Hướng dẫn sử dụng</h3>
@@ -812,6 +821,15 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
           <div class="panel modalGrid">
             <label class="f">Chủ đề <select id="settingsThemeSkin"></select></label>
             <label class="f">Chế độ sáng / tối <select id="settingsThemeMode"></select></label>
+            <label class="f">Định dạng số <select id="settingsNumberFormat">
+              <option value="vi-VN">1.234,56</option><option value="en-US">1,234.56</option>
+            </select></label>
+            <label class="f">Định dạng ngày <select id="settingsDateFormat">
+              <option value="dd/mm/yyyy">Ngày/Tháng/Năm</option>
+              <option value="dd-mm-yyyy">Ngày-Tháng-Năm</option>
+              <option value="yyyy-mm-dd">Năm-Tháng-Ngày</option>
+            </select></label>
+            <output class="loanSourceNote f wide" id="settingsFormatPreview" aria-label="Xem trước định dạng"></output>
           </div>
         </div>
         <div class="reportPanel" data-rpanel="config-forestry">
@@ -833,7 +851,7 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
                   <option value="">Chọn loại văn bản</option>
                   <option>Thông tư</option><option>Quyết định</option><option>Văn bản hợp nhất</option>
                 </select></label>
-                <label class="f wide">Số / ký hiệu văn bản <input name="documentNumber" type="text"></label>
+                <label class="f wide">Số / ký hiệu văn bản <input name="documentNumber" type="text" placeholder="Ví dụ 01/2026/TT-…"></label>
                 <label class="f wide">Căn cứ <input name="basis" type="text" placeholder="Theo Thông tư số …"></label>
                 <label class="f">Ngày hiệu lực <input name="effectiveFrom" type="date" aria-describedby="forestryValidityHint"></label>
                 <label class="f">Ngày hết hiệu lực <input name="effectiveTo" type="date" aria-describedby="forestryValidityHint"></label>
@@ -844,7 +862,19 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
               <legend>Tham số báo cáo dùng chung</legend>
               <div id="forestryParameterFields"></div>
             </fieldset>
-            <button class="btn primary" type="submit">Lưu tham số</button>
+            <div class="tools">
+              <button class="btn" id="forestryEditRegulation" type="button">Sửa</button>
+              <button class="btn primary" id="forestrySaveRegulation" type="submit" disabled>Lưu</button>
+              <button class="btn" id="forestryCancelRegulation" type="button" hidden>Hủy sửa</button>
+              <button class="btn danger" id="forestryDeleteRegulation" type="button">Xóa</button>
+            </div>
+            <div id="forestryDeleteWarning" class="forestry-delete-warning" hidden>
+              <p id="forestryDeleteMessage" role="alert"></p>
+              <div class="tools">
+                <button class="btn danger confirm" id="forestryConfirmDelete" type="button">Xác nhận xóa</button>
+                <button class="btn" id="forestryCancelDelete" type="button">Giữ quy định</button>
+              </div>
+            </div>
             <p id="forestrySettingsStatus" role="status" aria-live="polite"></p>
           </form>
         </div>

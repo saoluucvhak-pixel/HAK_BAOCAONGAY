@@ -1,3 +1,5 @@
+import { displayDecimal, displayVietnamDateTime } from '../utils/display-format.js';
+import { formatIsoDate as dateLabel } from '../utils/hak-format.js';
 import { forestryPrintPages } from '../services/export/forestry-layout.js';
 import { forestryWord, forestryWorkbook } from '../services/export/forestry-documents.js';
 import { closingStock, isForestryHistoryEntry, latestForestryClosing } from '../services/forestry-history.js';
@@ -37,8 +39,6 @@ function appendRow(parent, values, tag) {
   }
 }
 
-const previewQuantity = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 });
-const previewCurrency = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const dailyNumericColumns = new Set([0, 6, 7, 11, 12, 14, 15]);
 
 function showResults(container, reports) {
@@ -72,10 +72,11 @@ function showResults(container, reports) {
       body.replaceChildren();
       for (const values of report.rows.slice(page * pageSize, (page + 1) * pageSize)) {
         appendRow(body, values.map((value, index) => {
+          if (report.name === 'RP_MAU04' && (index === 1 || index === 9)) return dateLabel(value);
           if (typeof value !== 'number') return value;
-          if (report.name === 'RP_MAU04') return dailyNumericColumns.has(index) ? previewQuantity.format(value) : value;
-          if (report.name === 'RP_MAU14') return [6, 7, 9, 10].includes(index) ? previewCurrency.format(value) : value;
-          return index >= 4 && index <= 8 ? previewQuantity.format(value) : value;
+          if (report.name === 'RP_MAU04') return dailyNumericColumns.has(index) ? displayDecimal(value, 3) : value;
+          if (report.name === 'RP_MAU14') return [6, 7, 9, 10].includes(index) ? displayDecimal(value, 2) : value;
+          return index >= 4 && index <= 8 ? displayDecimal(value, 3) : value;
         }), 'td');
       }
       pageLabel.textContent = (page + 1) + ' / ' + pageCount;
@@ -108,11 +109,7 @@ async function buildExport(format, pages) {
 }
 
 const historyKey = CONFIG.STORAGE_KEYS.forestryHistory;
-const number = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 });
-const dateTime = new Intl.DateTimeFormat('vi-VN', {
-  dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
-});
-const dateLabel = date => date.split('-').reverse().join('/');
+const displayStock = value => displayDecimal(value, 3);
 const reportLabels = { M04_14: '04, 14', M04: '04', M14: '14', M: '29 tháng', Q: '29 quý', '6T': '29 sáu tháng', Y: '29 năm', CUSTOM: '29 kỳ tùy chọn' };
 
 const periodChoices = {
@@ -213,9 +210,9 @@ export function initForestryReports() {
     priorButton.textContent = openingReference?.label ?? 'Lấy tồn cuối kỳ trước';
     if (!manualOpening) elements.opening.value = prior?.closing ?? '';
     openingSource.textContent = prior
-      ? 'Tồn cuối ngày ' + dateLabel(prior.to) + ' là ' + number.format(prior.closing) + ' tấn.'
+      ? 'Tồn cuối ngày ' + dateLabel(prior.to) + ' là ' + displayStock(prior.closing) + ' tấn.'
       : legacy ? 'Có số tồn đã lưu trước đây cho ngày ' + dateLabel(range.from) + ': ' +
-        number.format(legacy['Tồn đầu ngày']) + ' tấn. Hãy đối chiếu trước khi dùng.'
+        displayStock(legacy['Tồn đầu ngày']) + ' tấn. Hãy đối chiếu trước khi dùng.'
       : 'Nhập tồn đầu kỳ nếu chưa có tồn cuối của ngày liền trước.';
   }
 
@@ -236,9 +233,9 @@ export function initForestryReports() {
       empty.textContent = 'Chưa có báo cáo đã tạo.';
     }
     for (const entry of entries) {
-      appendRow(historyTable, [dateTime.format(new Date(entry.createdAt)),
+      appendRow(historyTable, [displayVietnamDateTime(new Date(entry.createdAt)),
         dateLabel(entry.from) + ' – ' + dateLabel(entry.to), entry.selected.map(key => reportLabels[key]).join('; '),
-        entry.regulationCode ?? '—', number.format(entry.opening), Number.isFinite(entry.closing) ? number.format(entry.closing) : '—'], 'td');
+        entry.regulationCode ?? '—', displayStock(entry.opening), Number.isFinite(entry.closing) ? displayStock(entry.closing) : '—'], 'td');
     }
     refreshOpening();
   }
@@ -269,6 +266,14 @@ export function initForestryReports() {
     invalidateReport();
   });
   document.addEventListener('forestryhistorychange', renderHistory);
+  document.addEventListener('displayformatchange', () => {
+    refreshPeriod();
+    renderHistory();
+    if (result) {
+      output.replaceChildren();
+      showResults(output, result.reports);
+    }
+  });
   document.addEventListener('forestrysettingschange', () => {
     refreshOpening();
     invalidateReport();

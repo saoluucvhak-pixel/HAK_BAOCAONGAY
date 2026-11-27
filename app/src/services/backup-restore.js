@@ -15,17 +15,56 @@ import { logger } from './logger.js';
 import { pushUndoSnapshot } from '../store/app-state.js';
 import { RESULTS, runReport } from '../store/report-runtime.js';
 import { renderDMTables } from '../components/dm-tables.js';
-import { exportLoans, restoreLoans } from './loan-store.js';
+import { CONFIG } from '../config/config.js';
+import { isForestryHistoryEntry } from './forestry-history.js';
+import { exportLoans, restoreLoans, restoreLoansForYear } from './loan-store.js';
 import { reloadOpening } from '../components/tienvay-summary.js';
 import { reloadLoans } from '../components/loan-editor.js';
 
 function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+const validYear = year => typeof year === 'string' && /^\d{4}$/.test(year) && Number(year) >= 1900;
+const belongsToYear = (date, year) => typeof date === 'string' && date.startsWith(year + '-');
+
+export function filterBackupYear(backup, year) {
+  if (!validYear(year)) throw new Error('Nhập năm hợp lệ (4 chữ số).');
+  const history = backup.data.forestryHistory;
+  const out = {
+    appVersion: backup.appVersion, exportedAt: backup.exportedAt, year,
+    data: { forestryHistory: Array.isArray(history) ? history.filter(row => belongsToYear(row?.to, year)) : [] },
+  };
+  if (backup.khoanVay) out.khoanVay = {
+    schema: backup.khoanVay.schema,
+    rows: backup.khoanVay.rows.filter(row => belongsToYear(row?.ngayHachToan, year)),
+  };
+  return out;
+}
+
+function mergeYearlyHistory(backup) {
+  const { year, data } = backup;
+  if (!validYear(year) || Object.keys(data).some(key => key !== 'forestryHistory') ||
+      !Array.isArray(data.forestryHistory) ||
+      !data.forestryHistory.every(row => isForestryHistoryEntry(row) && belongsToYear(row.to, year))) {
+    throw new Error('File sao lưu theo năm không hợp lệ.');
+  }
+  const current = storageService.get(CONFIG.STORAGE_KEYS.forestryHistory, []);
+  if (!Array.isArray(current) || !current.every(isForestryHistoryEntry)) {
+    throw new Error('Lịch sử hiện tại có mục không hợp lệ. Chưa thay đổi dữ liệu.');
+  }
+  const identity = row => JSON.stringify([row.createdAt, row.company, row.source, row.intake, row.from, row.to, row.selected]);
+  const merged = new Map(current.map(row => [identity(row), row]));
+  for (const row of data.forestryHistory) merged.set(identity(row), row);
+  return [...merged.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
 
 /** Xuất toàn bộ dữ liệu người dùng đã lưu ra 1 file JSON, tải xuống ngay. */
 export async function backupData() {
   var status = $('#backupRestoreStatus');
   try {
     var backup = storageService.exportAll();
+    const yearInput = $('#backupYear');
+    if (yearInput && !yearInput.reportValidity()) return;
+    const year = yearInput?.value;
     // [2026-10-29] Kèm toàn bộ "Cập nhật khoản vay" (kho IndexedDB riêng) — không có thì file sao
     // lưu thiếu đúng phần dữ liệu người dùng tự nhập nhiều nhất.
     // [SỬA — rà soát 30/10] Không đọc được kho khoản vay (máy chặn IndexedDB, kho lỗi…) KHÔNG được làm hỏng
@@ -34,10 +73,11 @@ export async function backupData() {
     var loanErr = '';
     try { backup.khoanVay = await exportLoans(); }
     catch (le) { loanErr = (le && le.message) || String(le); logger.error('[backup-restore] Không đọc được khoản vay khi sao lưu', loanErr); }
+    if (year) backup = filterBackupYear(backup, year);
     var json = JSON.stringify(backup, null, 2);
     var blob = new Blob([json], { type: 'application/json' });
     var d = new Date();
-    var filename = 'BaoCaoNgay_Backup_' + d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + '.json';
+    var filename = 'BaoCaoNgay_Backup_' + (year ? 'Nam_' + year + '_' : '') + d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + '.json';
     downloadBlob(blob, filename);
     if (status) status.textContent = 'Đã tải file sao lưu "' + filename + '"' + (backup.khoanVay
       ? ' (gồm ' + backup.khoanVay.rows.length.toLocaleString('vi-VN') + ' dòng khoản vay).'
@@ -65,6 +105,8 @@ export async function restoreData(file) {
     if (backup.khoanVay && (!Array.isArray(backup.khoanVay.rows) || ![1, 2, 3].includes(backup.khoanVay.schema))) {
       throw new Error('Phần khoản vay của file sao lưu không hợp lệ — chưa thay đổi dữ liệu.');
     }
+    const yearly = Object.hasOwn(backup, 'year');
+    if (yearly) backup.data.forestryHistory = mergeYearlyHistory(backup);
     // Lưu bản gốc trước khi khôi phục để có thể hoàn nguyên localStorage nếu kho khoản vay lỗi.
     var beforeRestore = storageService.snapshotRaw();
     pushUndoSnapshot();
@@ -76,7 +118,7 @@ export async function restoreData(file) {
     var loanNote = '';
     if (backup.khoanVay) {
       var n;
-      try { n = await restoreLoans(backup.khoanVay); }
+      try { n = yearly ? await restoreLoansForYear(backup.khoanVay, backup.year) : await restoreLoans(backup.khoanVay); }
       catch (loanError) {
         var rollback = storageService.restoreRaw(beforeRestore);
         throw new Error('Không thể khôi phục khoản vay: ' + loanError.message +
@@ -99,7 +141,7 @@ export async function restoreData(file) {
     renderDMTables();
     if (RESULTS) runReport();
 
-    if (status) status.textContent = 'Đã khôi phục ' + result.restoredKeys.length + ' mục dữ liệu từ "' + file.name + '".' + loanNote + ' (Danh mục có thể bấm "Hoàn tác" nếu khôi phục nhầm.)';
+    if (status) status.textContent = (yearly ? 'Đã gộp dữ liệu năm ' + backup.year + '. ' : '') + 'Đã khôi phục ' + result.restoredKeys.length + ' mục dữ liệu từ "' + file.name + '".' + loanNote + ' (Danh mục có thể bấm "Hoàn tác" nếu khôi phục nhầm.)';
     logger.info('[backup-restore] Đã khôi phục', result.restoredKeys.join(', '), 'từ', file.name);
   } catch (e) {
     if (status) status.textContent = 'Lỗi khôi phục: ' + e.message;

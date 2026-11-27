@@ -1,3 +1,5 @@
+import { formatIsoDate } from '../../utils/hak-format.js';
+
 // Chỉ các cột in trên biểu mẫu. Các cột tra cứu nội bộ vẫn dùng trong bảng xem trước.
 const col = (column, text, across = 1, down = 1) => ({ column, text, across, down });
 
@@ -69,7 +71,7 @@ const M29 = {
 };
 
 function displayDate(value) {
-  return String(value).split('-').reverse().join('/');
+  return formatIsoDate(value);
 }
 
 function periodLabel(report, value, from, to) {

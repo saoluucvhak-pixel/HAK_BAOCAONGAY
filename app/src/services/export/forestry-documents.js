@@ -1,3 +1,4 @@
+import { displayDecimal } from '../../utils/display-format.js';
 import JSZip from 'jszip';
 
 const font = 'Times New Roman';
@@ -156,11 +157,10 @@ function bodyTable(page, width) {
       '</w:tr>';
   }).join('');
   const precision = page.number === '14' ? 2 : 3;
-  const numberFormat = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: precision, maximumFractionDigits: precision });
   const data = rowsForPrinting(page).map(row => '<w:tr><w:trPr><w:cantSplit/></w:trPr>' +
     row.map((value, index) => {
       const numeric = typeof value === 'number' && (index !== 0 || page.number === '04');
-      return wordCell(paragraph(numeric ? numberFormat.format(value) : value, {
+      return wordCell(paragraph(numeric ? displayDecimal(value, precision, precision) : value, {
         size: fontSize, align: numeric ? 'right' : 'center',
       }), widths[index], { noWrap: page.dateColumns?.includes(index) });
     }).join('') + '</w:tr>').join('');

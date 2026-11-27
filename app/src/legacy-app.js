@@ -31,6 +31,7 @@ import { renderDashboard } from './components/dashboard.js';
 import { initLoanEditor, getLoanView } from './components/loan-editor.js';
 import { initForestrySettings } from './components/forestry-settings.js';
 import { initForestryReports } from './components/forestry-reports.js';
+import { initDisplayFormat } from './utils/display-format.js';
 import { initThemePicker } from './components/theme-picker.js';
 import { initOpeningBalance, initLuyKeMode, renderTienVayKpi, renderThttKpi } from './components/tienvay-summary.js';
 import { pushUndoSnapshot, undo, redo } from './store/app-state.js';
@@ -283,6 +284,7 @@ function boot(){
   }
   installGlobalErrorHandlers();
   initThemePicker();
+  initDisplayFormat(() => { if (RESULTS) runReport(); });
   initDefaultDates();
   loadDM();
   renderDMTables();

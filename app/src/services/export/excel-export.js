@@ -15,6 +15,7 @@ import { libs } from '../export-libs.js';
 import { computeCongNo, computeHoTroOrTroGia, computeHoaHongDL, computeNhapKeo, computeThanhToan, computeTongHopHoTro, computeTongHopNgay, computeXeCho1h, sumCols } from '../report-service.js';
 import { STATE, TABLES } from '../../store/state.js';
 import { dateKeyToday, fmtDate, fmtTime, pad2, toExcelDate, toKeyFromInput } from '../../utils/date-utils.js';
+import { excelDateFormat } from '../../utils/display-format.js';
 import { alignOf } from '../../utils/hak-format.js';
 import { $, downloadBlob } from '../../utils/dom-utils.js';
 import { RESULTS } from '../../store/report-runtime.js';
@@ -104,14 +105,14 @@ function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName
       } else if (c[2]==='date'){
         // [CHUẨN HAK] Ô ngày là NGÀY THẬT của Excel (lọc/sắp xếp/tính được), hiển thị dd/mm/yyyy.
         cell.value = toExcelDate(v);
-        cell.numFmt = 'dd/mm/yyyy';
+        cell.numFmt = excelDateFormat();
         cell.alignment = { horizontal:'center' };
       } else if (c[2]==='time'){
         cell.value = fmtTime(v);
         cell.alignment = { horizontal:'center' };
       } else if (c[2]==='datekey'){
         cell.value = toExcelDate(v == null ? null : String(v).replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3'));
-        cell.numFmt = 'dd/mm/yyyy';
+        cell.numFmt = excelDateFormat();
         cell.alignment = { horizontal:'center' };
       } else {
         cell.value = v==null ? '' : v;

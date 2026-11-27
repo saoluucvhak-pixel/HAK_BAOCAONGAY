@@ -1,3 +1,4 @@
+import { displayVietnamDateTime, displayDateParts } from '../utils/display-format.js';
 import { CONFIG } from '../config/config.js';
 import { FORESTRY_DEFAULT_ROWS, normalizeForestryModel } from '../config/forestry-defaults.js';
 import { storageService } from '../services/storage-service.js';
@@ -82,6 +83,13 @@ export function initForestrySettings() {
   const picker = document.getElementById('forestryRegulation');
   const add = document.getElementById('forestryAddRegulation');
   const parentFields = ['documentType', 'documentNumber', 'basis', 'effectiveFrom', 'effectiveTo'];
+  const editButton = document.getElementById('forestryEditRegulation');
+  const saveButton = document.getElementById('forestrySaveRegulation');
+  const cancelButton = document.getElementById('forestryCancelRegulation');
+  const deleteButton = document.getElementById('forestryDeleteRegulation');
+  const warning = document.getElementById('forestryDeleteWarning');
+  const warningText = document.getElementById('forestryDeleteMessage');
+  let editing = false;
   let selectedCode;
   let draftCode;
   const grid = document.createElement('div');
@@ -109,8 +117,8 @@ export function initForestrySettings() {
   function render() {
     const { regulations, parameters } = readRegulations();
     const active = regulations.find(item => item.code === selectedCode) ?? regulations[0];
-    selectedCode = draftCode ?? active.code;
-    const settings = draftCode ? { code: draftCode } : active;
+    selectedCode = draftCode ?? active?.code ?? '';
+    const settings = draftCode ? {} : active ?? {};
     picker.replaceChildren(...regulations.map(item =>
       new Option([item.code, item.documentType, item.documentNumber].filter(Boolean).join(' · '), item.code)));
     if (draftCode) picker.add(new Option(draftCode + ' · Đang tạo', draftCode));
@@ -124,32 +132,88 @@ export function initForestrySettings() {
       const value = field === 'Tiêu hao SX' ? Number((raw * 100).toPrecision(12)) : raw;
       input.value = value ?? '';
     }
+    for (const input of form.querySelectorAll('input:not([name=regulationCode])')) input.readOnly = !editing;
+    form.elements.documentType.disabled = !editing;
+    editButton.disabled = !selectedCode || editing;
+    saveButton.disabled = !editing;
+    cancelButton.hidden = !editing;
+    deleteButton.disabled = !active || editing;
+    picker.disabled = editing || !regulations.length;
+    add.disabled = editing;
     const date = new Date(settings.updatedAt);
-    updated.textContent = Number.isFinite(+date) ? new Intl.DateTimeFormat('vi-VN', {
-      dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
-    }).format(date) : 'Chưa có lần lưu';
+    const today = new Intl.DateTimeFormat('sv-SE', { dateStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+    updated.textContent = editing
+      ? displayDateParts(...today.split('-')) + ' · sẽ ghi ngày giờ khi lưu'
+      : Number.isFinite(+date) ? displayVietnamDateTime(date) : 'Chưa có lần lưu';
   }
 
   picker.addEventListener('change', () => {
     selectedCode = picker.value;
     draftCode = undefined;
+    warning.hidden = true;
     status.textContent = '';
     render();
   });
   add.addEventListener('click', () => {
     const { regulations } = readRegulations();
-    let number = regulations.length + 1;
+    const history = storageService.get(CONFIG.STORAGE_KEYS.forestryHistory, []);
+    const usedCodes = new Set(regulations.map(item => item.code));
+    if (Array.isArray(history)) for (const item of history) usedCodes.add(item?.regulationCode);
+    let number = 1;
     do {
       draftCode = 'QD-' + String(number++).padStart(3, '0');
-    } while (regulations.some(item => item.code === draftCode));
+    } while (usedCodes.has(draftCode));
+    editing = true;
+    warning.hidden = true;
+    status.textContent = 'Quy định mới cần loại văn bản, số hoặc ký hiệu và ngày hiệu lực. Ngày cập nhật được ghi tự động.';
+    render();
+    form.elements.documentType.focus();
+  });
+  editButton.addEventListener('click', () => {
+    editing = true;
+    warning.hidden = true;
     status.textContent = '';
     render();
     form.elements.documentType.focus();
   });
+  cancelButton.addEventListener('click', () => {
+    editing = false;
+    draftCode = undefined;
+    status.textContent = 'Đã hủy thay đổi chưa lưu.';
+    render();
+  });
+  deleteButton.addEventListener('click', () => {
+    warningText.textContent = 'Xóa quy định ' + selectedCode + ' và bộ tham số của quy định này. Kỳ báo cáo cần một quy định còn hiệu lực. Báo cáo đã tạo vẫn nằm trong lịch sử.';
+    warning.hidden = false;
+    document.getElementById('forestryCancelDelete').focus();
+  });
+  document.getElementById('forestryCancelDelete').addEventListener('click', () => {
+    warning.hidden = true;
+    deleteButton.focus();
+  });
+  document.getElementById('forestryConfirmDelete').addEventListener('click', () => {
+    if (warning.hidden || editing || !selectedCode) return;
+    const removed = selectedCode;
+    const { regulations, parameters } = readRegulations();
+    if (!storageService.set(storageKey, {
+      regulations: regulations.filter(item => item.code !== removed),
+      parameters: parameters.filter(row => row.regulationCode !== removed),
+    })) {
+      status.textContent = 'Không xóa được quy định.';
+      return;
+    }
+    selectedCode = undefined;
+    warning.hidden = true;
+    status.textContent = 'Đã xóa quy định ' + removed + '.';
+    document.dispatchEvent(new Event('forestrysettingschange'));
+    add.focus();
+  });
+  document.addEventListener('displayformatchange', () => { if (!editing) render(); });
   render();
   document.addEventListener('forestrysettingschange', render);
   form.addEventListener('submit', event => {
     event.preventDefault();
+    if (!editing || !selectedCode) return;
     const values = new FormData(form);
     const parent = Object.fromEntries(parentFields.map(field => [field, values.get(field).trim()]));
     const { effectiveFrom, effectiveTo, documentType, documentNumber } = parent;
@@ -180,6 +244,7 @@ export function initForestrySettings() {
       return;
     }
     draftCode = undefined;
+    editing = false;
     status.textContent = 'Đã lưu quy định ' + selectedCode + ' và tham số báo cáo.';
     document.dispatchEvent(new Event('forestrysettingschange'));
   });
