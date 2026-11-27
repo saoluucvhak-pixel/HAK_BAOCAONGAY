@@ -13,12 +13,12 @@
   p { margin: 0 0 .9rem; }
   section { background: #fff; border: 1px solid #d5e0e3; padding: 20px; margin-top: 18px; border-radius: 10px; }
   label { display: block; font-weight: 650; margin-bottom: .7rem; }
-  input, textarea { display: block; box-sizing: border-box; margin-top: .25rem; width: 100%; padding: .55rem; border: 1px solid #99afb6; border-radius: 5px; font: inherit; }
+  input, select { display: block; box-sizing: border-box; margin-top: .25rem; width: 100%; padding: .55rem; border: 1px solid #99afb6; border-radius: 5px; font: inherit; }
   details { margin-bottom: .85rem; }
-  textarea { overflow-wrap: anywhere; resize: vertical; }
   button { border: 0; border-radius: 5px; background: #005864; color: #fff; font: inherit; font-weight: 650; padding: .55rem .85rem; cursor: pointer; }
   button:disabled { opacity: .55; cursor: wait; }
   button.secondary { background: #e5f0f2; color: #17424a; margin: .8rem .4rem 0 0; }
+  .profiles { margin: 1.15rem 0; }
   .status { margin: .8rem 0 0; }
   .error { color: #9f1e2c; }
   [hidden] { display: none !important; }
@@ -34,6 +34,12 @@
     <h2 id="issue-title">Tạo phản hồi cho máy cần cài</h2>
     <form id="issueForm">
       <label>Mã yêu cầu từ máy cần cài <input id="requestCode" type="text" spellcheck="false" autocomplete="off" inputmode="numeric" placeholder="12345678" maxlength="16"></label>
+      <div class="profiles">
+        <label>Công ty đã lưu
+          <select id="savedCompany"></select>
+        </label>
+        <button class="secondary" id="newCompany" type="button">Thêm công ty</button>
+      </div>
       <details id="companyDetails">
         <summary>Thông tin công ty và nguồn Google Sheets</summary>
         <label>Ngày hết hạn của file phản hồi <input id="expiry" type="date"></label>
@@ -48,6 +54,7 @@
         <label>Link CSV đề nghị thanh toán <input id="DNTT" maxlength="2000" inputmode="url"></label>
         <label>Link CSV hợp đồng NCC (tùy chọn) <input id="HDNCC" maxlength="2000" inputmode="url"></label>
         <label>Link CSV hồ sơ keo (tùy chọn) <input id="Hosokeo" maxlength="2000" inputmode="url"></label>
+        <button class="secondary" id="saveCompany" type="button">Lưu công ty</button>
       </details>
       <button type="submit" value="code">Tạo mã trả lời</button>
       <button class="secondary" type="submit" value="kit">Tạo file cài đặt HAK</button>
@@ -58,6 +65,13 @@
         <p>Sau khi nạp, kiểm tra cấu hình, dán mã yêu cầu mới và bấm Tạo file cài đặt HAK.</p>
       </details>
     </form>
+    <details class="profiles">
+      <summary>Sao lưu danh sách công ty</summary>
+      <button class="secondary" id="exportCompanies" type="button">Tải danh sách</button>
+      <label>Nạp danh sách vào HTML mới
+        <input id="importCompanies" type="file" accept=".json,application/json">
+      </label>
+    </details>
     <div id="replyPanel" hidden>
       <label>Mã trả lời <input id="replyCode" readonly inputmode="numeric"></label>
       <button class="secondary" id="copyReply" type="button">Sao chép mã trả lời</button>
@@ -71,6 +85,7 @@ const $ = (id) => document.getElementById(id);
 const product = 'com.hakgroup.baocaongay';
 const seed = '__HAK_BUILD_SEED__';
 const companyFields = ['TenCty', 'DiaChi', 'MST', 'SDT', 'DiaChiThuMua', 'MaHS', 'NhaMay', 'PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo'];
+const profilesFormat = 'hak-company-profiles-v1';
 const encoder = new TextEncoder();
 const hmac = { name: 'HMAC', hash: 'SHA-256' };
 let macKey;
@@ -114,7 +129,7 @@ function validateCompanyProfile(company) {
     if (typeof company[field] !== 'string' || company[field].length > $(field).maxLength)
       throw new Error('Thông tin công ty trong cấu hình không hợp lệ.');
   }
-  if (!company.TenCty) throw new Error('Nhập tên công ty trước khi tạo file cài đặt HAK.');
+  if (!company.TenCty) throw new Error('Nhập tên công ty.');
   const required = ['PhieuCan', 'DNTT'];
   for (const field of [...required, 'HDNCC', 'Hosokeo']) {
     const address = company[field];
@@ -127,6 +142,129 @@ function validateCompanyProfile(company) {
         /['"`<>\\\r\n]/.test(address) || (!published && !exported))
       throw new Error('Chỉ dùng liên kết Google Sheets đã xuất CSV.');
   }
+}
+
+function companyFromForm() {
+  return Object.fromEntries(companyFields.map((field) => [field, $(field).value.trim()]));
+}
+
+function showCompany(company = {}) {
+  for (const field of companyFields) $(field).value = company[field] ?? '';
+  $('companyDetails').open = true;
+}
+
+function companyKey(company) {
+  return company.TenCty.normalize('NFC').toLocaleLowerCase('vi');
+}
+
+function decodeCompanies(data) {
+  if (data?.format !== profilesFormat || !Array.isArray(data.companies))
+    throw new Error('Chọn file danh sách công ty HAK (.json) hợp lệ.');
+  const companies = new Map();
+  for (const entry of data.companies) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+      throw new Error('Thông tin công ty trong danh sách không hợp lệ.');
+    const company = Object.fromEntries(companyFields.map((field) => [
+      field, typeof entry[field] === 'string' ? entry[field].trim() : entry[field] ?? ''
+    ]));
+    validateCompanyProfile(company);
+    const key = companyKey(company);
+    if (companies.has(key)) throw new Error('Danh sách có tên công ty trùng nhau.');
+    companies.set(key, company);
+  }
+  return companies;
+}
+
+function readCompanies() {
+  const raw = localStorage.getItem(profilesFormat);
+  return raw === null ? new Map() : decodeCompanies(JSON.parse(raw));
+}
+
+function showCompanyList(companies, selected = '') {
+  const select = $('savedCompany');
+  const entries = [...companies].sort(([, left], [, right]) => left.TenCty.localeCompare(right.TenCty, 'vi'));
+  select.replaceChildren(new Option('Chọn công ty', ''), ...entries.map(([key, company]) => new Option(company.TenCty, key)));
+  select.value = selected;
+}
+
+function companyBackup(companies) {
+  return { format: profilesFormat, companies: [...companies.values()] };
+}
+
+function saveCompanies(companies) {
+  localStorage.setItem(profilesFormat, JSON.stringify(companyBackup(companies)));
+}
+
+function companyAction(action) {
+  return async (event) => {
+    try {
+      const message = await action(event);
+      if (message) report($('issueStatus'), message);
+    } catch (error) {
+      report($('issueStatus'), error.message, true);
+    }
+  };
+}
+
+$('newCompany').addEventListener('click', companyAction(() => {
+  $('savedCompany').value = '';
+  showCompany();
+  $('TenCty').focus();
+  return 'Điền thông tin rồi bấm Lưu công ty.';
+}));
+$('savedCompany').addEventListener('change', companyAction(() => {
+  const key = $('savedCompany').value;
+  if (!key) {
+    showCompany();
+    return;
+  }
+  const company = readCompanies().get(key);
+  if (!company) throw new Error('Danh sách đã thay đổi. Mở lại HTML rồi chọn công ty.');
+  showCompany(company);
+  return 'Đã chọn ' + company.TenCty + '.';
+}));
+$('saveCompany').addEventListener('click', companyAction(() => {
+  const company = companyFromForm();
+  validateCompanyProfile(company);
+  const companies = readCompanies();
+  const previous = $('savedCompany').value;
+  const key = companyKey(company);
+  if (previous !== key && companies.has(key))
+    throw new Error('Tên này đã có trong danh sách. Chọn công ty đó để sửa hoặc nhập tên khác.');
+  if (previous) companies.delete(previous);
+  companies.set(key, company);
+  saveCompanies(companies);
+  showCompanyList(companies, key);
+  return 'Đã lưu ' + company.TenCty + '.';
+}));
+$('exportCompanies').addEventListener('click', companyAction(() => {
+  const companies = readCompanies();
+  if (!companies.size) throw new Error('Chưa có công ty nào để tải.');
+  download('HAK-DanhSachCongTy.json', companyBackup(companies));
+}));
+$('importCompanies').addEventListener('change', companyAction(async (event) => {
+  const input = event.currentTarget;
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) throw new Error('File danh sách công ty vượt quá 5 MB.');
+  const incoming = decodeCompanies(JSON.parse(await file.text()));
+  const companies = readCompanies();
+  let added = 0;
+  for (const [key, company] of incoming) {
+    if (companies.has(key)) continue;
+    companies.set(key, company);
+    added++;
+  }
+  saveCompanies(companies);
+  showCompanyList(companies, $('savedCompany').value);
+  return 'Đã thêm ' + added + ' công ty. Các công ty trùng tên giữ dữ liệu đang lưu.';
+}));
+try {
+  showCompanyList(readCompanies());
+} catch {
+  showCompanyList(new Map());
+  report($('issueStatus'), 'Chưa đọc được danh sách công ty đã lưu trong trình duyệt.', true);
 }
 
 async function restoreCompanyProfile() {
@@ -157,9 +295,9 @@ async function restoreCompanyProfile() {
 
   const company = Object.fromEntries(companyFields.map((field) => [field, previous.company[field] ?? '']));
   validateCompanyProfile(company);
-  for (const field of companyFields) $(field).value = company[field];
+  $('savedCompany').value = '';
+  showCompany(company);
   $('previousSetup').value = '';
-  $('companyDetails').open = true;
   report($('issueStatus'), 'Đã nạp cấu hình cũ. Kiểm tra thông tin rồi tạo file bằng mã yêu cầu mới.');
 }
 
@@ -194,7 +332,7 @@ $('issueForm').addEventListener('submit', async (event) => {
     const expiresAt = Math.floor(Date.parse($('expiry').value + 'T23:59:59+07:00') / 1000);
     if (!Number.isFinite(expiresAt) || expiresAt <= issuedAt)
       throw new Error('Ngày hết hạn phải ở trong tương lai.');
-    const company = Object.fromEntries(companyFields.map((field) => [field, $(field).value.trim()]));
+    const company = companyFromForm();
     validateCompanyProfile(company);
     const body = encoder.encode(JSON.stringify({ product, version: 2, device: request, issuedAt, expiresAt, company }));
     const kit = { body: toBase64(body), signature: toBase64(await sign('setup-v1', body)) };
