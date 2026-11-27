@@ -32,8 +32,13 @@ const sheets = Object.fromEntries(Object.entries(sources).map(([key, rows]) => [
 ]));
 
 function install(file, expected = 0) {
-  const result = spawnSync('powershell.exe', ['-NoProfile', '-File', installerScript, path.resolve(file), installDir],
+  const run = () => spawnSync('powershell.exe', ['-NoProfile', '-File', installerScript, path.resolve(file), installDir],
     { stdio: 'inherit', timeout: 180_000 });
+  let result = run();
+  if (file === legacy && (result.status >>> 0) === 0xc0000005) {
+    console.warn('Legacy NSIS returned a Windows access violation. Retrying setup once.');
+    result = run();
+  }
   if (result.error) throw result.error;
   assert.equal(result.status, expected, 'NSIS exit code for ' + path.basename(file));
 }

@@ -84,7 +84,9 @@ Bộ cài 2.2.0 xác minh giấy phép trước khi cài. Electron kiểm tra l�
 3. **Phê duyệt và cấp phép.** Đối chiếu yêu cầu với người sử dụng và mã tài sản. Dùng lệnh `issue` bên dưới, ghi mã giấy phép, tài sản và hạn dùng vào sổ cấp phép. Mỗi file giấy phép chỉ khớp khóa TPM đã đăng ký.
 4. **Cài và gia hạn.** Đặt `HAK-GiayPhep.haklic` cạnh bộ cài. Lần sau cùng tài khoản có thể cài đè bằng giấy phép còn hiệu lực đã lưu. Khi ứng dụng yêu cầu gia hạn, chọn file mới ngay trong hộp thoại của Electron.
 
-Ví dụ chạy ở gốc repo trên máy quản trị. Chọn thư mục khóa riêng ngoài repo, có quyền truy cập giới hạn.
+**Dùng nút bấm:** tải [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html), mở bằng Chrome hoặc Edge rồi chọn **Tạo khóa**. Chỉ gửi `public.jwk` cho bên đóng bộ cài. Giữ `HAK-KhoaRieng.hakkey` và mật khẩu. Sau này dùng mục **Cấp giấy phép cho máy đã duyệt** trong cùng công cụ để ký giấy phép bằng file `.hakkey`.
+
+**Dùng dòng lệnh:** ví dụ sau tạo định dạng khóa riêng PEM cho công cụ Node.js. Chạy ở gốc repo trên máy quản trị và lưu khóa riêng vào thư mục có quyền truy cập giới hạn.
 
 ```powershell
 $secret = Read-Host 'Mat khau khoa cap phep HAK' -AsSecureString
