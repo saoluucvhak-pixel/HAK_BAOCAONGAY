@@ -213,6 +213,11 @@ assert.notEqual(JSON.parse(await readFile(requestFile, 'utf8')).device, previous
 install(candidate, 31); // The previous approval fails for the new request on the same machine.
 const registeredExe = await installedExecutable();
 verifyRun(registeredExe, 0);
+const verifier = path.join(installDir, 'resources', 'HAK-License-runtime.exe');
+const mismatchedMachine = spawnSync(verifier, ['check-other-machine-qa'], { encoding: 'utf8', timeout: 60_000 });
+if (mismatchedMachine.error) throw mismatchedMachine.error;
+assert.equal(mismatchedMachine.status, 31);
+assert.match(mismatchedMachine.stderr, /HAK-DEVICE-MISMATCH/);
 const upgraded = await openInstalled(true);
 try {
   assert.equal(upgraded.appInfo.version, expectedVersion);

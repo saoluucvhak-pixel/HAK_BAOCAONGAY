@@ -66,17 +66,17 @@ npm run test:dashboard-fit
 Lần đầu cần Chromium cho Playwright: `npx playwright install chromium`.
 Nếu cố ý thay đổi file xuất: `node tests/test-export-golden.mjs --update` (ghi lại mẫu chuẩn) — chỉ làm khi đã kiểm tra bằng mắt.
 
-## Cài đặt Windows bằng mã phản hồi
+## Cấp phép Windows bằng một khóa chung HAK
 
-1. Mở Setup. Sao chép **mã yêu cầu 8 chữ số** gửi HAK và giữ cửa sổ bộ cài mở.
-2. HAK mở **HAK-CapPhep.html đi kèm đúng bản Setup**, chọn hoặc nhập công ty, dán mã rồi bấm **Tạo mã và file HAK**. Gửi cả mã phản hồi và file `.haksetup`.
-3. Dán mã phản hồi vào Setup và bấm **Kiểm tra mã**. Khi nút **Nạp file HAK…** sáng, chọn file HAK gửi để hoàn tất cài đặt.
+1. Trên máy quản trị, mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html) bằng Chrome hoặc Edge cập nhật. Mở **Tạo hoặc khôi phục khóa**, đặt mật khẩu rồi bấm **Tạo khóa chung**. Giữ bản sao mã hóa `HAK-KhoaChung.hakkey` và mật khẩu ở nơi an toàn. Trên máy quản trị mới, chọn **Khôi phục khóa** với bản sao đó.
+2. Tải **HAK-PublicKey.jwk** một lần để dùng cho công cụ đóng gói. Dùng cùng file công khai qua các bản nâng cấp và các ứng dụng HAK đã tích hợp giao thức.
+3. Người cài sao chép mã yêu cầu `HAK4.…`. HTML hiển thị mã ứng dụng và mã máy. Chọn hoặc nhập công ty rồi bấm **Tạo mã và file HAK**. Gửi lại mã và file `.haksetup`. Người dùng giữ cửa sổ mở, kiểm tra mã rồi nạp file.
 
-Trong app Windows, vào **Cấu hình → Thông tin công ty** để xem hồ sơ ở chế độ chỉ đọc. Link Google Sheets được ẩn trên giao diện. Nút **Đổi cấu hình công ty…** tạo mã yêu cầu mới. HAK cấp lại mã và file bằng cùng quy trình. Hủy hoặc nạp file sai sẽ giữ cấu hình đang dùng.
+Mỗi lần cài lại hoặc đổi cấu hình có mã ngẫu nhiên mới. HAK ký bằng Ed25519. App xác minh chữ ký, hạn dùng, mã ứng dụng và mã máy trước khi mở. Mã máy dùng `MachineGuid` và serial mainboard nếu đọc được. Dự phòng lần lượt dùng UUID phần cứng, serial ổ đĩa đầu tiên rồi `MachineGuid` nếu Windows không cung cấp thông tin phần cứng. Cài lại Windows hoặc thay phần cứng ảnh hưởng đến mã định danh có thể cần HAK cấp lại.
 
-File `.haksetup` chứa hồ sơ đã mã hóa AES-256 và được kiểm tra HMAC-SHA-256 trước khi mở. Bộ cài và HTML quản trị cùng chứa thông tin cần để xử lý file. Ứng dụng lấy dữ liệu trực tiếp từ Google nên địa chỉ nguồn vẫn có thể được quan sát ngoài giao diện trên máy trạm.
+Hồ sơ trong file phản hồi được mã hóa AES-256-GCM cho khóa X25519 riêng của máy và lần yêu cầu. Trạng thái cấp phép trên máy được bảo vệ bằng DPAPI của tài khoản Windows. Trong app, **Cấu hình → Thông tin công ty** chỉ đọc và ẩn link Google Sheets trên giao diện. Thay cấu hình bằng mã và file mới do HAK cấp.
 
-Trong HTML quản trị, bấm **Thêm công ty**, nhập thông tin và link CSV rồi bấm **Lưu công ty**. **Phiếu cân** và **Đề nghị thanh toán** là hai nguồn bắt buộc. Khi đổi HTML hoặc máy quản trị, chọn **Sao lưu danh sách công ty → Tải danh sách** rồi nạp file JSON ở HTML mới. File sao lưu chỉ dùng trong nhóm quản trị.
+Dùng **Thêm công ty** và **Lưu công ty** để dùng lại thông tin. Phiếu cân và Đề nghị thanh toán là nguồn bắt buộc. Khi đổi máy quản trị, dùng **Sao lưu danh sách công ty** để chuyển hồ sơ. File cấp phép của máy trạm được mã hóa cho máy đó.
 
 ### Tài khoản đăng nhập trên Windows
 
@@ -88,9 +88,9 @@ Tài khoản dùng cục bộ trong hồ sơ Windows hiện tại. Ứng dụng 
 
 ### Phát hành bản nâng cấp
 
-Workflow **Release installer** trên nhánh `main` tự tạo một bộ tính mã ngẫu nhiên cho mỗi lần đóng gói. Chọn `publish=true` để đưa Setup lên GitHub Releases. HTML quản trị cùng bộ tính được lưu trong một bản nháp riêng tên **HAK quản trị nội bộ**. Dùng đúng cặp Setup và HTML cùng số phát hành. Giữ HTML trong nhóm quản trị HAK. Cơ chế này ngăn cài tùy tiện vì bộ cài chứa cùng bộ tính mã.
+Chạy `desktop-app/Dong-Bo-Cai-HAK.cmd` trên Windows có Node.js 22.12+ và .NET SDK. Chọn `HAK-PublicKey.jwk` lần đầu. Công cụ lưu khóa công khai tại `%LOCALAPPDATA%\HAK\Issuer` để dùng lại.
 
-GitHub phát hành bộ cài chưa ký Authenticode, kèm SHA-256 và thông tin nguồn gốc bản dựng. Nếu cần tự đóng trên Windows, chạy `desktop-app/Dong-Bo-Cai-HAK.cmd` với Node.js 22.12+ và .NET SDK. Setup và HTML nằm trong `desktop-app/release`.
+Nếu đóng gói bằng GitHub Actions, nhập nội dung **khóa công khai** vào tham số `issuer_public_key` hoặc biến kho `HAK_LICENSE_PUBLIC_KEY`. Chọn `publish=true` trên nhánh `main` để phát hành Setup. Khóa riêng và mật khẩu bảo vệ khóa ở lại HAK. Bộ cài chưa ký Authenticode và phát hành kèm SHA-256.
 
 ### Đo hiệu năng báo cáo
 

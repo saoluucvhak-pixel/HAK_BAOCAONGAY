@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -9,11 +8,9 @@ using System.Web.Script.Serialization;
 
 internal static class Program
 {
-    private const string Product = "com.hakgroup.baocaongay";
-    private const uint RequestRange = 100000000;
-    private const ulong ResponseRange = 1000000000000;
+    private const string Product = LicenseProtocol.Product;
     private static readonly byte[] StateContext = Encoding.UTF8.GetBytes(Product);
-    private const int MaxFileBytes = 16384;
+    private const int MaxFileBytes = 32768;
     private static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = MaxFileBytes * 2 };
     private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
     private static readonly string LicensePath = Path.Combine(
@@ -80,22 +77,38 @@ internal static class Program
                 return 0;
             }
 
+            if (policy.qa && args.Length == 1 && args[0] == "check-other-machine-qa")
+            {
+                var installed = ReadInstalledAuthorization();
+                try
+                {
+                    LicenseProtocol.OpenSetup(Convert.FromBase64String(installed.authorization),
+                        policy.publicKey, installed.session, "foreign-machine");
+                }
+                catch (InvalidDataException error) when (error.Message == "Giấy phép thuộc ứng dụng hoặc thiết bị khác.")
+                {
+                    Console.Error.WriteLine("HAK-DEVICE-MISMATCH");
+                    return 31;
+                }
+                return 0;
+            }
+
             // Only the isolated Windows CI build accepts unattended test input.
             if (policy.qa && args.Length == 2 && args[0] == "prepare-install-qa")
             {
-                var request = NewRequest();
+                var session = LicenseProtocol.NewSession();
                 Directory.CreateDirectory(Path.GetDirectoryName(LicensePath));
-                File.WriteAllText(LicensePath + ".pending-qa", request, Utf8);
-                File.WriteAllText(args[1], Json.Serialize(new Request { device = request }), Utf8);
+                File.WriteAllBytes(LicensePath + ".pending-qa", Protect(Json.Serialize(session)));
+                File.WriteAllText(args[1], Json.Serialize(new { device = session.wire }), Utf8);
                 return 0;
             }
             if (policy.qa && args.Length == 3 && args[0] == "accept-install-qa")
             {
                 string pending = LicensePath + ".pending-qa";
-                var request = Utf8.GetString(ReadLimited(pending));
+                var session = Json.Deserialize<LicenseProtocol.Session>(Unprotect(ReadLimited(pending)));
                 File.Delete(pending);
-                VerifyCode(Utf8.GetString(ReadLimited(args[2])).Trim(), policy, request);
-                AcceptFile(args[1], policy, request);
+                LicenseProtocol.VerifyResponse(Utf8.GetString(ReadLimited(args[2])).Trim(), policy.publicKey, session);
+                AcceptFile(args[1], policy, session);
                 if (Accounts.Read() == null) Accounts.InitializeDirect();
                 return 0;
             }
@@ -137,11 +150,12 @@ internal static class Program
     {
         try
         {
-            var request = NewRequest();
-            return ActivationDialog.Run(request, text => VerifyCode(Regex.Replace(text, @"\s+", ""), policy, request),
+            var session = LicenseProtocol.NewSession();
+            return ActivationDialog.Run(session.wire,
+                text => LicenseProtocol.VerifyResponse(Regex.Replace(text, @"\s+", ""), policy.publicKey, session),
                 file =>
                 {
-                    var license = AcceptFile(file, policy, request, path);
+                    var license = AcceptFile(file, policy, session, path);
                     if (reportCompany) WriteCompany(license);
                 }) ? 0 : 1;
         }
@@ -156,7 +170,7 @@ internal static class Program
     private static License ReadLicense(Policy policy, string path)
     {
         var installed = ReadInstalledAuthorization(path);
-        return Verify(Convert.FromBase64String(installed.authorization), policy, installed.request);
+        return Verify(Convert.FromBase64String(installed.authorization), policy, installed.session);
     }
 
     private static void WriteCompany(License license)
@@ -174,48 +188,6 @@ internal static class Program
         }
     }
 
-    private static string NewRequest()
-    {
-        string previous = null;
-        if (File.Exists(LicensePath))
-        {
-            try { previous = ReadInstalledAuthorization().request; }
-            catch (Exception error) when (error is IOException || error is CryptographicException ||
-                error is ArgumentException || error is InvalidOperationException) { }
-        }
-        var bytes = new byte[4];
-        uint limit = uint.MaxValue - uint.MaxValue % RequestRange;
-        using (var rng = RandomNumberGenerator.Create())
-        {
-            while (true)
-            {
-                rng.GetBytes(bytes);
-                uint value = BitConverter.ToUInt32(bytes, 0);
-                if (value >= limit) continue;
-                string request = (value % RequestRange).ToString("D8", CultureInfo.InvariantCulture);
-                if (request != previous) return request;
-            }
-        }
-    }
-
-    private static byte[] ComputeMac(Policy policy, string domain, byte[] payload)
-    {
-        var prefix = Utf8.GetBytes(Product + "\n" + domain + "\n");
-        var message = new byte[prefix.Length + payload.Length];
-        Buffer.BlockCopy(prefix, 0, message, 0, prefix.Length);
-        Buffer.BlockCopy(payload, 0, message, prefix.Length, payload.Length);
-        using (var hmac = new HMACSHA256(Convert.FromBase64String(policy.seed)))
-            return hmac.ComputeHash(message);
-    }
-
-    private static bool EqualBytes(byte[] left, byte[] right)
-    {
-        if (left.Length != right.Length) return false;
-        int difference = 0;
-        for (int i = 0; i < left.Length; i++) difference |= left[i] ^ right[i];
-        return difference == 0;
-    }
-
     private static byte[] ReadLimited(string file, int limit = MaxFileBytes)
     {
         using (var stream = File.OpenRead(file))
@@ -227,42 +199,17 @@ internal static class Program
         }
     }
 
-    private static License AcceptFile(string file, Policy policy, string request, string destination = null)
+    private static License AcceptFile(string file, Policy policy, LicenseProtocol.Session session, string destination = null)
     {
         var blob = ReadLimited(file);
-        var license = Verify(blob, policy, request);
-        SaveLicense(blob, request, destination ?? LicensePath);
+        var license = Verify(blob, policy, session);
+        SaveLicense(blob, session, destination ?? LicensePath);
         return license;
     }
 
-    private static License Verify(byte[] blob, Policy policy, string request)
+    private static License Verify(byte[] blob, Policy policy, LicenseProtocol.Session session)
     {
-        var envelope = Json.Deserialize<Envelope>(Utf8.GetString(blob));
-        if (envelope?.format != "haksetup-aes256-v1")
-            throw new InvalidDataException("Cần file phản hồi mã hóa do HAK cấp cho bản này.");
-        var iv = Convert.FromBase64String(envelope.iv);
-        var ciphertext = Convert.FromBase64String(envelope.body);
-        var tag = Convert.FromBase64String(envelope.signature);
-        if (iv.Length != 16 || ciphertext.Length == 0 || ciphertext.Length % 16 != 0 || tag.Length != 32)
-            throw new InvalidDataException("Cấu trúc file phản hồi HAK không hợp lệ.");
-
-        var authenticated = new byte[iv.Length + ciphertext.Length];
-        Buffer.BlockCopy(iv, 0, authenticated, 0, iv.Length);
-        Buffer.BlockCopy(ciphertext, 0, authenticated, iv.Length, ciphertext.Length);
-        if (!EqualBytes(ComputeMac(policy, "setup-tag-v1", authenticated), tag))
-            throw new InvalidDataException("File phản hồi không thuộc bộ cài này hoặc đã bị sửa.");
-
-        License license;
-        using (var aes = Aes.Create())
-        {
-            aes.Key = ComputeMac(policy, "setup-encryption-v1", new byte[0]);
-            aes.IV = iv;
-            aes.Mode = CipherMode.CBC;
-            aes.Padding = PaddingMode.PKCS7;
-            using (var decryption = aes.CreateDecryptor())
-                license = Json.Deserialize<License>(Utf8.GetString(decryption.TransformFinalBlock(ciphertext, 0, ciphertext.Length)));
-        }
-        VerifyRequestAndValidity(license, request);
+        var license = LicenseProtocol.OpenSetup(blob, policy.publicKey, session, MachineIdentity.Fingerprint.Value);
         if (license.company == null) throw new InvalidDataException("File phản hồi thiếu thông tin công ty.");
         ValidateCompany(license.company);
         return license;
@@ -293,38 +240,25 @@ internal static class Program
         if (!published && !exported) throw new InvalidDataException(label + " cần liên kết xuất CSV.");
     }
 
-    private static void VerifyCode(string code, Policy policy, string request)
+    private static byte[] Protect(string data)
     {
-        if (!Regex.IsMatch(request, @"\A[0-9]{8}\z") || !Regex.IsMatch(code, @"\A[0-9]{12}\z"))
-            throw new InvalidDataException("Mã trả lời phải có 12 chữ số.");
-        var bytes = ComputeMac(policy, "code-v1", Utf8.GetBytes(request));
-        ulong value = 0;
-        for (int i = 0; i < 6; i++) value = value * 256 + bytes[i];
-        string expected = (value % ResponseRange).ToString("D12", CultureInfo.InvariantCulture);
-        if (!EqualBytes(Utf8.GetBytes(expected), Utf8.GetBytes(code)))
-            throw new InvalidDataException("Mã trả lời không khớp với lần cài này.");
+        return ProtectedData.Protect(Utf8.GetBytes(data), StateContext, DataProtectionScope.CurrentUser);
     }
 
-    private static void VerifyRequestAndValidity(License license, string request)
+    private static string Unprotect(byte[] data)
     {
-        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        if (license == null || license.product != Product || license.version != 3 || license.issuedAt > now ||
-            license.expiresAt <= now || license.expiresAt <= license.issuedAt)
-            throw new InvalidDataException("File phản hồi đã hết hạn, chưa có hiệu lực hoặc thuộc sản phẩm khác.");
-        if (!Regex.IsMatch(request, @"\A[0-9]{8}\z") || license.device != request)
-            throw new InvalidDataException("Phản hồi này thuộc mã yêu cầu khác. Gửi mã đang hiển thị cho HAK.");
+        return Utf8.GetString(ProtectedData.Unprotect(data, StateContext, DataProtectionScope.CurrentUser));
     }
 
     private static InstalledAuthorization ReadInstalledAuthorization(string path = null)
     {
-        var data = ProtectedData.Unprotect(ReadLimited(path ?? LicensePath, MaxFileBytes * 2), StateContext, DataProtectionScope.CurrentUser);
-        var stored = Json.Deserialize<InstalledAuthorization>(Utf8.GetString(data));
-        if (stored == null || !Regex.IsMatch(stored.request ?? "", @"\A[0-9]{8}\z") || string.IsNullOrEmpty(stored.authorization))
+        var stored = Json.Deserialize<InstalledAuthorization>(Unprotect(ReadLimited(path ?? LicensePath, MaxFileBytes * 2)));
+        if (stored?.session == null || string.IsNullOrEmpty(stored.authorization))
             throw new InvalidDataException("Cần mã phản hồi cho lần cài này.");
         return stored;
     }
 
-    private static void SaveLicense(byte[] blob, string request, string destination)
+    private static void SaveLicense(byte[] blob, LicenseProtocol.Session session, string destination)
     {
         string directory = Path.GetDirectoryName(destination);
         Directory.CreateDirectory(directory);
@@ -333,9 +267,9 @@ internal static class Program
         {
             var installed = new InstalledAuthorization
             {
-                request = request, authorization = Convert.ToBase64String(blob)
+                session = session, authorization = Convert.ToBase64String(blob)
             };
-            File.WriteAllBytes(temp, ProtectedData.Protect(Utf8.GetBytes(Json.Serialize(installed)), StateContext, DataProtectionScope.CurrentUser));
+            File.WriteAllBytes(temp, Protect(Json.Serialize(installed)));
             ReplaceFile(temp, destination);
         }
         finally { File.Delete(temp); }
@@ -349,12 +283,10 @@ internal static class Program
 
     public sealed class InstalledAuthorization
     {
-        public string request { get; set; }
+        public LicenseProtocol.Session session { get; set; }
         public string authorization { get; set; }
     }
-    public sealed class Policy { public string seed { get; set; } public bool qa { get; set; } }
-    public sealed class Request { public string device { get; set; } }
-    public sealed class Envelope { public string format { get; set; } public string iv { get; set; } public string body { get; set; } public string signature { get; set; } }
+    public sealed class Policy { public string publicKey { get; set; } public bool qa { get; set; } }
     public sealed class Company
     {
         public string TenCty { get; set; }
@@ -371,11 +303,6 @@ internal static class Program
     }
     public sealed class License
     {
-        public string product { get; set; }
-        public int version { get; set; }
-        public string device { get; set; }
-        public long issuedAt { get; set; }
-        public long expiresAt { get; set; }
         public Company company { get; set; }
     }
 }

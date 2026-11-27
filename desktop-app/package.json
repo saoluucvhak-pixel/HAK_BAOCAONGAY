@@ -1,6 +1,6 @@
 {
   "name": "baocaongay-desktop",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Ứng dụng desktop Báo cáo ngày - HAK Group (chọn/đổi công ty ngay trong app)",
   "main": "main.js",
   "author": "HAK Group",
@@ -37,7 +37,10 @@
         }
       ],
       "icon": "build/icon.ico",
-      "signExts": ["!HAK-License-runtime.exe"],
+      "signExts": [
+        "!HAK-License-runtime.exe",
+        "!BouncyCastle.Cryptography.dll"
+      ],
       "signtoolOptions": {
         "signingHashAlgorithms": [
           "sha256"
@@ -68,6 +71,10 @@
       {
         "from": "build/license-bin/HAK-License.exe",
         "to": "HAK-License-runtime.exe"
+      },
+      {
+        "from": "build/license-bin/BouncyCastle.Cryptography.dll",
+        "to": "BouncyCastle.Cryptography.dll"
       }
     ]
   }

@@ -20,8 +20,12 @@ fs.writeFileSync(template, html);
 process.resourcesPath = tmp;
 const helper = 'test license helper';
 fs.writeFileSync(path.join(tmp, 'HAK-License-runtime.exe'), helper);
-fs.writeFileSync(path.join(appDir, 'app', 'license-verifier.json'),
-  JSON.stringify({ sha256: createHash('sha256').update(helper).digest('hex') }));
+const cryptoLibrary = 'test crypto library';
+fs.writeFileSync(path.join(tmp, 'BouncyCastle.Cryptography.dll'), cryptoLibrary);
+fs.writeFileSync(path.join(appDir, 'app', 'license-verifier.json'), JSON.stringify({
+  sha256: createHash('sha256').update(helper).digest('hex'),
+  cryptoSha256: createHash('sha256').update(cryptoLibrary).digest('hex')
+}));
 
 const profile = {
   TenCty: 'Công ty Thử nghiệm', DiaChi: 'Đắk Lắk',

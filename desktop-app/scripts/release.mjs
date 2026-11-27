@@ -35,7 +35,9 @@ execSync('npm run dist -- --publish never' + signingFlag, { cwd: ROOT, stdio: 'i
 // khi đóng gói. Bản dùng riêng trong thư mục registration vẫn được ký Authenticode.
 const expectedVerifier = JSON.parse(fs.readFileSync(path.join(ROOT, 'app', 'license-verifier.json'), 'utf8'));
 const packagedVerifier = fs.readFileSync(path.join(REL, 'win-unpacked', 'resources', 'HAK-License-runtime.exe'));
-if (sha256(packagedVerifier) !== expectedVerifier.sha256) {
+const cryptoLibrary = path.join(REL, 'win-unpacked', 'resources', 'BouncyCastle.Cryptography.dll');
+if (sha256(packagedVerifier) !== expectedVerifier.sha256 ||
+    sha256(fs.readFileSync(cryptoLibrary)) !== expectedVerifier.cryptoSha256) {
   throw new Error('App đã đóng gói chứa công cụ xác minh giấy phép sai SHA-256.');
 }
 
@@ -45,7 +47,8 @@ const registration = path.join(REL, 'registration');
 fs.mkdirSync(registration, { recursive: true });
 fs.copyFileSync(path.join(REL, 'win-unpacked', 'HAK-License.exe'), path.join(registration, 'HAK-License.exe'));
 fs.copyFileSync(path.join(ROOT, 'licensing', 'Register-HAK.cmd'), path.join(registration, 'Register-HAK.cmd'));
-fs.copyFileSync(path.join(ROOT, 'build', 'HAK-CapPhep.html'), path.join(REL, 'HAK-CapPhep.html'));
+fs.copyFileSync(cryptoLibrary, path.join(registration, 'BouncyCastle.Cryptography.dll'));
+fs.copyFileSync(path.join(ROOT, 'licensing', 'HAK-CapPhep.html'), path.join(REL, 'HAK-CapPhep.html'));
 const exe = fs.readFileSync(path.join(REL, exeName));
 const hash = sha256(exe);
 const parts = [];
