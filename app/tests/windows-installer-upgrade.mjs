@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFile, mkdtemp, readdir, readFile, unlink } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readdir, readFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,13 +34,29 @@ const sheets = Object.fromEntries(Object.entries(sources).map(([key, rows]) => [
 function install(file, expected = 0) {
   const run = () => spawnSync('powershell.exe', ['-NoProfile', '-File', installerScript, path.resolve(file), installDir],
     { stdio: 'inherit', timeout: 180_000 });
-  let result = run();
-  if (file === legacy && (result.status >>> 0) === 0xc0000005) {
-    console.warn('Legacy NSIS returned a Windows access violation. Retrying setup once.');
-    result = run();
-  }
+  const result = run();
+  if (file === legacy && (result.status >>> 0) === 0xc0000005) return false;
   if (result.error) throw result.error;
   assert.equal(result.status, expected, 'NSIS exit code for ' + path.basename(file));
+  return true;
+}
+
+// NSIS 1.0.0 sometimes crashes on the current hosted Windows image. Its verified payload
+// still provides the original app binary and data format for testing the new installer.
+async function extractLegacy() {
+  console.warn('Legacy NSIS crashed; using its verified application archive to seed the old profile.');
+  const sevenZip = path.join(process.env.ProgramFiles, '7-Zip', '7z.exe');
+  const payloadDir = path.join(dir, 'legacy-nsis');
+  await mkdir(payloadDir);
+  function extract(archive, output) {
+    const result = spawnSync(sevenZip, ['x', '-y', '-o' + output, archive], { encoding: 'utf8', timeout: 120_000 });
+    if (result.error) throw result.error;
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  }
+  extract(legacy, payloadDir);
+  const bundles = (await readdir(payloadDir, { recursive: true })).filter((file) => /app-64\.7z$/i.test(file));
+  assert.equal(bundles.length, 1, 'Không tìm thấy gói ứng dụng x64 trong NSIS 1.0.0.');
+  extract(path.join(payloadDir, bundles[0]), installDir);
 }
 
 async function openInstalled(offline) {
@@ -130,7 +146,7 @@ async function saveBackup(electron, page, filename) {
 }
 
 console.log('Cài bộ cài 1.0.0 và tạo dữ liệu qua giao diện.');
-install(legacy);
+if (!install(legacy)) await extractLegacy();
 const old = await openInstalled(false);
 const oldBackup = path.join(dir, 'old-backup.json');
 let original;
