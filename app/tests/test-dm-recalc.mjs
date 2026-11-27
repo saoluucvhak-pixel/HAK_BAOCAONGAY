@@ -2,7 +2,7 @@
 // không tính lại tiền". Kiểm chứng: (1) ô số/tiền trong Danh mục đủ rộng để đọc/gõ; (2) sửa Danh mục
 // (đơn giá hỗ trợ, hoa hồng, mã nguồn gốc/đại lý, xoá dòng) → báo cáo tính lại NGAY, không cần bấm
 // LẬP BÁO CÁO. Chạy: npm run test:dm-recalc  (tuỳ chọn: node tests/test-dm-recalc.mjs <index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { genPhieuCan, genDNTT, genHDNCC, genHosokeo, toCSV } from './fixtures.mjs';
@@ -17,7 +17,7 @@ const CSV = { tytjQLj: toCSV(pc), zPk2i: toCSV(dn), wW_a10: toCSV(genHDNCC(dn)),
 let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x ? '  [' + x + ']' : '')); };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 1366, height: 800 } });
 const errs = []; page.on('pageerror', (e) => errs.push(e.message));
 await page.route('https://docs.google.com/**', (r) => { const k = Object.keys(CSV).find((x) => r.request().url().includes(x)); return r.fulfill({ status: 200, contentType: 'text/csv', body: k ? CSV[k] : '' }); });

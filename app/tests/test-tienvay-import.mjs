@@ -2,7 +2,7 @@
 // app đứng mãi ở "Đang đọc file..." (Worker đọc file thoát giữa chừng, không trả kết quả).
 // Kiểm chứng trên đúng bản build (Worker thật trong Chromium), bấm chọn file như người dùng.
 // Chạy: npm run test:tienvay-import   (tuỳ chọn: node tests/test-tienvay-import.mjs <đường dẫn index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import XLSX from 'xlsx';
@@ -33,7 +33,7 @@ const xlsxBuf = (aoa) => {
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage();
 page.on('pageerror', () => {});
 await page.route('https://docs.google.com/**', (r) => {

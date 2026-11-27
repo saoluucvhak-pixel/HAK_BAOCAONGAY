@@ -16,17 +16,18 @@ Người dùng chọn thứ tự: làm **Offline trước**, đồng bộ Google
       (nạp thư viện xuất file khi cần); lưới an toàn `test:export-golden` (36 file). CHANGELOG Phase 4.2.
 - [x] **Ngân hàng 4 tab + chuẩn HAK** (29/10/2026) — tab Cập nhật khoản vay (IndexedDB, nhập tay/Excel,
       sửa/xoá/lưu, sao lưu), lũy kế từ đầu sổ, chuẩn định dạng + màu luxe toàn app. CHANGELOG Phase 4.4.
-- [ ] (Đề xuất tiếp) Màn hình "Cài đặt định dạng số" theo SYSTEM_PRECISION_SETTINGS của chuẩn (chọn số lẻ
-      cho tiền/khối lượng, ghi đè theo cột) — hiện dùng mặc định của chuẩn (tiền 0, khối lượng 2).
+- [x] **2.1.0** Cài đặt định dạng số cho tiền, khối lượng và số âm trên màn hình, bản in và file xuất.
 - [x] Chọn giao diện 5 chủ đề × sáng/tối (29/10/2026, Phase 4.6).
 - [x] Bảng kê chi tiết tiền vay theo mẫu + tab Tổng hợp thanh toán + chọn phiếu nhập kho để in (Phase 4.7).
 - [x] Cập nhật khoản vay chỉ 3 cột TH_VAY; dữ liệu sổ phụ cũ tự chuyển, không mất (Phase 4.8).
 - [x] Sổ chi tiết tiền vay: số dư đầu kỳ nhập tay + thẻ số liệu tổng (Phase 4.9).
 - [x] Thẻ tổng tab Cập nhật khoản vay + Tổng hợp thanh toán; nút Lưu ra Excel (Phase 4.10).
 - [x] Lũy kế tiền vay chi tính trong khoảng thời gian báo cáo (mặc định), giữ lựa chọn Từ đầu sổ (Phase 4.11).
-- [ ] (Đề xuất tiếp) Biểu đồ Dashboard đổi màu theo chủ đề đang chọn (hiện giữ màu cũ để không đổi cách đọc biểu đồ).
-- [ ] **4.2b** (còn lại) Event Bus nhẹ + thông báo nổi (toast) + mức log AUDIT/SYNC — chưa làm vì chưa có
-      chỗ dùng cụ thể đo được lợi ích; nên làm cùng 4.3 (khung module) khi bắt đầu thêm module mới.
+- [x] **2.1.0** Biểu đồ Dashboard đổi màu theo chủ đề và chế độ sáng/tối.
+- [x] **2.1.0** Event Bus và thông báo nổi cho khoản vay, tải nguồn, xuất file, Hoàn tác/Làm lại và gán tàu.
+- [x] **2.1.0** Dùng Worker nhúng khi có trên 10.000 phiếu cân, tiến trình theo bước xuất Excel/PDF.
+- [x] **2.1.0** Dùng chung trình khởi chạy Chromium cho Playwright và xử lý cảnh báo ESLint.
+- [ ] Mức log AUDIT/SYNC.
 - [ ] (Cân nhắc, CHƯA làm) Vẽ biểu đồ Dashboard chỉ khi đang mở tab Dashboard: đo được tiết kiệm ~25%
       thời gian LẬP BÁO CÁO nhưng chỉ ~15 ms với dữ liệu thật (đã ~55 ms) — lợi ích nhỏ, để sau.
 - [ ] **4.3** Khung module/plugin: đăng ký qua file danh sách (manifest) hoặc gộp lúc build — HTML
@@ -34,8 +35,7 @@ Người dùng chọn thứ tự: làm **Offline trước**, đồng bộ Google
 - [ ] **4.4** Ghi ngược Google Sheet (hàng đợi, thử lại, phát hiện xung đột) — CHƯA cần theo lựa
       chọn hiện tại; nếu làm: qua Google Apps Script Web App (không lưu token trong app).
 - [ ] **4.5** Khung nhập Excel dùng chung: nhiều file, kéo thả, xem trước, dò tiêu đề, ghép cột.
-- [ ] **4.6** Dữ liệu 100.000–500.000 dòng: tính toán trong Web Worker, xuất Excel/PDF dạng
-      streaming (hiện đã đo ổn tới 30.000 phiếu cân — PERFORMANCE_REPORT.md §6).
+- [ ] **4.6** Dữ liệu 100.000–500.000 dòng: xuất Excel/PDF dạng streaming (hiện đã đo ổn tới 30.000 phiếu cân — PERFORMANCE_REPORT.md §6).
 
 ## Phase 2 — Tách lớp UI (ưu tiên cao, cần làm trước Phase 3)
 
@@ -142,13 +142,7 @@ chức năng, không giảm trải nghiệm".
 
 ## Phase 4 — Hoàn thiện chất lượng (có thể làm song song, ít rủi ro hơn Phase 2/3)
 
-- [ ] **Dọn dẹp CSS trùng lặp**: phát hiện ở Phase 3.5 — `src/styles/main.css` (tách ra từ Phase
-      1) là file MỒ CÔI, không được `import` ở bất kỳ đâu trong `src/`. CSS thật sự dùng để build
-      `dist/index.html` nằm trong khối `<style>` nhúng thẳng trong `index.html`. Hiện đang phải
-      sửa CẢ 2 NƠI mỗi khi đổi style (đã làm vậy ở Phase 3.5) để tránh 2 file lệch nhau — nên gộp
-      lại thành 1 nguồn duy nhất (import `main.css` thật vào `index.html` qua `<link>`/Vite xử lý
-      CSS, xoá `<style>` nhúng tay) một khi có thời gian, tránh rủi ro sửa nhầm file không có tác
-      dụng về sau.
+- [x] **2.1.0** Dùng một stylesheet `src/styles/main.css`. Vite nhúng CSS vào HTML khi build.
 
 - [x] **Đã làm**: Thay toàn bộ `console.log`/`console.warn` còn sót trong `legacy-app.js` bằng
       `logger` — rà lại xác nhận không còn lệnh `console.*` nào ngoài chính `services/logger.js`.

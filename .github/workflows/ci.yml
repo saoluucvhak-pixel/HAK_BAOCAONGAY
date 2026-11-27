@@ -20,16 +20,19 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      # Các test trỏ cố định tới /opt/pw-browsers/chromium (môi trường phát triển) → trỏ về Chromium của Playwright.
-      - run: sudo mkdir -p /opt/pw-browsers && sudo ln -sf "$(node -e "console.log(require('playwright').chromium.executablePath())")" /opt/pw-browsers/chromium
       - run: npm run build
       # config.html lưu bản base64 của dist: phải đồng bộ sau build để tránh phát hành mẫu cũ.
       - run: npm run build:config
-      - run: npm run lint
+      - run: node scripts/verify-build.mjs
+      - name: Check committed artifacts match the build
+        run: git diff --exit-code -- config.html dist/index.html ../desktop-app/app/index.html
+      - run: npm run lint -- --max-warnings 0
       - run: npm test
-      # Cảnh báo lỗ hổng thư viện (xlsx chưa có bản vá; jsPDF/autotable cần nâng major) — chưa chặn CI.
-      - run: npm audit --omit=dev
-        continue-on-error: true
+      - run: npm run test:ui
+      - run: npm audit --audit-level=high
+      - name: Audit Electron and packaging dependencies
+        working-directory: desktop-app
+        run: npm audit --audit-level=high
 
   desktop-security-tests:
     runs-on: ubuntu-latest
@@ -63,11 +66,83 @@ jobs:
             throw 'Security manifest smoke test failed'
           }
 
+  desktop-upgrade-tests:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            app/package-lock.json
+            desktop-app/package-lock.json
+      - name: Build web template
+        working-directory: app
+        run: |
+          npm ci
+          npm run build
+          npm run build:config
+          Copy-Item dist/index.html ../desktop-app/app/index.html -Force
+          node scripts/verify-build.mjs
+      - name: Generate temporary issuer for licensing tests
+        env:
+          HAK_LICENSE_QA_KEYGEN: "1"
+        run: |
+          $fixtureDir = Join-Path $env:RUNNER_TEMP 'hak-license-qa'
+          New-Item -ItemType Directory $fixtureDir | Out-Null
+          node desktop-app/licensing/admin.mjs keygen "$fixtureDir/private.pem" "$fixtureDir/public.jwk"
+          "HAK_LICENSE_PUBLIC_KEY=$(Get-Content -Raw "$fixtureDir/public.jwk")" >> $env:GITHUB_ENV
+          "HAK_LICENSE_QA=1" >> $env:GITHUB_ENV
+          "HAK_QA_LICENSE_DIR=$fixtureDir" >> $env:GITHUB_ENV
+      - name: Package installer for Windows QA
+        working-directory: desktop-app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npm ci
+          npm run dist -- --publish never
+      - name: Prepare licensing acceptance and rejection cases
+        run: node desktop-app/tests/prepare-license-fixtures.mjs
+      - name: Fetch the published legacy installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        timeout-minutes: 2
+        run: |
+          $oldDir = Join-Path $env:RUNNER_TEMP 'hak-original'
+          gh release download installer-v1.0.0-2 --pattern '*.exe' --dir $oldDir
+          if ($LASTEXITCODE) { throw 'Legacy installer download failed.' }
+          $old = @(Get-ChildItem $oldDir -Filter '*.exe')
+          $new = @(Get-ChildItem desktop-app/release -Filter '*.exe')
+          if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Expected exactly one old and one new installer.' }
+          "HAK_QA_OLD=$($old[0].FullName)" >> $env:GITHUB_ENV
+          "HAK_QA_NEW=$($new[0].FullName)" >> $env:GITHUB_ENV
+      - name: Sign and verify the QA installer
+        timeout-minutes: 2
+        run: ./desktop-app/tests/sign-for-test.ps1 -Installer $env:HAK_QA_NEW
+      - name: Install both versions and verify upgrade and restore
+        timeout-minutes: 8
+        run: |
+          Write-Host "Published installer signature: $((Get-AuthenticodeSignature $env:HAK_QA_OLD).Status)"
+          if ((Get-AuthenticodeSignature $env:HAK_QA_NEW).Status -ne 'Valid') { throw 'QA installer signature invalid.' }
+          node app/tests/windows-installer-upgrade.mjs $env:HAK_QA_OLD $env:HAK_QA_NEW
+      - name: Remove the QA signing certificate
+        if: always()
+        run: |
+          if ($env:HAK_QA_CERT_THUMBPRINT) {
+            Remove-Item "Cert:\LocalMachine\Root\$env:HAK_QA_CERT_THUMBPRINT" -ErrorAction SilentlyContinue
+            Remove-Item "Cert:\CurrentUser\My\$env:HAK_QA_CERT_THUMBPRINT" -ErrorAction SilentlyContinue
+
+          }
+
   desktop-installer:
     # Chỉ build bộ cài từ main sau khi build/test và Windows mock đều đạt;
     # không công bố một EXE lấy từ PR chưa được nghiệm thu.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [build-test, desktop-windows-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.HAK_LICENSE_PUBLIC_KEY != ''
+    needs: [build-test, desktop-windows-tests, desktop-upgrade-tests]
     runs-on: windows-latest
     permissions:
       contents: read
@@ -89,6 +164,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           WIN_CSC_LINK: ${{ secrets.HAK_WINDOWS_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.HAK_WINDOWS_CSC_PASSWORD }}
+          HAK_LICENSE_PUBLIC_KEY: ${{ vars.HAK_LICENSE_PUBLIC_KEY }}
         run: |
           npm ci
           npm run dist
@@ -98,7 +174,7 @@ jobs:
           SIGNING_CERT_PRESENT: ${{ secrets.HAK_WINDOWS_CSC_LINK != '' }}
         run: |
           $requireSigned = $env:SIGNING_CERT_PRESENT -eq 'true'
-          ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature:$requireSigned
+          ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature:$requireSigned -RequireTimestamp:$requireSigned
       - name: Record GitHub build provenance for the EXE
         uses: actions/attest@v4
         with:

@@ -8,6 +8,7 @@
  * không phải lúc import module.
  * @module services/data-service
  */
+import { notify } from '../utils/event-bus.js';
 import { CONFIG } from '../config/config.js';
 import { STATE } from '../store/state.js';
 import { $, esc } from '../utils/dom-utils.js';
@@ -126,7 +127,7 @@ var lastLoadOffline = false;
 export function missingColumns(rows, required) {
   if (!rows || !rows.length) return [];
   var have = rows[0];
-  return required.filter(function (c) { return !Object.prototype.hasOwnProperty.call(have, c); });
+  return required.filter(function (c) { return !Object.hasOwn(have, c); });
 }
 
 export function setStatus(text, kind, detail) {
@@ -197,22 +198,26 @@ export async function loadAllData() {
     updateLastUpdatedText();
     var okText = 'Đã tải ' + STATE.phieucan.length.toLocaleString('vi-VN') + ' phiếu cân, ' + STATE.dntt.length.toLocaleString('vi-VN') + ' đề nghị thanh toán';
     if (lastLoadOffline) {
+      notify('warning', okText + ' từ bộ nhớ offline.');
       var offlineText = 'ĐANG XEM DỮ LIỆU OFFLINE (không kết nối được Google Sheet): ' + offlineUsed.map(function (o) { return o.name + ' lưu lúc ' + fmtStamp(o.savedAt); }).join(', ');
       setStatus(okText + ' — ⚠ ' + [offlineText].concat(warnings).join(' | '), 'warn',
         okText + '\n' + offlineText + '\nLý do: ' + offlineUsed[0].reason + (warnings.length ? '\n' + warnings.join('\n') : '') + '\nBấm "CẬP NHẬT DỮ LIỆU" khi có mạng để tải bản mới.');
     } else if (warnings.length) {
+      notify('warning', okText + ' từ Google Sheets. Có cảnh báo về nguồn dữ liệu.');
       warnings.forEach(function (w) { logger.warn('[Tải dữ liệu] ' + w); });
       setStatus(okText + ' — ⚠ ' + warnings.join(' | '), 'warn');
     } else {
       setStatus(okText, 'ok');
+      notify('success', okText + ' từ Google Sheets.');
     }
-    runReport();
+    await runReport();
   } catch (err) {
     logger.error('[Tải dữ liệu] ' + err.message);
     // Dữ liệu lần tải trước (nếu có) KHÔNG bị xoá khi làm mới thất bại — nói rõ để người dùng
     // biết số liệu đang xem là của lần tải trước, không phải số mới nhất.
     var keep = STATE.lastUpdated ? ' — vẫn đang hiển thị dữ liệu lần tải trước (' + pad2(STATE.lastUpdated.getHours()) + ':' + pad2(STATE.lastUpdated.getMinutes()) + ')' : '';
     setStatus('Lỗi tải dữ liệu: ' + err.message + keep, 'err');
+    notify('error', 'Lỗi tải dữ liệu: ' + err.message + keep);
   } finally {
     $('#btnReload').disabled = false;
   }

@@ -27,10 +27,25 @@ for (const f of fs.existsSync(REL) ? fs.readdirSync(REL) : []) {
   if (/\.part$|\.exe$|\.blockmap$|^GHEP_FILE\.bat$|^HUONG_DAN_GHEP_FILE\.txt$|^builder-debug\.yml$/.test(f)) fs.rmSync(path.join(REL, f), { force: true });
 }
 console.log('2) Đang đóng bộ cài (electron-builder)...');
-execSync('npx electron-builder --win --x64', { cwd: ROOT, stdio: 'inherit' });
+const requireSignature = process.env.HAK_REQUIRE_SIGNING === '1';
+const signingFlag = requireSignature ? ' --config.forceCodeSigning=true' : '';
+execSync('npm run dist -- --publish never' + signingFlag, { cwd: ROOT, stdio: 'inherit' });
+
+// Công cụ trong resources được xác thực qua SHA-256 bên trong app.asar. Giữ nguyên byte
+// khi đóng gói. Bản dùng riêng trong thư mục registration vẫn được ký Authenticode.
+const expectedVerifier = JSON.parse(fs.readFileSync(path.join(ROOT, 'app', 'license-verifier.json'), 'utf8'));
+const packagedVerifier = fs.readFileSync(path.join(REL, 'win-unpacked', 'resources', 'HAK-License-runtime.exe'));
+if (sha256(packagedVerifier) !== expectedVerifier.sha256) {
+  throw new Error('App đã đóng gói chứa công cụ xác minh giấy phép sai SHA-256.');
+}
 
 const exeName = fs.readdirSync(REL).find((f) => f.endsWith('.exe') && f.includes('Setup'));
 if (!exeName) { console.error('Không thấy file .exe trong release/'); process.exit(1); }
+const registration = path.join(REL, 'registration');
+fs.mkdirSync(registration, { recursive: true });
+fs.copyFileSync(path.join(REL, 'win-unpacked', 'HAK-License.exe'), path.join(registration, 'HAK-License.exe'));
+fs.copyFileSync(path.join(ROOT, 'licensing', 'Register-HAK.cmd'), path.join(registration, 'Register-HAK.cmd'));
+fs.copyFileSync(path.join(ROOT, 'licensing', 'HAK-CapPhep.html'), path.join(REL, 'HAK-CapPhep.html'));
 const exe = fs.readFileSync(path.join(REL, exeName));
 const hash = sha256(exe);
 const parts = [];
@@ -42,9 +57,13 @@ for (let i = 0, n = 0; i < exe.length; i += PART_SIZE, n++) {
 const rejoined = Buffer.concat(parts.map((p) => fs.readFileSync(path.join(REL, p))));
 if (sha256(rejoined) !== hash) { console.error('LỖI: ghép các phần không khớp file gốc!'); process.exit(1); }
 console.log('3) Đã chia ' + parts.length + ' phần, ghép thử khớp tuyệt đối. SHA256 = ' + hash);
-if (parts.length !== 3) console.warn('   LƯU Ý: số phần khác 3 — sửa danh sách file trong scripts/GHEP_FILE.template.bat cho khớp.');
 
-const bat = fs.readFileSync(path.join(ROOT, 'scripts', 'GHEP_FILE.template.bat'), 'latin1').replace('__SHA256__', hash).replace(/\r?\n/g, '\r\n');
+const bat = fs.readFileSync(path.join(ROOT, 'scripts', 'GHEP_FILE.template.bat'), 'latin1')
+  .replace('__SHA256__', hash)
+  .replace('__REQUIRE_SIGNATURE__', requireSignature ? '1' : '0')
+  .replace('__PARTS__', parts.join(' '))
+  .replace('__COPY_PARTS__', parts.map((name) => '"' + name + '"').join('+'))
+  .replace(/\r?\n/g, '\r\n');
 fs.writeFileSync(path.join(REL, 'GHEP_FILE.bat'), bat, 'latin1');
 const guide = [
   'HƯỚNG DẪN GHÉP FILE CÀI ĐẶT (BaoCaoNgay_Setup_*.part) — bản ' + pkg.version + ', đóng ngày ' + new Date().toLocaleDateString('vi-VN'),
@@ -55,13 +74,14 @@ const guide = [
   '',
   'CÁCH GHÉP — NHANH NHẤT: đặt các file .part và GHEP_FILE.bat CÙNG 1 thư mục, nhấp đúp GHEP_FILE.bat.',
   'File .bat tự ghép, kiểm tra SHA256 (file hỏng sẽ báo lỗi và tự xoá), rồi hỏi có mở trình cài đặt không',
-  '(C = Có, K = Không). Nếu Windows hiện "Windows đã bảo vệ PC của bạn": bấm "Thông tin bổ sung" → "Vẫn chạy".',
+  '(C = Có, K = Không).',
   '',
   'CÁCH THỦ CÔNG (PowerShell hoặc Command Prompt, tại thư mục chứa các file .part):',
   '   cmd /c copy /b ' + parts.join('+') + ' "BaoCaoNgay_Setup.exe"',
   '',
   'KIỂM TRA: Get-FileHash "BaoCaoNgay_Setup.exe" -Algorithm SHA256  — phải khớp:',
   '  SHA256: ' + hash,
+  ...(requireSignature ? ['  Authenticode: (Get-AuthenticodeSignature .\\BaoCaoNgay_Setup.exe).Status phải là Valid.'] : []),
   '',
   'Cài đè lên bản cũ được; lần mở đầu tiên app tự cập nhật báo cáo theo bản mới, KHÔNG cần cấu hình lại,',
   'KHÔNG mất danh mục/gán Tàu/thông tin đã nhập. Chi tiết thay đổi: CHANGELOG.md trong mã nguồn.',

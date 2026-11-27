@@ -4,7 +4,7 @@
 //  - Nhập sai bị báo, chưa lưu. Nhập đúng ⇒ sổ bắt đầu từ ngày nhập, dòng "Số dư đầu kỳ", thẻ + bảng + Excel
 //    cùng số; còn sau tải lại; có trong file sao lưu; khôi phục; xoá (bấm 2 lần) ⇒ về như cũ.
 // Chạy: npm run test:tienvay-opening   (tuỳ chọn: node tests/test-tienvay-opening.mjs <đường dẫn index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -35,7 +35,7 @@ function thvayFile() {
 let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x !== undefined ? '  [' + String(x).slice(0, 200) + ']' : '')); };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const ctx = await browser.newContext({ timezoneId: 'Asia/Ho_Chi_Minh', locale: 'vi-VN', viewport: { width: 1366, height: 800 }, acceptDownloads: true });
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', (e) => errors.push(e.message));

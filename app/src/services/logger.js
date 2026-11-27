@@ -12,7 +12,7 @@ function readStoredLevel() {
   try {
     const v = (typeof localStorage !== 'undefined') ? localStorage.getItem(STORAGE_KEY) : null;
     return v && LEVELS[v] != null ? v : 'WARN';
-  } catch (e) { return 'WARN'; }
+  } catch { return 'WARN'; }
 }
 
 class Logger {
@@ -25,7 +25,7 @@ class Logger {
   setLevel(level) {
     if (LEVELS[level] == null) return;
     this.level = level;
-    try { localStorage.setItem(STORAGE_KEY, level); } catch (e) { /* bỏ qua nếu localStorage không dùng được */ }
+    try { localStorage.setItem(STORAGE_KEY, level); } catch { /* bỏ qua nếu localStorage không dùng được */ }
   }
 
   _shouldLog(level) { return LEVELS[level] >= LEVELS[this.level]; }

@@ -7,7 +7,7 @@
 // Chạy:   npm run test:export-golden            (so sánh)
 //         node tests/test-export-golden.mjs --update   (ghi lại mẫu chuẩn — CHỈ khi CHỦ ĐỘNG đổi file xuất)
 //         node tests/test-export-golden.mjs --dist <index.html> [--dump <thư mục>]
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -76,7 +76,7 @@ ACTIONS.push(['tonghop-thang.xlsx', '#btnExportAllThang'], ['tonghop-ngay.xlsx',
 ACTIONS.push(['WO.pdf', ['#btnWOModal', '#btnWOPdf']], ['WO.xlsx', ['#btnWOModal', '#btnWOExcel']]);
 ACTIONS.push(['TNDN.pdf', ['#btnTNDNModal', '#btnBankPdf']], ['TNDN.xlsx', ['#btnTNDNModal', '#btnBankExcel']], ['PNK.pdf', ['#btnPNKModal', '#btnBankPdf']]);
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1440, height: 900 } });
 const errs = []; page.on('pageerror', (e) => errs.push(e.message));
 page.on('dialog', (d) => d.accept());

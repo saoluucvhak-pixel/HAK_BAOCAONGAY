@@ -6,16 +6,16 @@
 export const NHAPKEO_COLS = [
   ['STT','STT','int'], ['So_CT','Số CT','text'], ['Mã hàng','Mã hàng','text'], ['Khách hàng','Khách hàng','text'],
   ['Ngày cân 1','Ngày cân 1','date'], ['Giờ cân 1','Giờ cân 1','time'], ['Ngày cân 2','Ngày cân 2','date'], ['Giờ cân 2','Giờ cân 2','time'],
-  ['Biển số 1','Biển số 1','text'], ['Biển số 2','Biển số 2','text'], ['Cân lần 1','Cân lần 1','int'], ['Cân lần 2','Cân lần 2','int'],
-  ['KL hàng (KG)','Khối lượng (KG)','int'], ['Đơn giá_TC','Đơn giá','money'], ['Thành tiền','Thành tiền','money'], ['ĐL','Đại lý','text'], ['NG','Nguồn gốc','text']
+  ['Biển số 1','Biển số 1','text'], ['Biển số 2','Biển số 2','text'], ['Cân lần 1','Cân lần 1','kg'], ['Cân lần 2','Cân lần 2','kg'],
+  ['KL hàng (KG)','Khối lượng (KG)','kg'], ['Đơn giá_TC','Đơn giá','money'], ['Thành tiền','Thành tiền','money'], ['ĐL','Đại lý','text'], ['NG','Nguồn gốc','text']
 ];
 export const XECHO_COLS = [ ['TT','TT','int'], ['So_CT','Số CT','text'], ['Mã hàng','Mã hàng','text'], ['Khách hàng','Khách hàng','text'],
   ['Ngày cân 1','Ngày cân 1','date'], ['Giờ cân 1','Giờ cân 1','time'], ['Ngày cân 2','Ngày cân 2','date'], ['Giờ cân 2','Giờ cân 2','time'],
-  ['Biển số 1','Biển số 1','text'], ['KL hàng (KG)','Khối lượng (KG)','int'], ['Thời gian chờ','Thời gian chờ','text'] ];
+  ['Biển số 1','Biển số 1','text'], ['KL hàng (KG)','Khối lượng (KG)','kg'], ['Thời gian chờ','Thời gian chờ','text'] ];
 export const THANHTOAN_COLS = [ ['STT','STT','int'], ['Ngày thanh toán','Ngày thanh toán','date'], ['Số hợp đồng','Số hợp đồng','text'], ['Họ tên Chủ rừng','Chủ rừng','text'],
   ['Người nhận tiền','Người nhận tiền','text'], ['Số TK nhận tiền','Số TK','text'], ['Số CT','Số CT','text'],
   ['Ngày cân 1','Ngày cân 1','date'], ['Giờ cân 1','Giờ cân 1','time'], ['Ngày cân 2','Ngày cân 2','date'], ['Giờ cân 2','Giờ cân 2','time'],
-  ['Biển số 1','Biển số 1','text'], ['Cân lần 1','Cân lần 1','int'], ['Cân lần 2','Cân lần 2','int'],
+  ['Biển số 1','Biển số 1','text'], ['Cân lần 1','Cân lần 1','kg'], ['Cân lần 2','Cân lần 2','kg'],
   // [BUGFIX 2026-09-22] "Khối lượng" ở đây lấy từ DNTT_CT — đơn vị THẬT là TẤN (kiểm chứng bằng
   // Đơn giá = Thành tiền/Khối lượng ra ~1,5 triệu đồng/tấn gỗ keo, đúng giá thị trường; nếu là
   // KG thì giá sẽ vô lý ~1,5 triệu/kg). Nhãn cũ "(KG)" + kiểu 'int' (làm tròn số nguyên, mất số
@@ -24,15 +24,15 @@ export const THANHTOAN_COLS = [ ['STT','STT','int'], ['Ngày thanh toán','Ngày
   ['Khối lượng','Khối lượng (tấn)','kl'], ['Đơn giá thanh toán','Đơn giá TT','money'], ['Thành tiền','Thành tiền','money'] ];
 export const CONGNO_COLS = [ ['STT','STT','int'], ['So_CT','Số CT','text'], ['Khách hàng','Khách hàng','text'], ['Số hợp đồng','Số hợp đồng','text'], ['Mã hàng','Mã hàng','text'],
   ['Ngày cân 1','Ngày cân 1','date'], ['Giờ cân 1','Giờ cân 1','time'], ['Ngày cân 2','Ngày cân 2','date'], ['Giờ cân 2','Giờ cân 2','time'],
-  ['Biển số 1','Biển số 1','text'], ['Cân lần 1','Cân lần 1','int'], ['Cân lần 2','Cân lần 2','int'],
-  ['KL hàng (KG)','Khối lượng (KG)','int'], ['Đơn giá_TC','Đơn giá','money'], ['Thành tiền','Thành tiền','money'], ['ĐL','Đại lý','text'], ['NG','Nguồn gốc','text'] ];
+  ['Biển số 1','Biển số 1','text'], ['Cân lần 1','Cân lần 1','kg'], ['Cân lần 2','Cân lần 2','kg'],
+  ['KL hàng (KG)','Khối lượng (KG)','kg'], ['Đơn giá_TC','Đơn giá','money'], ['Thành tiền','Thành tiền','money'], ['ĐL','Đại lý','text'], ['NG','Nguồn gốc','text'] ];
 export const HOTRO_COLS = [ ['STT','STT','int'], ['So_CT','Số CT','text'], ['Khách hàng','Khách hàng','text'], ['Mã hàng','Mã hàng','text'],
   ['Ngày cân 1','Ngày cân 1','date'], ['Giờ cân 1','Giờ cân 1','time'], ['Ngày cân 2','Ngày cân 2','date'], ['Giờ cân 2','Giờ cân 2','time'],
-  ['Biển số 1','Biển số 1','text'], ['Cân lần 1','Cân lần 1','int'], ['Cân lần 2','Cân lần 2','int'],
+  ['Biển số 1','Biển số 1','text'], ['Cân lần 1','Cân lần 1','kg'], ['Cân lần 2','Cân lần 2','kg'],
   ['Khối lượng_Tấn','Khối lượng (tấn)','kl'], ['Hỗ trợ','Mức hỗ trợ/tấn','money'], ['Tiền hỗ trợ','Tiền hỗ trợ','money'], ['ĐL','Đại lý','text'], ['NG','Nguồn gốc','text'] ];
 export const TROGIA_COLS = [ ['STT','STT','int'], ['So_CT','Số CT','text'], ['Khách hàng','Khách hàng','text'], ['Mã hàng','Mã hàng','text'],
   ['Ngày cân 1','Ngày cân 1','date'], ['Giờ cân 1','Giờ cân 1','time'], ['Ngày cân 2','Ngày cân 2','date'], ['Giờ cân 2','Giờ cân 2','time'],
-  ['Biển số 1','Biển số 1','text'], ['Cân lần 1','Cân lần 1','int'], ['Cân lần 2','Cân lần 2','int'],
+  ['Biển số 1','Biển số 1','text'], ['Cân lần 1','Cân lần 1','kg'], ['Cân lần 2','Cân lần 2','kg'],
   ['Khối lượng_Tấn','Khối lượng (tấn)','kl'], ['Hỗ trợ','Mức trợ giá/tấn','money'], ['Tiền trợ giá','Tiền trợ giá','money'], ['ĐL','Đại lý','text'], ['NG','Nguồn gốc','text'] ];
 export const TONGHOPTRO_COLS = [ ['STT','STT','int'], ['Biển số 1','Biển số','text'], ['Từ ngày','Từ ngày','datekey'], ['Đến ngày','Đến ngày','datekey'],
   ['Số chuyến','Số chuyến','int'], ['Khối lượng_Tấn','Khối lượng (tấn)','kl'], ['Đơn giá hỗ trợ','Đơn giá hỗ trợ','money'],

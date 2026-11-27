@@ -1,6 +1,7 @@
 // Kiểm chứng: sau khi cài BẢN MỚI (app/index.html mẫu thay đổi), lần mở app kế tiếp phải dùng
 // báo cáo sinh từ MẪU MỚI — không được tiếp tục mở report.html cũ sinh từ mẫu của lần cài trước.
 // Chạy: node tests/test-template-refresh.js   (giả lập module 'electron', không cần mở cửa sổ)
+const { createHash } = require('node:crypto');
 const Module = require('module');
 const fs = require('fs');
 const os = require('os');
@@ -17,22 +18,41 @@ fs.copyFileSync(path.join(__dirname, '..', 'app', 'source-validator.js'), path.j
 let loaded = [], readyCb = null, windowOpenHandler = null, navigationHandler = null, externalUrls = [];
 const switches = {};
 const handlers = {};
+let packagedProfile, pickedKit, selectedProfile, licenseError, menuTemplate;
 const electronMock = {
   app: { getPath: () => userData, whenReady: () => ({ then: (cb) => { readyCb = cb; } }), on: () => {}, quit: () => {}, commandLine: { appendSwitch: (k, v) => { switches[k] = v; } } },
   BrowserWindow: Object.assign(function () { this.loadFile = (f) => loaded.push(f); this.webContents = { setWindowOpenHandler(fn) { windowOpenHandler = fn; }, on(name, fn) { if (name === 'will-navigate') navigationHandler = fn; }, session: { on() {} } }; this.on = () => {}; }, { getAllWindows: () => [] }),
-  Menu: { setApplicationMenu() {}, buildFromTemplate: () => ({}) },
+  Menu: { setApplicationMenu() {}, buildFromTemplate: (template) => { menuTemplate = template; return {}; } },
+  dialog: { showOpenDialog: async () => ({ filePaths: [pickedKit] }), showErrorBox: (title, message) => { licenseError = { title, message }; } },
   shell: { openExternal(url) { externalUrls.push(url); return Promise.resolve(); } },
   ipcMain: { handle: (n, fn) => { handlers[n] = fn; } },
 };
 const origLoad = Module._load;
-Module._load = function (req, parent, isMain) { if (req === 'electron') return electronMock; return origLoad.apply(this, arguments); };
+Module._load = function (req) {
+  if (req === 'electron') return electronMock;
+  if (req === 'node:child_process') {
+    return { execFile(_file, args, _options, callback) {
+      if (args[0] === 'accept-kit') {
+        if (args[1] !== pickedKit || !selectedProfile) {
+          callback(Object.assign(new Error('Verification failed'), { stderr: 'Sai máy được duyệt.' }));
+          return;
+        }
+        packagedProfile = selectedProfile;
+      }
+      const stdout = args[0] === 'check' && packagedProfile
+        ? Buffer.from(JSON.stringify(packagedProfile)).toString('base64') : '';
+      callback(null, { stdout });
+    } };
+  }
+  return origLoad.apply(this, arguments);
+};
 
 function startApp() {
   delete require.cache[require.resolve(path.join(appDir, 'main.js'))];
   loaded = [];
   require(path.join(appDir, 'main.js'));
-  readyCb();
-  return loaded[loaded.length - 1];
+  const ready = readyCb();
+  return electronMock.app.isPackaged ? ready : loaded[loaded.length - 1];
 }
 let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x ? '  [' + x + ']' : '')); };
@@ -121,7 +141,46 @@ check('Chặn điều hướng cửa sổ chính ra website và file lạ', prev
 navigationHandler({ preventDefault() { prevented++; } }, require('url').pathToFileURL(reportPath).toString());
 check('Vẫn cho phép điều hướng tới báo cáo do app quản lý', prevented === 2);
 
-Module._load = origLoad;
-fs.rmSync(tmp, { recursive: true, force: true });
-console.log('\n=== RESULT: ' + pass + ' passed, ' + fail + ' failed ===');
-process.exit(fail ? 1 : 0);
+async function checkPackagedProfile() {
+  electronMock.app.isPackaged = true;
+  process.resourcesPath = tmp;
+  const helper = 'test license helper';
+  fs.writeFileSync(path.join(tmp, 'HAK-License-runtime.exe'), helper);
+  const sha256 = createHash('sha256').update(helper).digest('hex');
+  fs.writeFileSync(path.join(appDir, 'app', 'license-verifier.json'), JSON.stringify({ sha256 }));
+  fs.writeFileSync(path.join(appDir, 'app', 'index.html'), realTemplate);
+  packagedProfile = {
+    TenCty: 'Công ty Thử nghiệm HAK', DiaChi: 'Đắk Lắk',
+    PhieuCan: 'https://docs.google.com/spreadsheets/d/e/KIT_PC/pub?output=csv',
+    DNTT: 'https://docs.google.com/spreadsheets/d/e/KIT_DN/pub?output=csv'
+  };
+
+  await startApp();
+  const configured = handlers['get-config'](trustedSetupEvent);
+  const report = fs.readFileSync(reportPath, 'utf8');
+  check('File đã xác minh tự mở báo cáo cùng cấu hình tiếng Việt và nguồn CSV',
+    loaded.at(-1) === reportPath && configured.DiaChi === packagedProfile.DiaChi &&
+    report.includes(packagedProfile.TenCty) && report.includes(packagedProfile.PhieuCan));
+  handlers['save-config'](trustedSetupEvent, { ...configured, DiaChi: 'Địa chỉ sửa tại máy' });
+  await startApp();
+  check('Mở lại với cùng file giữ chỉnh sửa tại máy',
+    handlers['get-config'](trustedSetupEvent).DiaChi === 'Địa chỉ sửa tại máy');
+
+  const importFile = menuTemplate[0].submenu.find((item) => item.label === 'Nạp file cài đặt HAK…').click;
+  pickedKit = path.join(tmp, 'HAK-CaiDat.haksetup');
+  await importFile();
+  check('File bị từ chối không cập nhật cấu hình',
+    licenseError?.message === 'Sai máy được duyệt.' &&
+    handlers['get-config'](trustedSetupEvent).DiaChi === 'Địa chỉ sửa tại máy');
+  selectedProfile = { ...packagedProfile, DiaChi: 'Địa chỉ do HAK cập nhật' };
+  await importFile();
+  check('File mới hợp lệ cập nhật cấu hình khi app đang mở',
+    handlers['get-config'](trustedSetupEvent).DiaChi === selectedProfile.DiaChi && loaded.at(-1) === reportPath);
+}
+
+checkPackagedProfile().catch((error) => check('Kiểm tra hồ sơ HAK', false, error.stack)).finally(() => {
+  Module._load = origLoad;
+  fs.rmSync(tmp, { recursive: true, force: true });
+  console.log('\n=== RESULT: ' + pass + ' passed, ' + fail + ' failed ===');
+  process.exitCode = fail ? 1 : 0;
+});

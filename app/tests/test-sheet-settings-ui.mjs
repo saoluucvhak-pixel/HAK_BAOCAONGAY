@@ -1,12 +1,12 @@
 // Playwright: cấu hình nguồn Google Sheets trong màn hình desktop setup (không gửi dữ liệu thật).
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const setup = path.resolve(__dirname, '../../desktop-app/app/setup.html');
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 try {
   const page = await browser.newPage();
   const errors = [];

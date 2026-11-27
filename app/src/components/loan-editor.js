@@ -10,6 +10,7 @@
  * chặn màn hình nhưng cũng không xoá nhầm bằng 1 cú bấm.
  * @module components/loan-editor
  */
+import { notify } from '../utils/event-bus.js';
 import { createFilter, core as sf } from '@hak/smart-filter';
 import { $, esc } from '../utils/dom-utils.js';
 import { STATE } from '../store/state.js';
@@ -58,7 +59,7 @@ function hayOf(r) {
 export async function reloadLoans() {
   try {
     const rows = sortLoans(await listLoans());
-    rows.forEach((r) => { Object.defineProperty(r, '_hay', { value: hayOf(r), enumerable: false }); });
+    rows.forEach((r) => { Object.defineProperty(r, '_hay', { value: hayOf(r), enumerable: false, configurable: true }); });
     ui.all = rows;
     ui.selected.forEach((id) => { if (!rows.some((r) => r.id === id)) ui.selected.delete(id); });
     STATE.vayRecords = rows;
@@ -69,6 +70,13 @@ export async function reloadLoans() {
     const s = $('#loanSummary'); if (s) s.textContent = 'Không đọc được dữ liệu khoản vay đã lưu: ' + e.message;
     setStatus('Lỗi: ' + e.message, 'err');
   }
+}
+
+export function refreshLoanFormatting() {
+  for (const row of ui.all) {
+    Object.defineProperty(row, '_hay', { value: hayOf(row) });
+  }
+  applyFilter();
 }
 
 function applyFilter() {
@@ -159,7 +167,12 @@ async function removeIds(ids, doneText) {
     ids.forEach((id) => ui.selected.delete(id));
     await reloadLoans();
     setStatus(doneText, 'ok');
-  } catch (e) { setStatus('CHƯA xoá được: ' + e.message, 'err'); }
+    notify('success', doneText);
+  } catch (e) {
+    const message = 'CHƯA xoá được: ' + e.message;
+    setStatus(message, 'err');
+    notify('error', message);
+  }
 }
 
 function onTableClick(e) {
@@ -218,16 +231,23 @@ function readLoanForm() {
 async function onSaveLoan() {
   const res = validateLoan(readLoanForm(), { userDates: true });
   LOAN_FIELDS.forEach(([key, label]) => { $('#' + inputId(key)).classList.toggle('invalid', res.errors.some((m) => m.indexOf(label + ':') === 0)); });
-  if (!res.ok) { $('#loanFormErrors').textContent = res.errors.join('\n'); return; }
+  if (!res.ok) {
+    $('#loanFormErrors').textContent = res.errors.join('\n');
+    notify('warning', 'Vui lòng kiểm tra thông tin khoản vay.');
+    return;
+  }
   const btn = $('#btnLoanSave'); btn.disabled = true;
   try {
     const isEdit = !!ui.editing;
     await saveLoan(res.value, ui.editing || { nguon: 'Nhập tay' });
     closeLoanModal();
     await reloadLoans();
-    setStatus(isEdit ? 'Đã lưu thay đổi.' : 'Đã thêm 1 khoản vay.', 'ok');
+    const message = isEdit ? 'Đã lưu thay đổi khoản vay.' : 'Đã thêm 1 khoản vay.';
+    setStatus(message, 'ok');
+    notify('success', message);
   } catch (e) {
     $('#loanFormErrors').textContent = 'CHƯA lưu được: ' + e.message;
+    notify('error', $('#loanFormErrors').textContent);
   } finally { btn.disabled = false; }
 }
 

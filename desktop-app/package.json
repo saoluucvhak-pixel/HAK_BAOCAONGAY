@@ -1,18 +1,18 @@
 {
   "name": "baocaongay-desktop",
-  "version": "1.0.0",
+  "version": "2.2.0",
   "description": "Ứng dụng desktop Báo cáo ngày - HAK Group (chọn/đổi công ty ngay trong app)",
   "main": "main.js",
   "author": "HAK Group",
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win --x64",
+    "dist": "node scripts/build-license.mjs && electron-builder --win --x64",
     "release": "node scripts/release.mjs"
   },
   "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.1.8"
+    "electron": "45.5.0",
+    "electron-builder": "26.18.0"
   },
   "build": {
     "appId": "com.hakgroup.baocaongay",
@@ -36,14 +36,39 @@
           ]
         }
       ],
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "signExts": ["!HAK-License-runtime.exe"],
+      "signtoolOptions": {
+        "signingHashAlgorithms": [
+          "sha256"
+        ],
+        "rfc3161TimeStampServer": "https://timestamp.digicert.com"
+      }
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Báo cáo ngày"
-    }
+      "shortcutName": "Báo cáo ngày",
+      "include": "build/installer.nsh"
+    },
+    "extraFiles": [
+      {
+        "from": "build/license-bin/HAK-License.exe",
+        "to": "HAK-License.exe"
+      }
+    ],
+    "electronFuses": {
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "enableNodeOptionsEnvironmentVariable": false
+    },
+    "extraResources": [
+      {
+        "from": "build/license-bin/HAK-License.exe",
+        "to": "HAK-License-runtime.exe"
+      }
+    ]
   }
 }

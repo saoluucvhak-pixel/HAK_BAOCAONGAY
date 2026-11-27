@@ -7,6 +7,8 @@
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module services/export/pdf-export
  */
+import { savePdf, updateExportProgress } from '../export-runner.js';
+import { alignOf } from '../../utils/hak-format.js';
 import { fmtCell } from '../../utils/cell-format.js';
 import { PDF_FONT_BOLD_B64, PDF_FONT_REGULAR_B64 } from '../../config/pdf-fonts.js';
 import { BRAND } from '../../constants/brand.js';
@@ -50,13 +52,13 @@ export function forcePdfMoneyColumnWidths(doc, body, foot, moneyColIndexes, colu
     columnStyles[i].cellWidth = maxW + PDF_CELL_PAD_DEFAULT * 2 + 0.5;
   });
 }
-export function exportPDF(key){
+export async function exportPDF(key){
   var st = TABLES[key]; if (!st) return;
   var doc = new libs.jsPDF({ orientation: 'landscape', unit:'mm', format:'a4' });
   ensurePdfFont(doc); // nhúng font Roboto (hỗ trợ dấu tiếng Việt) — tránh lỗi font khi xuất PDF
   var pageW = doc.internal.pageSize.getWidth();
   doc.setFont('Roboto','bold'); doc.setFontSize(13); doc.setTextColor.apply(doc, BRAND.companyRGB);
-  doc.text(companyNameFor(key), pageW/2, 12, { align:'center' });
+  doc.text(companyNameFor(), pageW/2, 12, { align:'center' });
   doc.setFontSize(12); doc.setTextColor(20,20,20);
   doc.text(reportTitle(key), pageW/2, 19, { align:'center' });
   doc.setFont('Roboto','normal'); doc.setFontSize(9); doc.setTextColor(90,90,90);
@@ -78,11 +80,11 @@ export function exportPDF(key){
   var body = (st.view||[]).map(function(r){ return st.cols.map(function(c, i){ return (i === 0 && r._label) ? r._label : fmtCell(r[c[0]], c[2]); }); });
   var foot = st.totals ? [st.cols.map(function(c,i){
     if (i===0) return 'Tổng cộng';
-    return st.totals.hasOwnProperty(c[0]) ? fmtCell(st.totals[c[0]], c[2]) : '';
+    return Object.hasOwn(st.totals, c[0]) ? fmtCell(st.totals[c[0]], c[2]) : '';
   })] : undefined;
   var columnStyles = {};
   st.cols.forEach(function(c,i){
-    var isNum = (c[2]==='money'||c[2]==='kl'||c[2]==='int');
+    var isNum = alignOf(c[2]) === 'right';
     var isCenter = (c[2]==='date'||c[2]==='time'||c[2]==='datekey');
     columnStyles[i] = { halign: isNum ? 'right' : (isCenter ? 'center' : 'left') };
   });
@@ -97,6 +99,7 @@ export function exportPDF(key){
     if (foot) { doc.setFont('Roboto','bold'); maxW = Math.max(maxW, doc.getTextWidth(foot[0][i] || '')); }
     columnStyles[i].cellWidth = maxW + PDF_CELL_PAD * 2 + 0.5;
   });
+  await updateExportProgress(45, 'Dàn trang bảng PDF');
   doc.autoTable({
     head: head, body: body, foot: foot, startY: 31,
     margin: { left:8, right:8, bottom:14 },
@@ -107,18 +110,22 @@ export function exportPDF(key){
     footStyles: { font:'Roboto', fontStyle:'bold', fillColor: BRAND.totalRGB, textColor:[20,20,20] },
     alternateRowStyles: { fillColor: BRAND.zebraRGB },
     columnStyles: columnStyles,
-    didDrawPage: function(data){
+    didDrawPage: function(){
       doc.setFont('Roboto','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
       doc.text('In lúc ' + new Date().toLocaleString('vi-VN'), 10, doc.internal.pageSize.getHeight()-6);
     }
   });
   // đánh số trang "Trang X/Y" — phải làm sau khi autoTable vẽ hết mọi trang mới biết tổng số trang
+  await updateExportProgress(78, 'Đánh số trang PDF');
   var totalPages = doc.internal.getNumberOfPages();
   for (var p=1; p<=totalPages; p++){
+    if (p > 1 && p % 25 === 0) {
+      await updateExportProgress(78 + Math.floor(12 * p / totalPages), 'Đánh số trang PDF');
+    }
     doc.setPage(p);
     doc.setFont('Roboto','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
     doc.text('Trang ' + p + '/' + totalPages, pageW-10, doc.internal.pageSize.getHeight()-6, { align:'right' });
   }
   var d = new Date();
-  doc.save('BaoCaoNgay_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '_' + key + '.pdf');
+  return savePdf(doc, 'BaoCaoNgay_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '_' + key + '.pdf');
 }

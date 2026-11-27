@@ -2,7 +2,7 @@
 // khác, mở khoá lại đúng Tàu đã gán, gỡ gán không còn ReferenceError, và báo cáo "Tổng hợp theo
 // Tàu" + Dashboard cập nhật đúng số liệu). Không thuộc bộ ui-baseline.mjs (đó là bộ kiểm tra
 // KHÔNG đổi hành vi cũ) — đây là kiểm tra CHỨC NĂNG MỚI, chạy độc lập bằng `node tests/test-tau-assignment.mjs`.
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { genPhieuCan, genDNTT, genHosokeo, toCSV } from './fixtures.mjs';
@@ -13,7 +13,7 @@ const DIST_HTML = path.resolve(__dirname, '../dist/index.html');
 let pass = 0, fail = 0;
 function check(name, cond) { if (cond) { pass++; console.log('OK  ', name); } else { fail++; console.log('FAIL', name); } }
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -61,7 +61,6 @@ await page.evaluate(() => {
 const selCountText1 = await page.evaluate(() => document.querySelector('#tauSelectedCount').textContent);
 check('Đếm đúng số dòng đã chọn trước khi gán (3 dòng)', selCountText1.includes('3'));
 
-page.once('dialog', (d) => d.accept());
 await page.click('#btnTauAssignConfirm');
 await page.waitForTimeout(300);
 const modalClosedAfterAssign = await page.evaluate(() => !document.querySelector('#tauModalOverlay').classList.contains('active'));
@@ -95,18 +94,10 @@ await page.evaluate(() => {
   chks[3].checked = true;
   chks[3].dispatchEvent(new Event('change'));
 });
-page.once('dialog', (d) => d.accept());
 await page.click('#btnTauAssignConfirm');
 await page.waitForTimeout(300);
 const assignMap2 = await page.evaluate(() => window.app.storageService.get('baocaongay_tau_assign', {}));
 check('Bổ sung thêm dòng thứ 4 vào ĐÚNG Tàu A thành công (không bị chặn, tổng 4 dòng)', Object.keys(assignMap2).length === 4);
-
-// ---------- Kiểm tra "defense in depth" ở service: assignTau() tự chặn nếu cố gán chồng sang Tàu khác ----------
-const guardResult = await page.evaluate(() => {
-  const soBKLS = Object.keys(window.app.storageService.get('baocaongay_tau_assign', {}))[0];
-  return window.app.__tauAssignTest ? null : 'no-hook'; // chỉ để ghi chú, không phải lỗi nếu app không expose hook riêng
-});
-// (Không có hook riêng cho assignTau ở window.app — bỏ qua kiểm tra trực tiếp hàm, đã kiểm tra gián tiếp qua UI ở trên)
 
 // ---------- Modal đã tự đóng sau khi gán (confirmTauAssignClick), kiểm tra tab "Tổng hợp theo Tàu" ----------
 await page.click('[data-rtab="tautonghop"]');

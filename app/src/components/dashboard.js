@@ -4,7 +4,9 @@
  *
  * [SỬA — Phase 3.4] Chart.js trước đây nạp qua <script src="cdn..."> — nếu mạng/máy chặn CDN
  * thì `typeof Chart === 'undefined'` và dashboard không vẽ được biểu đồ nào (âm thầm, không có
- * thông báo lỗi). Đã sửa: `import Chart from 'chart.js/auto'` — bundle thẳng vào
+ * thông báo lỗi). Đã sửa: `import { color } from 'chart.js/helpers';
+import { eventBus } from '../utils/event-bus.js';
+import Chart from 'chart.js/auto'` — bundle thẳng vào
  * `dist/index.html`, tự đăng ký đủ mọi loại biểu đồ giống hệt bản UMD CDN cũ, không phụ thuộc
  * mạng nữa. Xem BUG_FIXED.md.
  *
@@ -13,16 +15,18 @@
  * chỉ được GỌI (từ `runReport()`) sau khi `RESULTS` đã được gán, không phải lúc import module.
  * @module components/dashboard
  */
+import { color } from 'chart.js/helpers';
+import { eventBus } from '../utils/event-bus.js';
 import Chart from 'chart.js/auto';
 import { $ } from '../utils/dom-utils.js';
 import { fmtMoney, fmtKL, parseNum } from '../utils/number-utils.js';
-import { fmtDate, inDateRange, toKeyFromInput } from '../utils/date-utils.js';
+import { fmtDate, inDateRange } from '../utils/date-utils.js';
 import { RESULTS } from '../store/report-runtime.js';
 import { fitCardsIn } from './card-fit.js';
 
 const CHARTS = {};
 
-export function renderDashboard(ctx, reportKey) {
+export function renderDashboard(ctx, dashFromKey, dashToKey) {
   var r = RESULTS;
   var soXe = new Set(r.nhap.rows.map(function (x) { return x['Biển số 1']; }).filter(Boolean)).size;
   // [CHUẨN HAK] Bảng/báo cáo không kèm "đ" (đơn vị ghi ở tiêu đề); thẻ KPI là con số đứng riêng nên
@@ -51,10 +55,6 @@ export function renderDashboard(ctx, reportKey) {
   var gtData = r.tonghop.map(function (x) { return x['Giá trị nhập']; });
 
   var byDL = {}, byNG = {};
-  // [PERF-05] Đọc khoảng ngày từ ô nhập 1 lần trước vòng lặp (trước đây đọc DOM 2 lần cho MỖI
-  // phiếu cân — 10.000 phiếu = 20.000 lần querySelector). Giá trị không đổi trong vòng lặp nên
-  // kết quả giống hệt.
-  var dashFromKey = toKeyFromInput($('#fFrom').value), dashToKey = toKeyFromInput($('#fTo').value);
   ctx.phieucan.forEach(function (row) {
     if (!inDateRange(row['Ngày cân 1'], dashFromKey, dashToKey)) return;
     var kl = (parseNum(row['KL hàng (KG)']) || 0) / 1000;
@@ -62,16 +62,17 @@ export function renderDashboard(ctx, reportKey) {
     var ng = row['NG'] || '(khác)'; byNG[ng] = (byNG[ng] || 0) + kl;
   });
 
-  drawChart('chartKLNgay', 'bar', labels, [{ label: 'Khối lượng (tấn)', data: klData, backgroundColor: '#1f6feb' }]);
-  drawChart('chartGTNgay', 'line', labels, [{ label: 'Giá trị (đ)', data: gtData, borderColor: '#1a8a4a', backgroundColor: 'rgba(26,138,74,.15)', fill: true, tension: .25 }]);
-  drawChart('chartDL', 'bar', Object.keys(byDL), [{ label: 'Tấn', data: Object.values(byDL), backgroundColor: '#b8860b' }]);
-  drawChart('chartNG', 'bar', Object.keys(byNG), [{ label: 'Tấn', data: Object.values(byNG), backgroundColor: '#d13438' }]);
+  const theme = readChartTheme();
+  drawChart(theme, 'chartKLNgay', 'bar', labels, [{ label: 'Khối lượng (tấn)', data: klData }]);
+  drawChart(theme, 'chartGTNgay', 'line', labels, [{ label: 'Giá trị (đ)', data: gtData, fill: true, tension: .25 }]);
+  drawChart(theme, 'chartDL', 'bar', Object.keys(byDL), [{ label: 'Tấn', data: Object.values(byDL) }]);
+  drawChart(theme, 'chartNG', 'bar', Object.keys(byNG), [{ label: 'Tấn', data: Object.values(byNG) }]);
 
   // [MỚI 2026-09-22] "Dashboard có theo dõi bao nhiêu nguyên liệu phục vụ tàu nào" — mỗi cột là
   // 1 Tàu (nhãn kèm khách hàng), chiều cao = tổng khối lượng (tấn) đã gán cho tàu đó.
   var tauLabels = r.tautonghop.rows.map(function (x) { return x['Tàu'] + (x['Khách hàng xuất'] ? (' (' + x['Khách hàng xuất'] + ')') : ''); });
   var tauData = r.tautonghop.rows.map(function (x) { return +x['Khối lượng_Tấn'].toFixed(2); });
-  drawChart('chartTau', 'bar', tauLabels, [{ label: 'Tấn', data: tauData, backgroundColor: '#6f42c1' }]);
+  drawChart(theme, 'chartTau', 'bar', tauLabels, [{ label: 'Tấn', data: tauData }]);
 }
 
 /**
@@ -86,12 +87,53 @@ function fitCardValues() {
   fitCardsIn($('#dashCards'));
 }
 
-export function drawChart(canvasId, type, labels, datasets) {
-  if (typeof Chart === 'undefined') return;
-  var el = document.getElementById(canvasId); if (!el) return;
-  if (CHARTS[canvasId]) CHARTS[canvasId].destroy();
-  CHARTS[canvasId] = new Chart(el.getContext('2d'), {
-    type: type, data: { labels: labels, datasets: datasets },
-    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: datasets.length > 1 } }, scales: { y: { beginAtZero: true } } }
+export function initDashboardTheme() {
+  eventBus.on('theme:change', updateChartTheme);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateChartTheme);
+}
+
+function readChartTheme() {
+  const style = getComputedStyle(document.documentElement);
+  const token = (name) => style.getPropertyValue('--' + name).trim();
+  const accent = token('accent');
+  const palette = {
+    chartKLNgay: accent,
+    chartGTNgay: color(token('ok')).mix(color(accent), 0.55).hexString(),
+    chartDL: token('champ'),
+    chartNG: color(token('err')).mix(color(accent), 0.55).hexString(),
+    chartTau: token('accent-2')
+  };
+  return { palette, ink: token('ink'), line: token('line') };
+}
+
+function styleDataset(id, type, dataset, theme) {
+  const shade = theme.palette[id];
+  dataset.borderColor = shade;
+  dataset.backgroundColor = type === 'line' ? color(shade).alpha(0.15).rgbString() : shade;
+}
+
+function updateChartTheme() {
+  const theme = readChartTheme();
+  for (const [id, chart] of Object.entries(CHARTS)) {
+    const { labels, datasets } = chart.data;
+    drawChart(theme, id, chart.config.type, labels, datasets);
+  }
+}
+
+function drawChart(theme, canvasId, type, labels, datasets) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  CHARTS[canvasId]?.destroy();
+  styleDataset(canvasId, type, datasets[0], theme);
+  const axisStyle = { ticks: { color: theme.ink }, grid: { color: theme.line } };
+  CHARTS[canvasId] = new Chart(canvas, {
+    type,
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: datasets.length > 1 } },
+      scales: { x: { ...axisStyle }, y: { ...axisStyle, beginAtZero: true } }
+    }
   });
 }

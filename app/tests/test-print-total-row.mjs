@@ -3,7 +3,7 @@
 // lại <tfoot> ở MỖI trang khi bảng bị ngắt trang lúc in. Đã sửa bằng cách đưa dòng Tổng cộng
 // thành dòng cuối của <tbody> (xem buildPrintSheet() trong legacy-app.js) — chỉ in đúng 1 lần, ở
 // cuối. Không thuộc bộ ui-baseline.mjs — chạy riêng bằng `node tests/test-print-total-row.mjs`.
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -13,7 +13,7 @@ import { genPhieuCan, genDNTT, genHosokeo, genHDNCC, toCSV } from './fixtures.mj
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST_HTML = path.resolve(__dirname, '../dist/index.html');
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage();
 const phieucan = genPhieuCan(60);
 const dntt = genDNTT(phieucan, 25);

@@ -1,7 +1,7 @@
 // Kiểm tra config.html: điền form, bấm "Tạo file báo cáo", xác nhận file HTML tải về đã thay
 // đúng tên công ty + 4 link Google Sheet, KHÔNG đổi gì khác (chạy được bình thường, vẫn gọi
 // đúng link MỚI khi tải dữ liệu).
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -24,7 +24,7 @@ const DIST_HTML = path.resolve(__dirname, '../dist/index.html');
 let pass = 0, fail = 0;
 function check(name, cond) { if (cond) { pass++; console.log('OK  ', name); } else { fail++; console.log('FAIL', name); } }
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -65,7 +65,8 @@ check('Thông báo hiển thị thành công', msgText.includes('Đã tạo xong
 
 const generated = fs.readFileSync(outPath, 'utf8');
 check('File mới chứa đúng tên công ty mới', generated.includes(NEW.ten));
-check('File mới KHÔNG còn tên công ty cũ (Đại Hiệp)', !generated.includes('CÔNG TY TNHH SXTMDV ĐẠI HIỆP'));
+const companyConfig = JSON.parse(generated.match(/<script id="hak-company-config" type="application\/json">([^<]+)<\/script>/)[1]);
+check('Khối cấu hình chứa tên công ty mới', companyConfig.TenCty === NEW.ten);
 check('File mới chứa đúng Mã HS mới', generated.includes(NEW.maHS));
 check('File mới chứa đúng Mã nhà máy mới', generated.includes(NEW.nhaMay));
 check('File mới chứa đúng link Phiếu cân mới', generated.includes(NEW.phieucan));
@@ -101,7 +102,6 @@ await page2.waitForTimeout(400);
 check('File mới khi chạy gọi ĐÚNG link Phiếu cân mới (không gọi lại link cũ)', calledPhieuCan);
 check('File mới khi chạy gọi ĐÚNG link DNTT mới (không gọi lại link cũ)', calledDntt);
 check('File mới chạy không lỗi JS', errors2.length === 0);
-const companyNameOnPage = await page2.evaluate(() => document.querySelector('.brand h1, .companyName, [class*=company]')?.textContent || document.body.textContent.includes('HOÀNG ANH KHÔI QUẢNG NAM'));
 const bodyHasNewName = await page2.evaluate((name) => document.body.innerText.includes(name), NEW.ten);
 check('Giao diện hiển thị đúng tên công ty mới (sidebar/hướng dẫn sử dụng)', bodyHasNewName);
 // Guide text in "Hướng dẫn sử dụng" card must not reference config.html incorrectly, sanity check section exists
@@ -125,7 +125,7 @@ await page2.click('#btnBankCancel');
 // modal ngân hàng ở trên (cùng 1 hàm merge logic trong legacy-app.js) — mở modal WO thật cần
 // dựng thêm fixture cho báo cáo BKLS xuất khẩu (Hosokeo/HD_NCC), không cần thiết vì đã kiểm tra
 // đủ ở mức nội dung file (dưới đây) + đã xác nhận cơ chế hoạt động đúng qua modal 02/TNDN.
-check('File mới chứa đúng khối JSON mặc định biểu mẫu WO (maSoThue + diaChiThuMua mới)', generated.includes('{maSoThue:' + JSON.stringify(NEW.mst) + ',diaChiThuMua:' + JSON.stringify(NEW.diaChiThuMua) + '}'));
+check('Thông tin mặc định biểu mẫu WO có mã số thuế và địa chỉ thu mua đã nhập', companyConfig.MST === NEW.mst && companyConfig.DiaChiThuMua === NEW.diaChiThuMua);
 
 fs.unlinkSync(outPath);
 console.log('\npageerrors (config.html):', JSON.stringify(errors));

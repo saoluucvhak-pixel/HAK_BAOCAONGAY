@@ -7,15 +7,16 @@
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module services/export/excel-export
  */
+import { updateExportProgress, writeWorkbook } from '../export-runner.js';
+import { notify } from '../../utils/event-bus.js';
 import { fmtCell } from '../../utils/cell-format.js';
-import { CONFIG } from '../../config/config.js';
 import { BRAND, OUTER_BORDER_STYLE, THIN_BORDER } from '../../constants/brand.js';
 import { CONGNO_COLS, HOAHONG_COLS, HOTRO_COLS, NHAPKEO_COLS, THANHTOAN_COLS, TONGHOPTRO_COLS, TROGIA_COLS, XECHO_COLS } from '../../constants/columns.js';
 import { libs } from '../export-libs.js';
 import { computeCongNo, computeHoTroOrTroGia, computeHoaHongDL, computeNhapKeo, computeThanhToan, computeTongHopHoTro, computeTongHopNgay, computeXeCho1h, sumCols } from '../report-service.js';
 import { STATE, TABLES } from '../../store/state.js';
 import { dateKeyToday, fmtDate, fmtTime, pad2, toExcelDate, toKeyFromInput } from '../../utils/date-utils.js';
-import { alignOf } from '../../utils/hak-format.js';
+import { alignOf, excelNumberFormat, getPrecisionSettings } from '../../utils/hak-format.js';
 import { $, downloadBlob } from '../../utils/dom-utils.js';
 import { RESULTS } from '../../store/report-runtime.js';
 import { companyNameFor, ddmmyyyy, reportDateLabel, reportTitle, unitNote } from './report-meta.js';
@@ -25,10 +26,11 @@ import { companyNameFor, ddmmyyyy, reportDateLabel, reportTitle, unitNote } from
 /* Bảng màu thương hiệu dùng chung cho Excel + PDF, để hai bản xuất đồng bộ phong cách */
 /* Độ rộng cột: ưu tiên độ dài tiêu đề + dữ liệu thực tế (trong giới hạn min/max theo kiểu dữ liệu),
    thay vì gán cố định theo kiểu — để cột không bị cắt chữ hoặc thừa khoảng trắng. */
-function psColWidth(type, headerText, rows, key){
+function psColWidth(type, headerText, rows, key, preferences){
   var minW, maxW;
   switch(type){
     case 'int': minW=8; maxW=11; break;
+    case 'kg': minW=8; maxW=preferences.kgDigits ? 15 : 11; break;
     case 'money': minW=13; maxW=18; break;
     case 'kl': minW=11; maxW=15; break;
     case 'date': minW=11; maxW=13; break;
@@ -39,15 +41,28 @@ function psColWidth(type, headerText, rows, key){
   var longest = (headerText||'').length;
   (rows||[]).forEach(function(r){
     var v = r[key];
-    var s = (v==null) ? '' : (type==='money'||type==='kl') ? fmtCell(v,type) : (type==='date') ? fmtDate(v) : (type==='time') ? fmtTime(v) : (type==='datekey') ? fmtCell(v,'datekey') : String(v);
+    var s = (v==null) ? '' : (type==='money'||type==='kl'||(type==='kg'&&preferences.kgDigits)) ? fmtCell(v,type) : (type==='date') ? fmtDate(v) : (type==='time') ? fmtTime(v) : (type==='datekey') ? fmtCell(v,'datekey') : String(v);
     if (s.length > longest) longest = s.length;
   });
   return Math.max(minW, Math.min(maxW, longest + 2));
 }
-function buildWorksheet(workbook, key, sheetName){
-  var st = TABLES[key];
-  if (!st) return;
-  buildWorksheetCore(workbook, st.cols, st.view || st.rows || [], st.totals, sheetName||key, companyNameFor(key), reportTitle(key), reportDateLabel());
+async function buildWorksheets(workbook, sheets) {
+  const dateLabel = reportDateLabel();
+  const prepared = sheets.flatMap(([key, name]) => {
+    const table = TABLES[key];
+    return table ? [[key, name, table.cols, table.view || table.rows || [], table.totals, dateLabel]] : [];
+  });
+  await buildPreparedSheets(workbook, prepared);
+}
+
+async function buildPreparedSheets(workbook, sheets) {
+  const preferences = getPrecisionSettings();
+  for (const [index, [key, name, cols, rows, totals, dateLabel]] of sheets.entries()) {
+    const description = 'Tạo trang Excel ' + (index + 1) + '/' + sheets.length + ' (' + name + ')';
+    const progress = (fraction) => updateExportProgress(20 + Math.floor(60 * (index + fraction) / sheets.length), description);
+    await progress(0);
+    await buildWorksheetCore(workbook, cols, rows, totals, name, companyNameFor(), reportTitle(key), dateLabel, preferences, progress);
+  }
 }
 /**
  * [2026-09-22] Tách phần thân của buildWorksheet() cũ ra hàm riêng, nhận cols/rows/totals/
@@ -56,7 +71,7 @@ function buildWorksheet(workbook, key, sheetName){
  * TABLES/RESULTS đang hiển thị trên màn hình "Báo cáo tháng"). Logic vẽ sheet GIỮ NGUYÊN 100%
  * so với bản gốc — chỉ đổi cách lấy input (tham số thay vì TABLES[key]/document.querySelector).
  */
-function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName, title, dateLabel){
+async function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName, title, dateLabel, preferences, progress){
   var ncols = cols.length;
   var ws = workbook.addWorksheet((sheetName).slice(0,31), {
     views: [{ state:'frozen', ySplit:5, showGridLines:false }],
@@ -73,7 +88,7 @@ function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName
   var c3 = ws.getCell(3,1); c3.value = dateLabel + unitNote(cols, dateLabel); c3.font = { size:10, italic:true, color:{argb:'FF555555'} }; c3.alignment = { horizontal:'center' };
   ws.getRow(1).height = 20; ws.getRow(2).height = 18;
   // đường kẻ mảnh dưới khối tiêu đề để tách biệt với bảng dữ liệu
-  for (var ci=1; ci<=ncols; ci++){ ws.getCell(4,ci).border = { bottom:{style:'thin', color:{argb:BRAND.lineARGB}} }; }
+  for (let ci=1; ci<=ncols; ci++){ ws.getCell(4,ci).border = { bottom:{style:'thin', color:{argb:BRAND.lineARGB}} }; }
 
   var headerRowIdx = 5;
   var headerRow = ws.getRow(headerRowIdx);
@@ -88,18 +103,20 @@ function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName
   headerRow.height = 30;
   headerRow.commit();
 
-  rows.forEach(function(r, ridx){
+  const numberFormats = cols.map(([, , type]) => alignOf(type) === 'right' ? excelNumberFormat(type, preferences) : null);
+  for (const [ridx, r] of rows.entries()) {
+    if (rows.length >= 2000 && ridx && ridx % 500 === 0) await progress(ridx / rows.length);
     var row = ws.getRow(headerRowIdx+1+ridx);
     var isZebra = (ridx % 2 === 1);
     cols.forEach(function(c,i){
-      var isNum = (c[2]==='money'||c[2]==='kl'||c[2]==='int');
+      var numFmt = numberFormats[i];
       var cell = row.getCell(i+1);
       var v = r[c[0]];
       if (i === 0 && r._label){
         cell.value = r._label; cell.font = { italic:true }; // dòng "Số dư đầu kỳ"
-      } else if (isNum){
+      } else if (numFmt){
         cell.value = (v==null||isNaN(v)) ? null : v;
-        cell.numFmt = c[2]==='kl' ? '#,##0.00' : '#,##0';
+        cell.numFmt = numberFormats[i];
         cell.alignment = { horizontal:'right' };
       } else if (c[2]==='date'){
         // [CHUẨN HAK] Ô ngày là NGÀY THẬT của Excel (lọc/sắp xếp/tính được), hiển thị dd/mm/yyyy.
@@ -121,16 +138,16 @@ function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName
       if (isZebra) cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:BRAND.zebraFillARGB }, bgColor:{ argb:BRAND.zebraFillARGB } };
     });
     row.commit();
-  });
+  }
 
   if (totals){
     var totalRow = ws.getRow(headerRowIdx+1+rows.length);
     cols.forEach(function(c,i){
       var cell = totalRow.getCell(i+1);
       if (i===0){ cell.value = 'Tổng cộng'; }
-      else if (totals.hasOwnProperty(c[0])){
+      else if (Object.hasOwn(totals, c[0])){
         cell.value = totals[c[0]];
-        cell.numFmt = c[2]==='kl' ? '#,##0.00' : '#,##0';
+        cell.numFmt = numberFormats[i];
         cell.alignment = { horizontal:'right' };
       }
       cell.font = { bold:true };
@@ -142,7 +159,7 @@ function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName
 
   // viền ngoài đậm quanh toàn bộ bảng (từ dòng tiêu đề cột đến dòng cuối) cho cảm giác 1 khối bảng rõ ràng
   var lastRowIdx = headerRowIdx + rows.length + (totals?1:0);
-  for (var ci=1; ci<=ncols; ci++){
+  for (let ci=1; ci<=ncols; ci++){
     var topCell = ws.getCell(headerRowIdx, ci); topCell.border = Object.assign({}, topCell.border, { top:{style:OUTER_BORDER_STYLE, color:{argb:BRAND.headerFillARGB}} });
     var botCell = ws.getCell(lastRowIdx, ci); botCell.border = Object.assign({}, botCell.border, { bottom:{style:OUTER_BORDER_STYLE, color:{argb:BRAND.headerFillARGB}} });
   }
@@ -152,38 +169,33 @@ function buildWorksheetCore(workbook, cols, rows, totals, sheetName, companyName
   }
 
   ws.autoFilter = { from:{row:headerRowIdx, column:1}, to:{row:headerRowIdx, column:ncols} };
-  cols.forEach(function(c,i){ ws.getColumn(i+1).width = psColWidth(c[2], c[1], rows, c[0]); });
+  cols.forEach(function(c,i){ ws.getColumn(i+1).width = psColWidth(c[2], c[1], rows, c[0], preferences); });
 }
 export async function exportExcel(key){
   var st = TABLES[key];
   if (!st){ return; }
   var workbook = new libs.ExcelJS.Workbook();
-  buildWorksheet(workbook, key, key);
-  var buf = await workbook.xlsx.writeBuffer();
+  await buildWorksheets(workbook, [[key, key]]);
+  var buf = await writeWorkbook(workbook);
   var blob = new Blob([buf], { type:'application/octet-stream' });
   var d = new Date();
-  downloadBlob(blob, 'BaoCaoNgay_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '_' + key + '.xlsx');
+  return downloadBlob(blob, 'BaoCaoNgay_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '_' + key + '.xlsx');
 }
 /* "Xuất tất cả" của mục Báo cáo tổng hợp — chỉ gồm 9 báo cáo gỗ keo (không gồm BKLS lâm sản,
    vì BKLS có nút "Xuất tất cả" riêng ngay trong mục Tổng hợp lâm sản — xem exportLamSanExcel()). */
 export async function exportAllExcel(){
-  if (!RESULTS){ alert('Chưa có dữ liệu báo cáo. Hãy bấm LẬP BÁO CÁO trước.'); return; }
+  if (!RESULTS){ notify('warning', 'Chưa có dữ liệu báo cáo. Hãy bấm LẬP BÁO CÁO trước.'); return; }
   var workbook = new libs.ExcelJS.Workbook();
   var sheets = [
     ['nhapkeo', 'BK_NHAPKEO'], ['thanhtoan', 'BK_TTTKEO'], ['congno', 'BC_CONGNO'],
     ['xecho', 'BK_NHAPKEO_1H'], ['tonghop', 'TH_NXT'], ['hotro', 'BK_TIENHT'],
     ['trogia', 'BK_TROGIA'], ['tonghoptro', 'TH_TIENHOTRO'], ['hoahong', 'TH_HHDL']
   ];
-  sheets.forEach(function(s){
-    var key = s[0], sheetName = s[1];
-    var st = TABLES[key];
-    if (!st || !st.view) return;
-    buildWorksheet(workbook, key, sheetName);
-  });
-  var buf = await workbook.xlsx.writeBuffer();
+  await buildWorksheets(workbook, sheets);
+  var buf = await writeWorkbook(workbook);
   var blob = new Blob([buf], { type:'application/octet-stream' });
   var d = new Date();
-  downloadBlob(blob, 'BaoCaoNgay_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '_TatCa.xlsx');
+  return downloadBlob(blob, 'BaoCaoNgay_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '_TatCa.xlsx');
 }
 /**
  * [2026-09-22] "Báo cáo ngày" — file Excel THỨ 2 xuất kèm khi bấm "Xuất tất cả Excel" (theo yêu
@@ -219,7 +231,6 @@ export async function exportNgayExcel(){
   var tonghop = computeTongHopNgay(ctx.phieucan, ctx.dntt, ctx.phieucanBySoCT, fromKey, toKey);
 
   var workbook = new libs.ExcelJS.Workbook();
-  var company = CONFIG.TEN_CONG_TY;
   var sheets = [
     ['nhapkeo', 'BK_NHAPKEO', NHAPKEO_COLS, nhap.rows, { 'KL hàng (KG)': nhap.totalKL, 'Thành tiền': nhap.totalTien }, ngayLabel],
     ['thanhtoan', 'BK_TTTKEO', THANHTOAN_COLS, tt.rows, { 'Khối lượng': tt.totalKL, 'Thành tiền': tt.totalTien }, ngayLabel],
@@ -231,46 +242,34 @@ export async function exportNgayExcel(){
     ['tonghoptro', 'TH_TIENHOTRO', TONGHOPTRO_COLS, tonghoptro, sumCols(tonghoptro, ['Khối lượng_Tấn','Tiền hỗ trợ','Khấu trừ thuế TNCN','Còn thanh toán']), ngayLabel],
     ['hoahong', 'TH_HHDL', HOAHONG_COLS, hoahong, sumCols(hoahong, ['Khối lượng thanh toán','Tiền hoa hồng']), ngayLabel]
   ];
-  sheets.forEach(function(s){
-    buildWorksheetCore(workbook, s[2], s[3], s[4], s[1], company, reportTitle(s[0]), s[5]);
-  });
-  var buf = await workbook.xlsx.writeBuffer();
+  await buildPreparedSheets(workbook, sheets);
+  var buf = await writeWorkbook(workbook);
   var blob = new Blob([buf], { type:'application/octet-stream' });
   var d = new Date();
-  downloadBlob(blob, 'BaoCaoNgay_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '_BaoCaoNgay.xlsx');
+  return downloadBlob(blob, 'BaoCaoNgay_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '_BaoCaoNgay.xlsx');
 }
 /* "Xuất tất cả" riêng của mục Tổng hợp lâm sản — 3 sheet BKLS Chi tiết + Tổng hợp + Tổng hợp
    theo Tàu (mẫu WO chính thức xuất riêng qua nút "Xuất mẫu WO", không gộp vào đây). */
 export async function exportLamSanExcel(){
-  if (!RESULTS){ alert('Chưa có dữ liệu báo cáo. Hãy bấm LẬP BÁO CÁO trước.'); return; }
+  if (!RESULTS){ notify('warning', 'Chưa có dữ liệu báo cáo. Hãy bấm LẬP BÁO CÁO trước.'); return; }
   var workbook = new libs.ExcelJS.Workbook();
   var sheets = [ ['bklsct', 'TH_XUATHANG_01'], ['bklsth', 'TH_XUATHANG_02'], ['tautonghop', 'TONGHOP_THEO_TAU'] ];
-  sheets.forEach(function(s){
-    var key = s[0], sheetName = s[1];
-    var st = TABLES[key];
-    if (!st || !st.view) return;
-    buildWorksheet(workbook, key, sheetName);
-  });
-  var buf = await workbook.xlsx.writeBuffer();
+  await buildWorksheets(workbook, sheets);
+  var buf = await writeWorkbook(workbook);
   var blob = new Blob([buf], { type:'application/octet-stream' });
   var d = new Date();
-  downloadBlob(blob, 'BangKeLamSan_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.xlsx');
+  return downloadBlob(blob, 'BangKeLamSan_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.xlsx');
 }
 /* "Xuất tất cả" riêng của mục Báo cáo ngân hàng — 3 sheet dạng bảng (mẫu 02/TNDN
    chính thức có nút xuất riêng "Xuất mẫu 02/TNDN", phiếu nhập kho hàng loạt có nút
    xuất riêng "Xuất phiếu nhập kho", không gộp vào đây). */
 export async function exportBankExcel(){
-  if (!RESULTS){ alert('Chưa có dữ liệu báo cáo. Hãy bấm LẬP BÁO CÁO trước.'); return; }
+  if (!RESULTS){ notify('warning', 'Chưa có dữ liệu báo cáo. Hãy bấm LẬP BÁO CÁO trước.'); return; }
   var workbook = new libs.ExcelJS.Workbook();
   var sheets = [ ['tienvay', 'BKCT_TIENVAY'], ['thtt', 'THTT_NH'], ['tndn', 'BK02_TNDN'], ['pnk', 'PHIEU_NHAPKHO'] ];
-  sheets.forEach(function(s){
-    var key = s[0], sheetName = s[1];
-    var st = TABLES[key];
-    if (!st || !st.view) return;
-    buildWorksheet(workbook, key, sheetName);
-  });
-  var buf = await workbook.xlsx.writeBuffer();
+  await buildWorksheets(workbook, sheets);
+  var buf = await writeWorkbook(workbook);
   var blob = new Blob([buf], { type:'application/octet-stream' });
   var d = new Date();
-  downloadBlob(blob, 'BaoCaoNganHang_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.xlsx');
+  return downloadBlob(blob, 'BaoCaoNganHang_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.xlsx');
 }

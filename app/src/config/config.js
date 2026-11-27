@@ -7,14 +7,25 @@
  * (không có công ty nào khác liên quan, kể cả 3 báo cáo ngân hàng — xem services/report-service.js).
  * @module config
  */
+function readCompanyConfig() {
+  if (typeof document === 'undefined') return {};
+  try {
+    return JSON.parse(document.getElementById('hak-company-config')?.textContent || '{}') ?? {};
+  } catch {
+    return {};
+  }
+}
+
+const company = readCompanyConfig();
+
 export const CONFIG = Object.freeze({
-  PHIEUCAN: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTj7PHtJtv1iBaF9tCKJ9zgnTyc4j6Hbt9CEYX36sVIDXwJDQUvMGd-O_bc8E-N6iEh5JqH9tytjQLj/pub?output=csv',
-  DNTT_CT: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqRW3Yk2MBgXp1qi29tQZQyn1R-opTUjE5PqBFIH7knAOcr1YvthP_AuXa_10knbaprgtM4i_zPk2i/pub?gid=1612289204&single=true&output=csv',
-  HD_NCC: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRmYRMAG3XDhHz74P7L1-NrKyPD8Zozp5lPU9rR-_dirOq5UHfSMNdZ4pq4PF5DpI6nosDBlAwW_a10/pub?gid=1578334272&single=true&output=csv',
-  HOSOKEO: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0mcMT2TsD7lOLSNrTqZPVjJJ395kI54SxSri5-n_VxrfAcC74IKkgCnesT30d1bhx59gJC4esmF7s/pub?gid=0&single=true&output=csv',
-  MA_HS: '4401220090',
-  NHA_MAY: 'CNHAK',
-  TEN_CONG_TY: 'CÔNG TY TNHH SXTMDV ĐẠI HIỆP',
+  PHIEUCAN: company.PhieuCan || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTj7PHtJtv1iBaF9tCKJ9zgnTyc4j6Hbt9CEYX36sVIDXwJDQUvMGd-O_bc8E-N6iEh5JqH9tytjQLj/pub?output=csv',
+  DNTT_CT: company.DNTT || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqRW3Yk2MBgXp1qi29tQZQyn1R-opTUjE5PqBFIH7knAOcr1YvthP_AuXa_10knbaprgtM4i_zPk2i/pub?gid=1612289204&single=true&output=csv',
+  HD_NCC: company.HDNCC || (company._hakCompanyProfile ? '' : 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRmYRMAG3XDhHz74P7L1-NrKyPD8Zozp5lPU9rR-_dirOq5UHfSMNdZ4pq4PF5DpI6nosDBlAwW_a10/pub?gid=1578334272&single=true&output=csv'),
+  HOSOKEO: company.Hosokeo || (company._hakCompanyProfile ? '' : 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0mcMT2TsD7lOLSNrTqZPVjJJ395kI54SxSri5-n_VxrfAcC74IKkgCnesT30d1bhx59gJC4esmF7s/pub?gid=0&single=true&output=csv'),
+  MA_HS: company.MaHS || (company._hakCompanyProfile ? '' : '4401220090'),
+  NHA_MAY: company.NhaMay || (company._hakCompanyProfile ? '' : 'CNHAK'),
+  TEN_CONG_TY: company.TenCty || 'CÔNG TY TNHH SXTMDV ĐẠI HIỆP',
 
   // Thông tin công ty dùng làm GIÁ TRỊ MẶC ĐỊNH ban đầu cho modal "Thông tin xuất báo cáo ngân
   // hàng" (Mẫu 02/TNDN, Phiếu nhập kho) và modal "Khai báo mẫu WO" — 2 nơi này VẪN cho sửa/lưu
@@ -22,8 +33,8 @@ export const CONFIG = Object.freeze({
   // để điền sẵn lần mở modal ĐẦU TIÊN (chưa từng lưu gì) — xem loadBankInfo()/loadWOInfo() trong
   // legacy-app.js. Để trống ('') nghĩa là vẫn yêu cầu nhập tay như hành vi gốc (không đổi gì so
   // với trước khi có tính năng này). Công cụ `config.html` điền các giá trị này.
-  DEFAULT_BANK_INFO: Object.freeze({ maSoThue: '', diaChi: '', soDienThoai: '', diaChiThuMua: '' }),
-  DEFAULT_WO_INFO: Object.freeze({ maSoThue: '', diaChiThuMua: '' }),
+  DEFAULT_BANK_INFO: Object.freeze({ maSoThue: company.MST || '', diaChi: company.DiaChi || '', soDienThoai: company.SDT || '', diaChiThuMua: company.DiaChiThuMua || '' }),
+  DEFAULT_WO_INFO: Object.freeze({ maSoThue: company.MST || '', diaChiThuMua: company.DiaChiThuMua || '' }),
 
   // [2026-10-29] Sổ chi tiết tiền vay — dòng sổ phụ ngân hàng (tab "Cập nhật khoản vay") được tính là
   // TIỀN VAY GIẢI NGÂN khi cột "Diễn giải" đúng 1 trong các câu dưới. Lấy NGUYÊN VĂN từ bước
@@ -42,7 +53,8 @@ export const CONFIG = Object.freeze({
     BANK_INFO: 'baocaongay_bank_info',
     WO_INFO: 'baocaongay_wo_info',
     TAU_ASSIGN: 'baocaongay_tau_assign',
+    PRECISION_SETTINGS: 'baocaongay_precision_settings',
     APP_STATE_BACKUP: 'baocaongay_app_state_backup'
   },
-  APP_VERSION: '2.0.0'
+  APP_VERSION: '2.1.0'
 });

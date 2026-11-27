@@ -11,7 +11,7 @@
 // ensurePdfFont()) — áp dụng cho cả 3 hàm buildWOPdf()/buildTNDNPdf()/buildPNKPdf() giống hệt
 // cách đã sửa exportPDF() ở Phase 3.8.
 // Không thuộc bộ ui-baseline.mjs — chạy riêng bằng `node tests/test-pdf-custom-money-wrap.mjs`.
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -60,7 +60,7 @@ const CSV_BY_URL_SUBSTR = [
   ['2PACX-1vT0mcMT2TsD7lOLSNrTqZPVjJJ395kI54SxSri5-n_VxrfAcC74IKkgCnesT30d1bhx59gJC4esmF7s', toCSV(hosokeo)],
 ];
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage({ acceptDownloads: true });
 const errors = []; page.on('pageerror', (e) => errors.push(e.message));
 
@@ -113,7 +113,7 @@ await page.waitForTimeout(100);
   await download.saveAs(p);
   results.wo = countOrphanD(p);
 }
-await page.click('#btnWOCancel').catch(() => {});
+await page.locator('#woModalOverlay').waitFor({ state: 'hidden' });
 
 // 2) Mẫu 02/TNDN
 await page.click('[data-target="nganhang"]');
@@ -130,7 +130,7 @@ await page.waitForTimeout(100);
   await download.saveAs(p);
   results.tndn = countOrphanD(p);
 }
-await page.click('#btnBankCancel').catch(() => {});
+await page.locator('#bankModalOverlay').waitFor({ state: 'hidden' });
 
 // 3) Phiếu nhập kho
 await page.click('[data-rtab="pnk"]');
@@ -146,7 +146,7 @@ await page.waitForTimeout(100);
   await download.saveAs(p);
   results.pnk = countOrphanD(p);
 }
-await page.click('#btnBankCancel').catch(() => {});
+await page.locator('#bankModalOverlay').waitFor({ state: 'hidden' });
 
 console.log('Số chỗ "đ" bị ngắt dòng riêng: WO=' + results.wo + ' TNDN=' + results.tndn + ' PNK=' + results.pnk);
 console.log('pageerrors:', errors);

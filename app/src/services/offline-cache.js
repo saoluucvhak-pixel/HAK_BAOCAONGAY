@@ -40,7 +40,7 @@ const MIGRATIONS = {
 let dbPromise = null;
 
 function idbAvailable() {
-  try { return typeof indexedDB !== 'undefined' && indexedDB !== null; } catch (e) { return false; }
+  try { return typeof indexedDB !== 'undefined' && indexedDB !== null; } catch { return false; }
 }
 
 function openDb() {
@@ -68,11 +68,11 @@ function openDb() {
       const db = req.result;
       // Kết nối đến sau timeout phải đóng lại: tránh rò rỉ kết nối / chặn nâng cấp schema.
       if (settled) {
-        try { db.close(); } catch (e) { /* bỏ qua */ }
+        try { db.close(); } catch { /* bỏ qua */ }
         return;
       }
       // Tab khác mở bản app mới hơn (nâng phiên bản kho) → đóng kết nối cũ để không chặn nâng cấp.
-      db.onversionchange = () => { try { db.close(); } catch (e) { /* bỏ qua */ } dbPromise = null; };
+      db.onversionchange = () => { try { db.close(); } catch { /* bỏ qua */ } dbPromise = null; };
       finish(db);
     };
     req.onerror = () => { clearTimeout(timer); logger.warn('[Offline] Lỗi mở IndexedDB:', req.error && req.error.message); if (!settled) dbPromise = null; finish(null); };

@@ -6,7 +6,7 @@
 import { esc } from './dom-utils.js';
 import { fmtDate, fmtTime } from './date-utils.js';
 import { fmtMoney, fmtKL } from './number-utils.js';
-import { alignOf } from './hak-format.js';
+import { alignOf, formatInteger, formatWeightKg } from './hak-format.js';
 
 /**
  * [CHUẨN HAK] Lớp CSS căn lề theo kiểu cột: số → phải (' num'), ngày/giờ → giữa (' ctr'), chữ → trái.
@@ -23,7 +23,8 @@ export function fmtCell(val, type) {
   switch (type) {
     case 'money': return fmtMoney(val);
     case 'kl': return fmtKL(val);
-    case 'int': return Math.round(val).toLocaleString('vi-VN');
+    case 'kg': return formatWeightKg(val);
+    case 'int': return formatInteger(val);
     case 'date': return fmtDate(val);
     case 'time': return fmtTime(val);
     case 'datekey': { var s = String(val); if (s.length !== 8) return ''; return s.slice(6, 8) + '/' + s.slice(4, 6) + '/' + s.slice(0, 4); }

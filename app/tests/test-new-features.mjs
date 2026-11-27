@@ -2,10 +2,10 @@
 // pass, kept here), fuzzy (accent-insensitive) search, virtual scroll (>300 rows), and that
 // handleTienVayFile no longer throws ReferenceError. Manual verification, not part of the
 // CI-style ui-baseline.mjs regression suite.
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { genPhieuCan, genDNTT, genHDNCC, genHosokeo, toCSV } from './fixtures.mjs';
+import { genPhieuCan, genDNTT, toCSV } from './fixtures.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST_HTML = path.resolve(__dirname, '../dist/index.html');
@@ -23,7 +23,7 @@ Math.random = mulberry32(7);
 let pass = 0, fail = 0;
 function check(name, cond) { if (cond) { pass++; console.log('OK  ', name); } else { fail++; console.log('FAIL', name); } }
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));

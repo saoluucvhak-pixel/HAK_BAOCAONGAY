@@ -2,7 +2,7 @@
 // trước khi có khoản vay, nút "Sao lưu" luôn tải được file (Danh mục, Cấu hình…). Thêm khoản vay vào sao
 // lưu KHÔNG được làm mất khả năng đó: vẫn tải file (không có trường khoanVay) và báo rõ cho người dùng.
 // Chạy: npm run test:backup-noidb   (tuỳ chọn: node tests/test-backup-noidb.mjs <đường dẫn index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -17,7 +17,7 @@ const CSV = { PC: toCSV(pc), DN: toCSV(dn), HD: toCSV(genHDNCC(dn)), HK: toCSV(g
 let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x !== undefined ? '  [' + String(x).slice(0, 220) + ']' : '')); };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const ctx = await browser.newContext({ timezoneId: 'Asia/Ho_Chi_Minh', locale: 'vi-VN', acceptDownloads: true });
 const page = await ctx.newPage();
 // Máy chặn IndexedDB (vd chính sách bảo mật / chế độ riêng tư): indexedDB không dùng được.
@@ -27,7 +27,7 @@ await page.goto('file://' + DIST, { waitUntil: 'load' });
 await page.waitForTimeout(2500);
 await page.click('.item[data-target="cauhinh"]');
 let dl = null;
-try { [dl] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }), page.click('#btnBackupData')]); } catch (e) { dl = null; }
+try { [dl] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }), page.click('#btnBackupData')]); } catch { dl = null; }
 const st = await page.textContent('#backupRestoreStatus');
 check('Kho khoản vay không đọc được: VẪN tải được file sao lưu', !!dl, st);
 if (dl) {

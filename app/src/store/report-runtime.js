@@ -17,3 +17,14 @@ export function registerRunReport(fn) { _runReport = fn; }
 
 /** Lập lại báo cáo theo bộ lọc hiện tại. */
 export function runReport() { return _runReport ? _runReport.apply(null, arguments) : undefined; }
+
+let pendingReport = null;
+
+export function getPendingReport() { return pendingReport; }
+
+export function setPendingReport(task) { pendingReport = task; }
+
+/** Cập nhật sau khi chỉnh dữ liệu nếu đã lập hoặc đang lập báo cáo. */
+export function refreshReport() {
+  if (RESULTS || pendingReport) return runReport();
+}

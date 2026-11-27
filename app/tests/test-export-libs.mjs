@@ -3,7 +3,7 @@
 // dùng kg được"), các nút xuất phải hoạt động THẬT (tải file thật, không chỉ không throw lỗi) —
 // mô phỏng đúng tình huống mạng chặn CDN bằng cách CHẶN HẲN mọi domain CDN trong lúc test, để
 // chứng minh export không còn phụ thuộc mạng nữa.
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import ExcelJS from 'exceljs';
@@ -25,7 +25,7 @@ Math.random = mulberry32(7);
 let pass = 0, fail = 0;
 function check(name, cond) { if (cond) { pass++; console.log('OK  ', name); } else { fail++; console.log('FAIL', name); } }
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
