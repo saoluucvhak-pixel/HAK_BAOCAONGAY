@@ -45,7 +45,7 @@ const registration = path.join(REL, 'registration');
 fs.mkdirSync(registration, { recursive: true });
 fs.copyFileSync(path.join(REL, 'win-unpacked', 'HAK-License.exe'), path.join(registration, 'HAK-License.exe'));
 fs.copyFileSync(path.join(ROOT, 'licensing', 'Register-HAK.cmd'), path.join(registration, 'Register-HAK.cmd'));
-fs.copyFileSync(path.join(ROOT, 'licensing', 'HAK-CapPhep.html'), path.join(REL, 'HAK-CapPhep.html'));
+fs.copyFileSync(path.join(ROOT, 'build', 'HAK-CapPhep.html'), path.join(REL, 'HAK-CapPhep.html'));
 const exe = fs.readFileSync(path.join(REL, exeName));
 const hash = sha256(exe);
 const parts = [];

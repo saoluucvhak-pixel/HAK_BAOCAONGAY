@@ -9,6 +9,7 @@ import { _electron } from 'playwright';
 import { genDNTT, genHDNCC, genHosokeo, genPhieuCan, toCSV } from './fixtures.mjs';
 
 const [legacy, candidate] = process.argv.slice(2);
+const { version: expectedVersion } = JSON.parse(await readFile(new URL('../../desktop-app/package.json', import.meta.url), 'utf8'));
 assert(process.env.GITHUB_ACTIONS === 'true' && process.platform === 'win32' && legacy && candidate,
   'Chạy trên runner Windows tạm thời với hai đường dẫn bộ cài.');
 const legacyHash = '0a01f0fac4613f9522fc221da255b2b989be29ba8375c4bc359ef7c53d508d05';
@@ -193,7 +194,7 @@ for (const kind of ['wrong-device', 'tampered', 'expired']) {
   install(candidate, 31);
 }
 
-console.log('Cài đè cùng thư mục và mở 2.2.0 ở chế độ offline.');
+console.log('Cài đè cùng thư mục và mở báo cáo ở chế độ offline.');
 stageApproval();
 const previousRequest = JSON.parse(await readFile(requestFile, 'utf8')).device;
 await copyFile(path.join(licenses, 'approved.haklic'), besideKit);
@@ -206,7 +207,7 @@ const registeredExe = await installedExecutable();
 verifyRun(registeredExe, 0);
 const upgraded = await openInstalled(true);
 try {
-  assert.equal(upgraded.appInfo.version, '2.2.0');
+  assert.equal(upgraded.appInfo.version, expectedVersion);
   assert.equal(upgraded.appInfo.userData, old.appInfo.userData);
   await upgraded.page.reload();
   await waitForReport(upgraded.page, true);
