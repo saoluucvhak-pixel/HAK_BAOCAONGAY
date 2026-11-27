@@ -79,6 +79,15 @@ try {
   await page.locator('#integrationGuide > summary').click();
   assert((await page.getByRole('link', { name: 'Tải HAK-PublicKey.jwk chính thức' }).getAttribute('href')).includes('installer-v2.6.0-16.1'));
   assert(await page.getByRole('link', { name: 'Xem mã giao thức v4' }).isVisible());
+  await page.getByText('Prompt cho agent tích hợp app mới', { exact: true }).click();
+  const agentPrompt = await page.getByLabel('Prompt tích hợp cấp phép HAK v4').inputValue();
+  assert(agentPrompt.includes('[URL_GITHUB_APP_MUC_TIEU]'));
+  assert(agentPrompt.includes('/installer-v2.6.0-16.1/desktop-app/licensing/HAK-PublicKey.jwk'));
+  assert(agentPrompt.includes('tự viết bộ tạo yêu cầu'));
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.getByRole('button', { name: 'Sao chép prompt', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#agentPromptStatus').textContent === 'Đã sao chép prompt.');
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), agentPrompt);
   await page.locator('#issuerDetails > summary').click();
   await selectBackup(page, password);
   await page.waitForFunction(() => document.querySelector('#issuerStatus').textContent.includes('đã mở'));

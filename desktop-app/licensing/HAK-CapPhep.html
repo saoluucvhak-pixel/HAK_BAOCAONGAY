@@ -25,6 +25,7 @@
   button:disabled { opacity: .55; cursor: wait; }
   button.secondary { background: #e5f0f2; color: #17424a; margin: .8rem .4rem 0 0; }
   .company-json { overflow: auto; padding: .85rem; background: #f3f6f7; border-radius: 5px; }
+  #agentPrompt { box-sizing: border-box; width: 100%; min-height: 16rem; resize: vertical; padding: .75rem; font: .9rem/1.5 monospace; }
   .file-help { margin: .35rem 0 .85rem; }
   .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .85rem; }
   .actions button.secondary { margin: 0; }
@@ -147,6 +148,33 @@
       <li><strong>Hiện đúng tên trong HTML và xác định dữ liệu riêng.</strong> Người tích hợp thêm cặp mã ứng dụng và tên lấy từ repo vào mục <code>productNames</code> trong mã nguồn HTML quản trị. HTML vẫn đọc được yêu cầu hợp lệ trước khi thêm tên và sẽ hiện mã app để đối chiếu. App chỉ cần kích hoạt thì đọc dữ liệu cấu hình rỗng <code>{}</code>. Nếu app cần nhận cấu hình riêng, bổ sung đúng trường nhập trong HTML và phần đọc, kiểm tra các trường đó ở app. Hai nguồn CSV của Báo cáo ngày chỉ áp dụng cho Báo cáo ngày. Cập nhật bản HTML quản trị đang dùng khi thêm tên hoặc trường cấu hình. Nếu trình duyệt chưa có khóa HAK, nạp file phục hồi cấp phép đã lưu. <a href="https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/tree/main/desktop-app/licensing">Mở thư mục cấp phép trên GitHub</a>.</li>
       <li><strong>Nghiệm thu trước khi phát hành.</strong> Dùng cùng một HTML để cấp cho Báo cáo ngày và app mới. Xác nhận HTML hiện đúng tên từ repo, mỗi bộ cài nhận phản hồi của mình, app mở lại được sau kích hoạt và phản hồi bị từ chối khi dùng chéo app, chéo máy, sau khi tạo mã yêu cầu mới, khi hết hạn hoặc khi file bị sửa. Thử chạy app chính trên máy chưa được cấp phép và xác nhận màn hình làm việc vẫn bị khóa. Ghi lại URL repo, tên hiển thị, mã định danh và commit đã kiểm thử. Phát hành bộ cài tại GitHub Releases của chính app đó.</li>
     </ol>
+    <details id="agentPromptDetails">
+      <summary>Prompt cho agent tích hợp app mới</summary>
+      <p class="file-help">Sao chép toàn bộ prompt, thay <code>[URL_GITHUB_APP_MUC_TIEU]</code> bằng link GitHub của app cần làm, rồi gửi cho agent có quyền sửa repo đó.</p>
+      <label for="agentPrompt">Prompt tích hợp cấp phép HAK v4</label>
+      <textarea id="agentPrompt" readonly spellcheck="false">Hãy triển khai từ đầu chức năng khóa cấp phép offline HAK v4 trong repo GitHub này.
+Repo app cần sửa: [URL_GITHUB_APP_MUC_TIEU]
+
+App mục tiêu có thể chưa có chức năng cấp phép. Hãy đọc mã nguồn, xác định hệ điều hành, ngôn ngữ, màn hình khởi động và cách đóng bộ cài. Với repo chưa có cấp phép, hãy tự viết bộ tạo yêu cầu, màn nhập phản hồi và bộ xác minh, rồi tích hợp chúng vào luồng khởi động thật. Báo cáo ngày là nguồn tham chiếu giao thức. Mọi thay đổi trên repo HTML quản trị dùng chung cần được báo rõ để HAK cập nhật.
+
+Nguồn chính thức của HAK
+- Khóa công khai Ed25519 dùng chung: https://raw.githubusercontent.com/saoluucvhak-pixel/HAK_BAOCAONGAY/installer-v2.6.0-16.1/desktop-app/licensing/HAK-PublicKey.jwk
+- Mã giao thức v4: https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/LicenseProtocol.cs
+- Cách lưu và xác minh khi cài hoặc mở app: https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/Program.cs
+- HTML quản trị tạo mã và file: https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/HAK-CapPhep.html
+
+Các việc phải triển khai
+1. Lấy tên hiển thị từ cấu hình đóng gói repo mục tiêu, ví dụ build.productName của Electron. Chốt và lưu mã app riêng, ổn định theo dạng com.hakgroup.&lt;ma-app&gt;. Dành com.hakgroup.baocaongay cho Báo cáo ngày. Gửi HAK đúng cặp mã app và tên để thêm vào productNames của HTML dùng chung.
+2. Tích hợp màn kích hoạt vào Setup nếu app có bộ cài, và vào app chính trước khi mở chức năng làm việc. Mỗi phiên yêu cầu mới tạo nonce 16 byte bằng bộ sinh số ngẫu nhiên mật mã và cặp X25519 mới. Tính lại mã máy từ định danh ổn định của hệ điều hành và phần cứng, theo cách phù hợp với nền tảng đích. Hiện tên app và nút sao chép mã cho người cài. Giữ mã yêu cầu của phiên và khóa riêng X25519 trên chính máy đó.
+3. Tạo mã HAK4. theo mã tham chiếu: tiền tố HAK4. + Base64URL không đệm của JSON UTF-8 gồm product, machine, nonce và key. Các trường machine và nonce mã hóa 16 byte, key mã hóa 32 byte khóa công khai X25519. Dùng nguyên chuỗi HAK4. đầy đủ làm đầu vào ký và đối chiếu.
+4. Yêu cầu cả mã HAKA4. và file .haksetup hợp lệ trước khi mở khóa. Nhúng đúng khóa công khai Ed25519 HAK vào bộ xác minh của Setup và app chính. Xác minh chữ ký mã phản hồi trên UTF-8 ("hak-unlock-v4\n" + mã HAK4. đầy đủ) và chữ ký file trên UTF-8 ("hak-setup-v4\n" + body Base64URL gốc). Dùng đúng định dạng haksetup-ed25519-v4. Đối chiếu chính xác mã yêu cầu còn chờ, mã app, mã máy và hạn dùng. Giải mã theo mã tham chiếu bằng X25519, HKDF-SHA256 với salt là mã HAK4. đầy đủ và info là hak-company-v4, rồi AES-256-GCM với AAD là mã HAK4. đầy đủ. Dùng thư viện mật mã chuẩn của nền tảng. Giữ file phục hồi .hakkey và mật khẩu trên máy quản trị HAK.
+5. Với app chỉ cần kích hoạt, chấp nhận tải trọng cấu hình {} sau khi xác minh và giải mã. Nếu app có cấu hình riêng, xác định trường theo nhu cầu app và gửi HAK phần cần bổ sung trong HTML dùng chung. Các trường công ty và Google Sheets của Báo cáo ngày dành cho Báo cáo ngày.
+6. Sau khi chấp nhận, lưu bằng vùng lưu trữ được bảo vệ phù hợp với hệ điều hành. Kiểm tra lại chữ ký, mã app, mã máy hiện tại và hạn dùng trước mỗi lần chạy. Các lối mở app trực tiếp vẫn phải đi qua kiểm tra. Cài lại cần phê duyệt phải tạo yêu cầu mới. Giữ nguyên chức năng hiện có của app ngoài bước kiểm tra cấp phép.
+7. Dựng bộ cài trên nền tảng đích. Thử cùng HTML quản trị cấp cho app mục tiêu, kiểm tra mở app sau khi duyệt và mở lại sau khởi động. Kiểm tra từ chối với máy khác, mã app khác, yêu cầu cũ, phản hồi hết hạn, chữ ký hoặc file bị sửa và app chạy trực tiếp khi chưa kích hoạt. Dùng khóa thử cho kiểm thử tự động. Bản phát hành dùng khóa công khai chính thức ở trên. Ghi rõ các bước đã chạy, kết quả và phần còn cần HAK xác nhận trên máy thật.
+8. Bàn giao URL repo, tên hiển thị, mã app, đường dẫn các file sửa, cách chạy kiểm thử, commit hoặc PR và cặp mã app → tên cần thêm vào HTML quản trị.</textarea>
+      <button class="secondary" id="copyAgentPrompt" type="button">Sao chép prompt</button>
+      <p class="status" id="agentPromptStatus" role="status"></p>
+    </details>
   </details>
 </main>
 <script>
@@ -555,6 +583,18 @@ $('copyReply').addEventListener('click', async () => {
     reply.focus();
     reply.select();
     report($('issueStatus'), 'Bấm Ctrl+C để sao chép mã trả lời.');
+  }
+});
+$('copyAgentPrompt').addEventListener('click', async () => {
+  const prompt = $('agentPrompt');
+  const status = $('agentPromptStatus');
+  try {
+    await navigator.clipboard.writeText(prompt.value);
+    report(status, 'Đã sao chép prompt.');
+  } catch {
+    prompt.focus();
+    prompt.select();
+    report(status, 'Bấm Ctrl+C để sao chép prompt đã được chọn.');
   }
 });
 </script>
