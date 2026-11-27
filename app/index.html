@@ -283,6 +283,7 @@ a{color:var(--accent)}
 .pageHead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px}
 .pageHead h1{font-size:1.15rem;margin:0;font-weight:700}
 .pageHead h2{font-size:16px;margin:0;color:var(--ink);font-weight:700}
+.tools[hidden]{display:none}
 .tools{display:flex;gap:8px;flex-wrap:wrap}
 
 /* ---------- Tab con trong "Báo cáo tổng hợp" ---------- */
@@ -435,6 +436,7 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
 #forestryUpdated{font-variant-numeric:tabular-nums}
 #forestryForm fieldset>label{display:inline-block;margin:4px 12px 4px 0}
 #forestryForm .modalGrid label{display:grid;gap:4px;min-width:0}
+#forestryFolderPath{overflow-wrap:anywhere}
 #forestryForm input{min-width:0}
 #forestryForm label[hidden]{display:none}
 #forestryForm .modalGrid select{min-width:0;font:inherit}
@@ -661,6 +663,10 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
             <button class="btn primary" type="submit">Lập báo cáo kiểm lâm</button>
             <button class="btn" type="button" id="forestryExport" disabled>Xuất Excel</button>
             <button class="btn" type="button" id="forestryWord" disabled>Xuất Word</button>
+          </div>
+          <div id="forestryFolderOptions" class="tools" hidden>
+            <button class="btn small" type="button" id="forestryChooseFolder">Chọn thư mục lưu</button>
+            <output id="forestryFolderPath" class="loanSourceNote" aria-live="polite"></output>
           </div>
           <p id="forestryStatus" role="status" aria-live="polite"></p>
         </form>

@@ -95,19 +95,16 @@ function showResults(container, reports) {
   }
 }
 
-async function exportReports(format, pages, filename) {
-  if (format === 'word') {
-    const buffer = await forestryWord(pages);
-    downloadBlob(new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    }), filename + '.docx');
-    return;
-  }
+async function buildExport(format, pages) {
+  if (format === 'word') return {
+    bytes: await forestryWord(pages), extension: 'docx',
+    mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  };
   const { ExcelJS } = await ensureExportLibs();
-  const buffer = await forestryWorkbook(ExcelJS, pages).xlsx.writeBuffer();
-  downloadBlob(new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  }), filename + '.xlsx');
+  return {
+    bytes: await forestryWorkbook(ExcelJS, pages).xlsx.writeBuffer(), extension: 'xlsx',
+    mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  };
 }
 
 const historyKey = CONFIG.STORAGE_KEYS.forestryHistory;
@@ -317,6 +314,39 @@ export function initForestryReports() {
       submitButton.disabled = false;
     }
   });
+  const desktop = window.api;
+  const folderButton = document.getElementById('forestryChooseFolder');
+  const folderPath = document.getElementById('forestryFolderPath');
+  const canSaveToFolder = typeof desktop?.saveForestryExport === 'function';
+  let exportFolder = '';
+  function showExportFolder(folder) {
+    exportFolder = folder;
+    folderPath.textContent = folder || 'Chọn thư mục để lưu Word và Excel theo từng khoảng ngày.';
+  }
+  async function chooseExportFolder() {
+    folderButton.disabled = true;
+    try {
+      const selection = await desktop.chooseForestryExportFolder();
+      if (selection.canceled) return false;
+      if (!selection.ok) throw new Error(selection.error);
+      showExportFolder(selection.folder);
+      return true;
+    } finally {
+      folderButton.disabled = false;
+    }
+  }
+
+  if (canSaveToFolder) {
+    document.getElementById('forestryFolderOptions').hidden = false;
+    showExportFolder('');
+    desktop.forestryExportFolder().then(folder => {
+      if (!exportFolder) showExportFolder(folder);
+    }).catch(() => {});
+    folderButton.addEventListener('click', () => {
+      chooseExportFolder().catch(error => { status.textContent = error.message; });
+    });
+  }
+
   function handleExport(format) {
     return async () => {
       if (!result || exporting) return;
@@ -324,11 +354,21 @@ export function initForestryReports() {
       exporting = true;
       updateExportButtons();
       try {
+        if (canSaveToFolder && !exportFolder && (folderButton.disabled || !await chooseExportFolder())) return;
         const pages = forestryPrintPages(reports, {
           from, to, company: CONFIG.TEN_CONG_TY, commodityCode: CONFIG.MA_HS,
           bookNumber: form.elements.bookNumber.value.trim(),
         });
-        await exportReports(format, pages, 'BaoCaoKiemLam_' + from + '_' + to);
+        const file = await buildExport(format, pages);
+        if (canSaveToFolder) {
+          const saved = await desktop.saveForestryExport({
+            from, to, format: file.extension, bytes: new Uint8Array(file.bytes),
+          });
+          if (!saved.ok) throw new Error(saved.error);
+          status.textContent = 'Đã lưu ' + saved.destination;
+        } else {
+          downloadBlob(new Blob([file.bytes], { type: file.mime }), 'BaoCaoKiemLam_' + from + '_' + to + '.' + file.extension);
+        }
       } catch (error) {
         status.textContent = 'Lỗi xuất ' + (format === 'word' ? 'Word' : 'Excel') + ': ' + error.message;
       } finally {

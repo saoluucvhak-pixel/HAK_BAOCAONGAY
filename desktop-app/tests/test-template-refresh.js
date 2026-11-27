@@ -17,7 +17,9 @@ fs.copyFileSync(path.join(__dirname, '..', 'app', 'source-validator.js'), path.j
 let loaded = [], readyCb = null, windowOpenHandler = null, navigationHandler = null, externalUrls = [];
 const switches = {};
 const handlers = {};
+let selectedFolder;
 const electronMock = {
+  dialog: { showOpenDialog: async () => selectedFolder ? { filePaths: [selectedFolder] } : { canceled: true } },
   app: { getPath: () => userData, whenReady: () => ({ then: (cb) => { readyCb = cb; } }), on: () => {}, quit: () => {}, commandLine: { appendSwitch: (k, v) => { switches[k] = v; } } },
   BrowserWindow: Object.assign(function () { this.loadFile = (f) => loaded.push(f); this.webContents = { setWindowOpenHandler(fn) { windowOpenHandler = fn; }, on(name, fn) { if (name === 'will-navigate') navigationHandler = fn; }, session: { on() {} } }; this.on = () => {}; }, { getAllWindows: () => [] }),
   Menu: { setApplicationMenu() {}, buildFromTemplate: () => ({}) },
@@ -140,7 +142,35 @@ const savedQuoted = handlers['save-config'](trustedSetupEvent, { ...company, Ten
 const quotedReport = fs.readFileSync(reportPath, 'utf8');
 check('Tên công ty có dấu nháy và ký tự HTML được mã hóa đúng', savedQuoted.ok &&
   quotedReport.includes(JSON.stringify(quotedCompany).replace(/</g, '\\u003c')));
-Module._load = origLoad;
-fs.rmSync(tmp, { recursive: true, force: true });
-console.log('\n=== RESULT: ' + pass + ' passed, ' + fail + ' failed ===');
-process.exit(fail ? 1 : 0);
+async function testForestryExport() {
+  const reportEvent = { senderFrame: { url: require('url').pathToFileURL(reportPath).toString() } };
+  const choose = handlers['choose-forestry-export-folder'];
+  const save = handlers['save-forestry-export'];
+  const payload = { from: '2026-11-01', to: '2026-11-27', format: 'xlsx', bytes: Uint8Array.of(80, 75, 3, 4) };
+  check('Hủy chọn thư mục không lưu thiết lập', (await choose(reportEvent)).canceled === true);
+  check('Từ chối lưu khi chưa chọn thư mục', !(await save(reportEvent, payload)).ok);
+  selectedFolder = path.join(tmp, 'reports');
+  fs.mkdirSync(selectedFolder);
+  check('Chọn được thư mục báo cáo', (await choose(reportEvent)).folder === selectedFolder);
+  startApp();
+  check('Nhớ thư mục sau khi mở lại app', handlers['forestry-export-folder'](reportEvent) === selectedFolder);
+  check('Từ chối lưu từ màn hình cấu hình', !(await save(trustedSetupEvent, payload)).ok);
+  check('Từ chối ngày sai', !(await save(reportEvent, { ...payload, to: '2026-11-31' })).ok);
+  const files = await Promise.all([save(reportEvent, payload), save(reportEvent, payload),
+    save(reportEvent, { ...payload, from: '2026-10-01', to: '2026-10-31', format: 'docx' })]);
+  check('Lưu Word và Excel vào đúng thư mục kỳ, xuất lại không ghi đè',
+    files.every(file => file.ok && fs.readFileSync(file.destination).equals(Buffer.from(payload.bytes))) &&
+    new Set(files.map(file => file.destination)).size === 3 &&
+    files.slice(0, 2).every(file => path.basename(path.dirname(file.destination)) === '2026-11-01_2026-11-27') &&
+    path.basename(path.dirname(files[2].destination)) === '2026-10-01_2026-10-31');
+}
+
+testForestryExport().catch(error => {
+  console.error(error);
+  fail++;
+}).finally(() => {
+  Module._load = origLoad;
+  fs.rmSync(tmp, { recursive: true, force: true });
+  console.log('\n=== RESULT: ' + pass + ' passed, ' + fail + ' failed ===');
+  process.exitCode = fail ? 1 : 0;
+});

@@ -12,5 +12,8 @@ contextBridge.exposeInMainWorld('api', {
   /** Lưu cấu hình mới — main.js sẽ tự sinh lại báo cáo đúng công ty rồi báo kết quả. */
   saveConfig: (data) => ipcRenderer.invoke('save-config', data),
   /** Mở màn hình quản lý Google Sheets trong cùng cửa sổ Desktop. */
-  openConfig: () => ipcRenderer.invoke('open-config')
+  openConfig: () => ipcRenderer.invoke('open-config'),
+  forestryExportFolder: () => ipcRenderer.invoke('forestry-export-folder'),
+  chooseForestryExportFolder: () => ipcRenderer.invoke('choose-forestry-export-folder'),
+  saveForestryExport: (payload) => ipcRenderer.invoke('save-forestry-export', payload)
 });

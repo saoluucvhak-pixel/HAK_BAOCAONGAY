@@ -21,7 +21,7 @@
  * và phần JS trong `config.html` ở dự án `app/` để đối chiếu — cùng 1 bộ DEFAULTS).
  * @module main
  */
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require('electron');
 // [CHUẨN HAK — 2026-10-29] Ô chọn ngày (Từ ngày/Đến ngày) hiển thị dd/mm/yyyy như chuẩn HAK, bất kể
 // Windows đang để ngôn ngữ gì — ô <input type="date"> theo ngôn ngữ của Chromium. Chỉ đổi hiển thị;
 // giá trị bên trong vẫn là yyyy-mm-dd như trước.
@@ -205,6 +205,88 @@ function isTrustedSetupUrl(value) {
       path.normalize(fileURLToPath(value)) === path.normalize(SETUP_HTML);
   } catch (e) { return false; }
 }
+
+const FORESTRY_FOLDER = path.join(app.getPath('userData'), 'forestry-export-folder.json');
+
+function forestryFolder() {
+  try {
+    const folder = JSON.parse(fs.readFileSync(FORESTRY_FOLDER, 'utf8'));
+    return typeof folder === 'string' && path.isAbsolute(folder) ? folder : '';
+  } catch { return ''; }
+}
+
+function isReportSender(event) {
+  const frame = event?.senderFrame;
+  if (!frame || !isTrustedAppUrl(frame.url)) return false;
+  return !isTrustedSetupUrl(frame.url);
+}
+
+function validExportDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(value + 'T00:00:00Z');
+  return Number.isFinite(+date) && date.toISOString().slice(0, 10) === value;
+}
+
+ipcMain.handle('forestry-export-folder', event => isReportSender(event) ? forestryFolder() : '');
+
+ipcMain.handle('choose-forestry-export-folder', async event => {
+  if (!isReportSender(event) || !mainWindow) return { ok: false, error: 'Nguồn yêu cầu không được phép.' };
+  const selection = await dialog.showOpenDialog(mainWindow, {
+    title: 'Chọn thư mục lưu báo cáo kiểm lâm',
+    defaultPath: forestryFolder() || app.getPath('documents'),
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (selection.canceled || !selection.filePaths.length) return { canceled: true };
+  try {
+    const folder = selection.filePaths[0];
+    fs.writeFileSync(FORESTRY_FOLDER, JSON.stringify(folder));
+    return { ok: true, folder };
+  } catch {
+    return { ok: false, error: 'Không lưu được thiết lập thư mục.' };
+  }
+});
+
+ipcMain.handle('save-forestry-export', async (event, payload) => {
+  if (!isReportSender(event)) return { ok: false, error: 'Nguồn yêu cầu không được phép.' };
+  const { from, to, format, bytes } = payload ?? {};
+  if (!validExportDate(from) || !validExportDate(to) || from > to ||
+      !['xlsx', 'docx'].includes(format) || !(bytes instanceof Uint8Array) ||
+      bytes.length < 4 || bytes.length > 64 * 1024 * 1024 ||
+      bytes[0] !== 0x50 || bytes[1] !== 0x4b || bytes[2] !== 3 || bytes[3] !== 4) {
+    return { ok: false, error: 'Dữ liệu xuất báo cáo không hợp lệ.' };
+  }
+  const base = forestryFolder();
+  if (!base) return { ok: false, error: 'Hãy chọn thư mục lưu báo cáo.' };
+  const period = from + '_' + to;
+  const folder = path.join(base, period);
+  try {
+    const realBase = await fs.promises.realpath(base);
+    await fs.promises.mkdir(folder).catch(error => { if (error.code !== 'EEXIST') throw error; });
+    const realFolder = await fs.promises.realpath(folder);
+    if (path.relative(realBase, realFolder) !== period) throw new Error('Thư mục kỳ không hợp lệ.');
+    for (let index = 1; index <= 999; index++) {
+      const filename = 'BaoCaoKiemLam_' + period + (index === 1 ? '' : '_' + index) + '.' + format;
+      const destination = path.join(realFolder, filename);
+      const file = await fs.promises.open(destination, 'wx').catch(error => {
+        if (error.code !== 'EEXIST') throw error;
+        return null;
+      });
+      if (!file) continue;
+      try {
+        await file.writeFile(bytes);
+        await file.close();
+      } catch (error) {
+        await file.close().catch(() => {});
+        await fs.promises.unlink(destination).catch(() => {});
+        throw error;
+      }
+      return { ok: true, destination };
+    }
+    return { ok: false, error: 'Đã có quá nhiều file cho kỳ này.' };
+  } catch {
+    return { ok: false, error: 'Không ghi được báo cáo. Kiểm tra quyền ghi hoặc chọn thư mục khác.' };
+  }
+});
 
 ipcMain.handle('open-config', (event) => {
   // Chỉ trang báo cáo được tạo trong thư mục dữ liệu ứng dụng mới được yêu cầu mở cấu hình.
