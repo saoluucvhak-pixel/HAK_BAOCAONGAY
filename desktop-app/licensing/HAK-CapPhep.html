@@ -57,7 +57,8 @@
     <form id="issueForm">
       <label>Mã yêu cầu từ máy cần cài <input id="requestCode" type="text" spellcheck="false" autocomplete="off" placeholder="HAK4.…" maxlength="1024"></label>
       <p id="requestSummary" class="status" hidden></p>
-      <div class="profiles">
+      <label>Ngày hết hạn của file phản hồi <input id="expiry" type="date" required></label>
+      <div class="profiles" id="companyChooser">
         <label>Công ty đã lưu
           <select id="savedCompany"></select>
         </label>
@@ -65,7 +66,6 @@
       </div>
       <details id="companyDetails">
         <summary>Thông tin công ty và nguồn Google Sheets</summary>
-        <label>Ngày hết hạn của file phản hồi <input id="expiry" type="date"></label>
         <label>Tên công ty <input id="TenCty" maxlength="200"></label>
         <label>Địa chỉ công ty <input id="DiaChi" maxlength="300"></label>
         <label>Mã số thuế <input id="MST" maxlength="40"></label>
@@ -101,6 +101,7 @@ const $ = (id) => document.getElementById(id);
 const companyFields = ['TenCty', 'DiaChi', 'MST', 'SDT', 'DiaChiThuMua', 'MaHS', 'NhaMay', 'PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo'];
 const profilesFormat = 'hak-company-profiles-v1';
 const setupFormat = 'haksetup-ed25519-v4';
+const reportingProduct = 'com.hakgroup.baocaongay';
 const vaultFormat = 'hak-ed25519-issuer-v1';
 const encoder = new TextEncoder();
 let issuerKey;
@@ -249,13 +250,17 @@ async function unlockIssuer() {
 
 $('requestCode').addEventListener('input', () => {
   const summary = $('requestSummary');
+  let needsProfile = true;
   try {
     const request = parseRequest($('requestCode').value.replace(/\s+/g, ''));
     summary.textContent = 'Ứng dụng ' + request.product + ' · Máy ' + request.machine;
     summary.hidden = false;
+    needsProfile = request.product === reportingProduct;
   } catch {
     summary.hidden = true;
   }
+  $('companyChooser').hidden = !needsProfile;
+  $('companyDetails').hidden = !needsProfile;
 });
 
 async function createSetup(wire, request, company, issuedAt, expiresAt, key) {
@@ -455,8 +460,8 @@ $('issueForm').addEventListener('submit', async (event) => {
     const expiresAt = Math.floor(Date.parse($('expiry').value + 'T23:59:59+07:00') / 1000);
     if (!Number.isFinite(expiresAt) || expiresAt <= issuedAt)
       throw new Error('Ngày hết hạn phải ở trong tương lai.');
-    const company = companyFromForm();
-    validateCompanyProfile(company);
+    const company = request.product === reportingProduct ? companyFromForm() : {};
+    if (request.product === reportingProduct) validateCompanyProfile(company);
     const key = await unlockIssuer();
     const kit = await createSetup(wire, request, company, issuedAt, expiresAt, key);
     if (encoder.encode(JSON.stringify(kit)).length > 32768)

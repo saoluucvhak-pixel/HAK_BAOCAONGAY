@@ -83,9 +83,12 @@ try {
     name: 'HAK-DanhSachCongTy.json', mimeType: 'application/json', buffer: profiles
   });
   await recovered.locator('#savedCompany').selectOption({ label: 'Công ty thứ hai' });
+  const anotherReport = newRequest();
+  const restoredProfile = await issue(recovered, anotherReport, publicKey);
+  assert.equal(openCompany(restoredProfile, publicKey, anotherReport).TenCty, 'Công ty thứ hai');
   const anotherApp = newRequest('com.hakgroup.quan-ly-kho');
   const newFile = await issue(recovered, anotherApp, publicKey);
-  assert.equal(openCompany(newFile, publicKey, anotherApp).TenCty, 'Công ty thứ hai');
+  assert.deepEqual(openCompany(newFile, publicKey, anotherApp), {});
   assert.throws(() => openCompany(newFile, publicKey, recipient), /Wrong recipient/);
   console.log('PASS: one offline issuer, encrypted key recovery, multiple apps and device-specific encrypted profiles.');
 } finally {
