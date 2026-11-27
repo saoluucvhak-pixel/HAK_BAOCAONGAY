@@ -277,8 +277,7 @@ const { promisify } = require('node:util');
 const execLicense = promisify(execFile);
 
 async function authorizeInstalledApp() {
-  if (!app.isPackaged) return true;
-  const helper = path.join(path.dirname(process.execPath), 'HAK-License.exe');
+  const helper = path.join(__dirname, 'license', 'HAK-License.exe');
   const run = (...args) => execLicense(helper, args, { windowsHide: true, timeout: 45000 });
   try {
     await run('check');

@@ -89,6 +89,8 @@ jobs:
           Copy-Item dist/index.html ../desktop-app/app/index.html -Force
           node scripts/verify-build.mjs
       - name: Generate temporary issuer for licensing tests
+        env:
+          HAK_LICENSE_QA_KEYGEN: "1"
         run: |
           $fixtureDir = Join-Path $env:RUNNER_TEMP 'hak-license-qa'
           New-Item -ItemType Directory $fixtureDir | Out-Null

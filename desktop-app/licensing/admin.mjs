@@ -2,12 +2,17 @@ import { createPrivateKey, createPublicKey, generateKeyPairSync, randomUUID, sig
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const product = 'com.hakgroup.baocaongay';
+const passphrase = process.env.HAK_LICENSE_KEY_PASSPHRASE;
+const qaBuild = process.env.GITHUB_ACTIONS === 'true' && process.env.HAK_LICENSE_QA_KEYGEN === '1';
 const [command, ...args] = process.argv.slice(2);
 try {
   if (command === 'keygen' && args.length === 2) {
     const [privatePath, publicPath] = args;
+    if (!qaBuild && (!passphrase || passphrase.length < 12))
+      throw new Error('Đặt HAK_LICENSE_KEY_PASSPHRASE dài ít nhất 12 ký tự trước khi tạo khóa.');
     const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 3072 });
-    writeFileSync(privatePath, privateKey.export({ type: 'pkcs8', format: 'pem' }), { flag: 'wx', mode: 0o600 });
+    const protection = passphrase ? { cipher: 'aes-256-cbc', passphrase } : {};
+    writeFileSync(privatePath, privateKey.export({ type: 'pkcs8', format: 'pem', ...protection }), { flag: 'wx', mode: 0o600 });
     writeFileSync(publicPath, JSON.stringify(publicKey.export({ format: 'jwk' })), { flag: 'wx' });
   } else if (command === 'issue' && (args.length === 5 || args.length === 6)) {
     const [privatePath, requestFile, output, asset, expires, qa] = args;
@@ -24,7 +29,7 @@ try {
     if (!asset.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(expires) || !Number.isFinite(expiresAt) ||
         new Date(end.getTime() + 7 * 3600000).toISOString().slice(0, 10) !== expires || expiresAt <= issuedAt)
       throw new Error('Cần mã tài sản và ngày hết hạn hợp lệ trong tương lai (YYYY-MM-DD, giờ Việt Nam).');
-    const privateKey = createPrivateKey(readFileSync(privatePath));
+    const privateKey = createPrivateKey({ key: readFileSync(privatePath), passphrase });
     if (createPublicKey(privateKey).asymmetricKeyType !== 'rsa' || privateKey.asymmetricKeyDetails.modulusLength < 3072)
       throw new Error('Cần khóa cấp phép RSA 3072 bit hoặc lớn hơn.');
     const id = randomUUID();

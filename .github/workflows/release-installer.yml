@@ -4,6 +4,15 @@ name: Release installer
 # Kết quả được đăng lên mục Releases của repo (tải từng file trực tiếp) và nằm trong Artifacts của lần chạy: file Setup .exe, các phần .part (≤ 28 MB), GHEP_FILE.bat, HUONG_DAN_GHEP_FILE.txt.
 on:
   workflow_dispatch:
+    inputs:
+      issuer_public_key:
+        description: RSA public JWK of the HAK license issuer (optional if repository variable is set)
+        type: string
+        required: false
+      publish:
+        description: Post the verified installer to GitHub Releases
+        type: boolean
+        default: false
 
 permissions:
   contents: write   # tạo GitHub Release
@@ -38,7 +47,7 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.HAK_WINDOWS_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.HAK_WINDOWS_CSC_PASSWORD }}
           HAK_REQUIRE_SIGNING: "1"
-          HAK_LICENSE_PUBLIC_KEY: ${{ vars.HAK_LICENSE_PUBLIC_KEY }}
+          HAK_LICENSE_PUBLIC_KEY: ${{ inputs.issuer_public_key || vars.HAK_LICENSE_PUBLIC_KEY }}
         run: |
           if (-not $env:HAK_LICENSE_PUBLIC_KEY) { throw 'Configure HAK_LICENSE_PUBLIC_KEY with the company issuer public key.' }
           if (-not $env:WIN_CSC_LINK) { throw 'Configure HAK_WINDOWS_CSC_LINK before publishing a signed installer.' }
@@ -65,6 +74,7 @@ jobs:
             desktop-app/release/*.part
             desktop-app/release/GHEP_FILE.bat
             desktop-app/release/HUONG_DAN_GHEP_FILE.txt
+            desktop-app/release/registration/Register-HAK.cmd
             desktop-app/release/registration/HAK-License.exe
             desktop-app/release/SHA256SUMS.txt
             desktop-app/release/INSTALLER_SECURITY.json
@@ -73,6 +83,7 @@ jobs:
 
       # Đăng lên Releases để tải trực tiếp từng file (không cần tải zip Artifacts).
       - name: Publish GitHub Release
+        if: inputs.publish
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -83,6 +94,6 @@ jobs:
             desktop-app/release/*.exe desktop-app/release/*.part \
             desktop-app/release/GHEP_FILE.bat desktop-app/release/HUONG_DAN_GHEP_FILE.txt \
             desktop-app/release/SHA256SUMS.txt desktop-app/release/INSTALLER_SECURITY.json \
-            desktop-app/release/registration/HAK-License.exe \
+            desktop-app/release/registration/HAK-License.exe desktop-app/release/registration/Register-HAK.cmd \
             --title "Bộ cài Báo cáo ngày ${VERSION} (lần ${{ github.run_number }})" \
             --notes "Bộ cài desktop Báo cáo ngày ${VERSION}, đóng từ commit ${{ github.sha }}, đã xác minh chữ ký Authenticode. Tải các file .part cùng GHEP_FILE.bat vào một thư mục, nhấp đúp GHEP_FILE.bat; hoặc tải thẳng file Setup .exe."

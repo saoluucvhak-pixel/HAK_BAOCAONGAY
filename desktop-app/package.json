@@ -25,7 +25,11 @@
     "files": [
       "main.js",
       "preload.js",
-      "app/**/*"
+      "app/**/*",
+      {
+        "from": "build/license-bin/HAK-License.exe",
+        "to": "license/HAK-License.exe"
+      }
     ],
     "win": {
       "target": [
@@ -57,6 +61,14 @@
         "from": "build/license-bin/HAK-License.exe",
         "to": "HAK-License.exe"
       }
-    ]
+    ],
+    "asar": {
+      "smartUnpack": false
+    },
+    "electronFuses": {
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "enableNodeOptionsEnvironmentVariable": false
+    }
   }
 }

@@ -75,6 +75,35 @@ node tests/test-template-refresh.js
 ```
 Đóng trên Linux/Mac cần Wine; đóng trực tiếp trên Windows thì không cần.
 
+### Cài trên thiết bị đã được HAK duyệt
+
+Bộ cài 2.2.0 xác minh giấy phép trước khi cài. Electron kiểm tra lại mỗi lần mở. Giấy phép gắn với khóa TPM không xuất được trong tài khoản Windows đăng ký. Cần đăng ký bằng đúng tài khoản sẽ chạy báo cáo. Máy Windows cần TPM hoạt động và .NET Framework 4.8.
+
+1. **Thiết lập một lần trên máy quản trị HAK.** Tạo cặp khóa bằng Node.js theo ví dụ dưới đây. Giữ `private.pem` trong kho quản trị. Nội dung `public.jwk` dùng cho biến Actions `HAK_LICENSE_PUBLIC_KEY` hoặc trường `issuer_public_key` của workflow **Release installer**. Workflow mặc định chỉ tạo artifact. Tùy chọn `publish` đăng lên GitHub Releases.
+2. **Đăng ký máy.** Gửi `HAK-License.exe` và `Register-HAK.cmd` đã đóng cùng bản phát hành. Người dùng mở `Register-HAK.cmd` trong tài khoản đã duyệt rồi gửi `HAK-YeuCau.hakreq` cho HAK qua kênh công ty.
+3. **Phê duyệt và cấp phép.** Đối chiếu yêu cầu với người sử dụng và mã tài sản. Dùng lệnh `issue` bên dưới, ghi mã giấy phép, tài sản và hạn dùng vào sổ cấp phép. Mỗi file giấy phép chỉ khớp khóa TPM đã đăng ký.
+4. **Cài và gia hạn.** Đặt `HAK-GiayPhep.haklic` cạnh bộ cài. Lần sau cùng tài khoản có thể cài đè bằng giấy phép còn hiệu lực đã lưu. Khi ứng dụng yêu cầu gia hạn, chọn file mới ngay trong hộp thoại của Electron.
+
+Ví dụ chạy ở gốc repo trên máy quản trị. Chọn thư mục khóa riêng ngoài repo, có quyền truy cập giới hạn.
+
+```powershell
+$secret = Read-Host 'Mat khau khoa cap phep HAK' -AsSecureString
+$address = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+try {
+  $env:HAK_LICENSE_KEY_PASSPHRASE = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($address)
+  # Chạy một lần để khởi tạo đơn vị:
+  node desktop-app/licensing/admin.mjs keygen 'C:\HAK-Keys\private.pem' 'C:\HAK-Keys\public.jwk'
+  # Chạy sau khi duyệt mỗi yêu cầu, với hạn sử dụng do HAK chọn:
+  node desktop-app/licensing/admin.mjs issue 'C:\HAK-Keys\private.pem' '.\HAK-YeuCau.hakreq' '.\HAK-GiayPhep.haklic' 'HAK-KT-023' '2027-02-28'
+}
+finally {
+  Remove-Item Env:HAK_LICENSE_KEY_PASSPHRASE -ErrorAction SilentlyContinue
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($address)
+}
+```
+
+Giấy phép kiểm tra offline theo đồng hồ Windows. Việc thu hồi ngay qua mạng cần một dịch vụ riêng. Cài lại Windows, xóa TPM hoặc đổi tài khoản có thể cần đăng ký lại. Bản HTML web và quyền truy cập nguồn Google Sheets do chính sách phân phối dữ liệu của HAK quản lý riêng.
+
 ### Phát hành có chữ ký Authenticode
 
 Workflow **Release installer** trên GitHub dùng chứng thư Code Signing của đơn vị qua Actions secrets `HAK_WINDOWS_CSC_LINK` và `HAK_WINDOWS_CSC_PASSWORD`. Chứng thư phải dùng được với electron-builder trên runner Windows. Workflow ký SHA-256 với dấu thời gian RFC 3161, kiểm tra trạng thái `Valid` rồi công bố EXE, SHA-256 và bản kê kiểm tra. Khóa riêng nằm trong hệ thống quản lý secrets của đơn vị.

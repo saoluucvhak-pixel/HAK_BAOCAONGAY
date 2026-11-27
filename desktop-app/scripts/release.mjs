@@ -36,6 +36,7 @@ if (!exeName) { console.error('Không thấy file .exe trong release/'); process
 const registration = path.join(REL, 'registration');
 fs.mkdirSync(registration, { recursive: true });
 fs.copyFileSync(path.join(REL, 'win-unpacked', 'HAK-License.exe'), path.join(registration, 'HAK-License.exe'));
+fs.copyFileSync(path.join(ROOT, 'licensing', 'Register-HAK.cmd'), path.join(registration, 'Register-HAK.cmd'));
 const exe = fs.readFileSync(path.join(REL, exeName));
 const hash = sha256(exe);
 const parts = [];
