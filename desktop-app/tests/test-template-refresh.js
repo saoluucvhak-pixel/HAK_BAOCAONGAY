@@ -1,186 +1,175 @@
-// Kiểm chứng: sau khi cài BẢN MỚI (app/index.html mẫu thay đổi), lần mở app kế tiếp phải dùng
-// báo cáo sinh từ MẪU MỚI — không được tiếp tục mở report.html cũ sinh từ mẫu của lần cài trước.
-// Chạy: node tests/test-template-refresh.js   (giả lập module 'electron', không cần mở cửa sổ)
+const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
-const Module = require('module');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+const fs = require('node:fs');
+const Module = require('node:module');
+const os = require('node:os');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bcn-'));
-const userData = path.join(tmp, 'userData'); fs.mkdirSync(userData);
-const appDir = path.join(tmp, 'appdir'); fs.mkdirSync(path.join(appDir, 'app'), { recursive: true });
-const realTemplate = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
-fs.writeFileSync(path.join(appDir, 'app', 'setup.html'), '<html>setup</html>');
-fs.copyFileSync(path.join(__dirname, '..', 'main.js'), path.join(appDir, 'main.js'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hak-managed-report-'));
+const appDir = path.join(tmp, 'appdir');
+const template = path.join(appDir, 'app', 'index.html');
+const report = path.join(tmp, 'report.html');
+const config = path.join(tmp, 'company-config.json');
+const main = path.join(appDir, 'main.js');
+fs.mkdirSync(path.dirname(template), { recursive: true });
+fs.copyFileSync(path.join(__dirname, '..', 'main.js'), main);
 fs.copyFileSync(path.join(__dirname, '..', 'app', 'source-validator.js'), path.join(appDir, 'app', 'source-validator.js'));
+const html = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
+fs.writeFileSync(template, html);
+process.resourcesPath = tmp;
+const helper = 'test license helper';
+fs.writeFileSync(path.join(tmp, 'HAK-License-runtime.exe'), helper);
+fs.writeFileSync(path.join(appDir, 'app', 'license-verifier.json'),
+  JSON.stringify({ sha256: createHash('sha256').update(helper).digest('hex') }));
 
-let loaded = [], readyCb = null, windowOpenHandler = null, navigationHandler = null, externalUrls = [];
-const switches = {};
+const profile = {
+  TenCty: 'Công ty Thử nghiệm', DiaChi: 'Đắk Lắk',
+  PhieuCan: 'https://docs.google.com/spreadsheets/d/e/TEST_PC/pub?output=csv',
+  DNTT: 'https://docs.google.com/spreadsheets/d/e/TEST_DN/pub?output=csv'
+};
+let active = null;
+let pending = null;
+let failCommit = false;
+let loaded = [];
+let commands = [];
+let ready;
+let showError;
+let navigation;
+let openWindow;
+let external = [];
+let quits = 0;
 const handlers = {};
-let packagedProfile, pickedKit, selectedProfile, licenseError, menuTemplate;
-const electronMock = {
-  app: { getPath: () => userData, whenReady: () => ({ then: (cb) => { readyCb = cb; } }), on: () => {}, quit: () => {}, commandLine: { appendSwitch: (k, v) => { switches[k] = v; } } },
-  BrowserWindow: Object.assign(function () { this.loadFile = (f) => loaded.push(f); this.webContents = { setWindowOpenHandler(fn) { windowOpenHandler = fn; }, on(name, fn) { if (name === 'will-navigate') navigationHandler = fn; }, session: { on() {} } }; this.on = () => {}; }, { getAllWindows: () => [] }),
-  Menu: { setApplicationMenu() {}, buildFromTemplate: (template) => { menuTemplate = template; return {}; } },
-  dialog: { showOpenDialog: async () => ({ filePaths: [pickedKit] }), showErrorBox: (title, message) => { licenseError = { title, message }; } },
-  shell: { openExternal(url) { externalUrls.push(url); return Promise.resolve(); } },
-  ipcMain: { handle: (n, fn) => { handlers[n] = fn; } },
+const switches = {};
+const electron = {
+  app: {
+    isPackaged: true, requestSingleInstanceLock: () => true, getPath: () => tmp,
+    whenReady: () => ({ then: (callback) => { ready = callback; } }),
+    on() {}, quit() { quits++; },
+    commandLine: { appendSwitch: (key, value) => { switches[key] = value; } }
+  },
+  BrowserWindow: Object.assign(function () {
+    this.loadFile = (file) => { loaded.push(file); return Promise.resolve(); };
+    this.webContents = {
+      setWindowOpenHandler(fn) { openWindow = fn; },
+      on(name, fn) { if (name === 'will-navigate') navigation = fn; },
+      session: { on() {} }
+    };
+    this.on = () => {};
+  }, { getAllWindows: () => [] }),
+  Menu: { setApplicationMenu() {}, buildFromTemplate: () => ({}) },
+  dialog: { showErrorBox: (_title, message) => { showError = message; } },
+  shell: { openExternal(url) { external.push(url); return Promise.resolve(); } },
+  ipcMain: { handle: (name, fn) => { handlers[name] = fn; } }
 };
-const origLoad = Module._load;
-Module._load = function (req) {
-  if (req === 'electron') return electronMock;
-  if (req === 'node:child_process') {
-    return { execFile(_file, args, _options, callback) {
-      if (args[0] === 'accept-kit') {
-        if (args[1] !== pickedKit || !selectedProfile) {
-          callback(Object.assign(new Error('Verification failed'), { stderr: 'Sai máy được duyệt.' }));
+const encode = (company) => Buffer.from(JSON.stringify(company)).toString('base64');
+const originalLoad = Module._load;
+Module._load = function (name) {
+  if (name === 'electron') return electron;
+  if (name === 'node:child_process') return {
+    execFile(_file, [command, id], _options, callback) {
+      commands.push({ command, id });
+      switch (command) {
+        case 'check':
+          callback(null, { stdout: active ? encode(active) : '' });
           return;
-        }
-        packagedProfile = selectedProfile;
+        case 'enroll-change':
+          if (pending) callback(null, { stdout: encode(pending) });
+          else callback(Object.assign(new Error('Canceled'), { code: 1 }));
+          return;
+        case 'commit-change':
+          if (failCommit) {
+            callback(new Error('Commit failed'));
+            return;
+          }
+          active = pending;
+          break;
+        case 'discard-change':
+          pending = null;
+          break;
+        default:
+          callback(Object.assign(new Error('Unexpected command: ' + command), { code: 1 }));
+          return;
       }
-      const stdout = args[0] === 'check' && packagedProfile
-        ? Buffer.from(JSON.stringify(packagedProfile)).toString('base64') : '';
-      callback(null, { stdout });
-    } };
-  }
-  return origLoad.apply(this, arguments);
-};
-
-function startApp() {
-  delete require.cache[require.resolve(path.join(appDir, 'main.js'))];
-  loaded = [];
-  require(path.join(appDir, 'main.js'));
-  const ready = readyCb();
-  return electronMock.app.isPackaged ? ready : loaded[loaded.length - 1];
-}
-let pass = 0, fail = 0;
-const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x ? '  [' + x + ']' : '')); };
-
-// Lần cài 1: mẫu v1 → người dùng cấu hình công ty
-fs.writeFileSync(path.join(appDir, 'app', 'index.html'), realTemplate.replace('</body>', '<!--TEMPLATE-V1--></body>'));
-startApp();
-check('[2026-10-29] Ô ngày theo tiếng Việt: main.js bật --lang=vi', switches.lang === 'vi', switches.lang);
-const trustedSetupEvent = { senderFrame: { url: require('url').pathToFileURL(path.join(appDir, 'app', 'setup.html')).toString() } };
-const untrustedEvent = { senderFrame: { url: 'https://untrusted.example/path' } };
-check('Không cho trang lạ lấy cấu hình', handlers['get-config'](untrustedEvent) === null);
-check('Không cho trang lạ sửa cấu hình', handlers['save-config'](untrustedEvent, { TenCty: 'HACK' }).ok === false);
-const res = handlers['save-config'](trustedSetupEvent, { TenCty: 'CONG TY THU NGHIEM', PhieuCan: 'https://docs.google.com/spreadsheets/d/e/TEST_PC/pub?output=csv', DNTT: 'https://docs.google.com/spreadsheets/d/e/TEST_DN/pub?output=csv' });
-check('Cấu hình lần đầu thành công', res && res.ok, JSON.stringify(res));
-const badCfg = handlers['save-config'](trustedSetupEvent, { TenCty: 'FORGED', PhieuCan: 'http://localhost/private', DNTT: 'javascript:alert(1)' });
-check('Link sai/không bảo mật bị từ chối ngay tại IPC', badCfg.ok === false);
-check('Cấu hình đang dùng giữ nguyên khi đường dẫn không hợp lệ', handlers['get-config'](trustedSetupEvent).TenCty === 'CONG TY THU NGHIEM');
-
-const oldReportBytes = fs.readFileSync(path.join(userData, 'report.html'));
-const oldConfigBytes = fs.readFileSync(path.join(userData, 'company-config.json'));
-const originalRename = fs.renameSync;
-fs.renameSync = function (src, dst) {
-  if (dst === path.join(userData, 'company-config.json')) throw new Error('Simulated locked config file');
-  return originalRename.apply(this, arguments);
-};
-let failedUpdate;
-try {
-  failedUpdate = handlers['save-config'](trustedSetupEvent, {
-    TenCty: 'KHÔNG ĐƯỢC LƯU',
-    PhieuCan: 'https://docs.google.com/spreadsheets/d/e/NEW_PC/pub?output=csv',
-    DNTT: 'https://docs.google.com/spreadsheets/d/e/NEW_DN/pub?output=csv'
-  });
-} finally { fs.renameSync = originalRename; }
-check('Lỗi ghi file config phải báo thất bại', failedUpdate && failedUpdate.ok === false);
-check('Lỗi ghi config phải giữ nguyên report.html', fs.readFileSync(path.join(userData, 'report.html')).equals(oldReportBytes));
-check('Lỗi ghi config phải giữ nguyên company-config.json', fs.readFileSync(path.join(userData, 'company-config.json')).equals(oldConfigBytes));
-
-const reportPath = path.join(userData, 'report.html');
-check('report.html sinh từ mẫu v1', fs.readFileSync(reportPath, 'utf8').includes('TEMPLATE-V1'));
-
-// Lần cài 2: cài bản MỚI (mẫu v2) rồi mở app
-fs.writeFileSync(path.join(appDir, 'app', 'index.html'), realTemplate.replace('</body>', '<!--TEMPLATE-V2--></body>'));
-const opened = startApp();
-const html = fs.readFileSync(reportPath, 'utf8');
-check('Sau khi cài bản mới: mở đúng report.html', opened === reportPath, opened);
-check('Sau khi cài bản mới: báo cáo đã dùng MẪU MỚI (v2), không còn mẫu cũ (v1)', html.includes('TEMPLATE-V2') && !html.includes('TEMPLATE-V1'));
-check('Sau khi cài bản mới: vẫn giữ đúng cấu hình công ty đã lưu', html.includes('CONG TY THU NGHIEM') && html.includes('https://docs.google.com/spreadsheets/d/e/TEST_PC/pub?output=csv'));
-
-// Lần mở 3: KHÔNG đổi mẫu → không cần sinh lại (không ghi file thừa)
-const mtime1 = fs.statSync(reportPath).mtimeMs;
-const t = Date.now(); while (Date.now() - t < 30) {}
-startApp();
-check('Mở lại khi mẫu không đổi: không sinh lại file thừa', fs.statSync(reportPath).mtimeMs === mtime1);
-
-// Người dùng ĐANG dùng bản cũ (đã cấu hình từ trước, chưa có file dấu vân tay) cài bản mới
-fs.rmSync(path.join(userData, 'report-template.sha1'), { force: true });
-fs.writeFileSync(reportPath, fs.readFileSync(reportPath, 'utf8').replace('TEMPLATE-V2', 'TEMPLATE-OLDINSTALL'));
-fs.writeFileSync(path.join(appDir, 'app', 'index.html'), realTemplate.replace('</body>', '<!--TEMPLATE-V3--></body>'));
-startApp();
-check('Nâng cấp từ bản cũ (chưa có dấu vân tay): tự sinh lại theo mẫu mới', fs.readFileSync(reportPath, 'utf8').includes('TEMPLATE-V3'));
-
-// Mẫu mới bị hỏng (không tìm thấy vị trí thay thế) → vẫn mở được báo cáo cũ, không mất gì
-fs.writeFileSync(path.join(appDir, 'app', 'index.html'), '<html>mau hong</html>');
-const opened2 = startApp();
-check('Mẫu mới lỗi: vẫn mở báo cáo đang có (không bị đẩy về màn hình cấu hình/mất báo cáo)', opened2 === reportPath && fs.readFileSync(reportPath, 'utf8').includes('CONG TY THU NGHIEM'), opened2);
-
-// Mở màn hình nguồn Google Sheets ngay từ mục Cấu hình trong báo cáo desktop.
-const trustedReportEvent = { senderFrame: { url: require('url').pathToFileURL(reportPath).toString() } };
-const beforeOpen = loaded.length;
-const forbiddenOpen = handlers['open-config'](untrustedEvent);
-check('Trang lạ không thể mở màn hình cấu hình qua IPC', forbiddenOpen.ok === false && loaded.length === beforeOpen);
-const allowedOpen = handlers['open-config'](trustedReportEvent);
-check('Màn hình báo cáo Desktop mở được trình quản lý nguồn', allowedOpen.ok === true && loaded[loaded.length - 1] === path.join(appDir, 'app', 'setup.html'));
-
-// Security regression: giới hạn protocol bên ngoài và chặn điều hướng cửa sổ tới URL lạ.
-windowOpenHandler({ url: 'javascript:alert(1)' });
-windowOpenHandler({ url: 'file:///etc/passwd' });
-windowOpenHandler({ url: 'customapp://payload' });
-check('Không mở giao thức javascript/file/custom ra ngoài', externalUrls.length === 0);
-const openResult = windowOpenHandler({ url: 'https://example.org/help' });
-check('HTTPS được mở bằng trình duyệt mặc định, popup Electron bị từ chối', externalUrls.length === 1 && externalUrls[0] === 'https://example.org/help' && openResult.action === 'deny');
-let prevented = 0;
-navigationHandler({ preventDefault() { prevented++; } }, 'https://example.org/foreign');
-navigationHandler({ preventDefault() { prevented++; } }, 'file:///tmp/untrusted.html');
-check('Chặn điều hướng cửa sổ chính ra website và file lạ', prevented === 2);
-navigationHandler({ preventDefault() { prevented++; } }, require('url').pathToFileURL(reportPath).toString());
-check('Vẫn cho phép điều hướng tới báo cáo do app quản lý', prevented === 2);
-
-async function checkPackagedProfile() {
-  electronMock.app.isPackaged = true;
-  process.resourcesPath = tmp;
-  const helper = 'test license helper';
-  fs.writeFileSync(path.join(tmp, 'HAK-License-runtime.exe'), helper);
-  const sha256 = createHash('sha256').update(helper).digest('hex');
-  fs.writeFileSync(path.join(appDir, 'app', 'license-verifier.json'), JSON.stringify({ sha256 }));
-  fs.writeFileSync(path.join(appDir, 'app', 'index.html'), realTemplate);
-  packagedProfile = {
-    TenCty: 'Công ty Thử nghiệm HAK', DiaChi: 'Đắk Lắk',
-    PhieuCan: 'https://docs.google.com/spreadsheets/d/e/KIT_PC/pub?output=csv',
-    DNTT: 'https://docs.google.com/spreadsheets/d/e/KIT_DN/pub?output=csv'
+      callback(null, { stdout: '' });
+    }
   };
+  return originalLoad.apply(this, arguments);
+};
 
-  await startApp();
-  const configured = handlers['get-config'](trustedSetupEvent);
-  const report = fs.readFileSync(reportPath, 'utf8');
-  check('File đã xác minh tự mở báo cáo cùng cấu hình tiếng Việt và nguồn CSV',
-    loaded.at(-1) === reportPath && configured.DiaChi === packagedProfile.DiaChi &&
-    report.includes(packagedProfile.TenCty) && report.includes(packagedProfile.PhieuCan));
-  handlers['save-config'](trustedSetupEvent, { ...configured, DiaChi: 'Địa chỉ sửa tại máy' });
-  await startApp();
-  check('Mở lại với cùng file giữ chỉnh sửa tại máy',
-    handlers['get-config'](trustedSetupEvent).DiaChi === 'Địa chỉ sửa tại máy');
-
-  const importFile = menuTemplate[0].submenu.find((item) => item.label === 'Nạp file cài đặt HAK…').click;
-  pickedKit = path.join(tmp, 'HAK-CaiDat.haksetup');
-  await importFile();
-  check('File bị từ chối không cập nhật cấu hình',
-    licenseError?.message === 'Sai máy được duyệt.' &&
-    handlers['get-config'](trustedSetupEvent).DiaChi === 'Địa chỉ sửa tại máy');
-  selectedProfile = { ...packagedProfile, DiaChi: 'Địa chỉ do HAK cập nhật' };
-  await importFile();
-  check('File mới hợp lệ cập nhật cấu hình khi app đang mở',
-    handlers['get-config'](trustedSetupEvent).DiaChi === selectedProfile.DiaChi && loaded.at(-1) === reportPath);
+async function start() {
+  delete require.cache[require.resolve(main)];
+  require(main);
+  loaded = [];
+  await ready();
 }
 
-checkPackagedProfile().catch((error) => check('Kiểm tra hồ sơ HAK', false, error.stack)).finally(() => {
-  Module._load = origLoad;
+async function run() {
+  await start();
+  assert.deepEqual(loaded, [], 'Ứng dụng cần cấu hình xác minh để mở');
+  assert.match(showError, /Cần file cấu hình/);
+  assert.equal(quits, 1);
+
+  active = profile;
+  await start();
+  assert.equal(switches.lang, 'vi');
+  assert.deepEqual(loaded, [report]);
+  assert.equal(handlers['save-config'], undefined);
+  assert.equal(handlers['get-config'], undefined);
+
+  // A replacement of the local projections is discarded on reopening.
+  fs.writeFileSync(config, JSON.stringify({ TenCty: 'Tên tự sửa' }));
+  fs.writeFileSync(report, '<html>Tên tự sửa</html>');
+  fs.writeFileSync(template, html.replace('</body>', '<!--NEW-TEMPLATE--></body>'));
+  await start();
+  assert.equal(JSON.parse(fs.readFileSync(config, 'utf8')).TenCty, profile.TenCty);
+  assert(fs.readFileSync(report, 'utf8').includes('NEW-TEMPLATE'));
+
+  const trusted = { senderFrame: { url: pathToFileURL(report).href } };
+  const untrusted = { senderFrame: { url: 'https://untrusted.example/' } };
+  const before = commands.length;
+  assert.equal((await handlers['open-config'](untrusted)).ok, false);
+  assert.equal(commands.length, before);
+  assert.deepEqual(await handlers['open-config'](trusted), { ok: true, canceled: true });
+  assert.equal(commands[before].command, 'enroll-change');
+
+  pending = { ...profile, PhieuCan: 'http://localhost/private' };
+  assert.equal((await handlers['open-config'](trusted)).ok, false);
+  assert.equal(JSON.parse(fs.readFileSync(config, 'utf8')).PhieuCan, profile.PhieuCan);
+
+  pending = { ...profile, DiaChi: 'Địa chỉ mới' };
+  failCommit = true;
+  assert.equal((await handlers['open-config'](trusted)).ok, false);
+  assert.equal(JSON.parse(fs.readFileSync(config, 'utf8')).DiaChi, profile.DiaChi);
+
+  pending = { ...profile, DiaChi: 'Địa chỉ đã duyệt' };
+  failCommit = false;
+  assert.equal((await handlers['open-config'](trusted)).ok, true);
+  assert.equal(JSON.parse(fs.readFileSync(config, 'utf8')).DiaChi, 'Địa chỉ đã duyệt');
+  assert.equal(loaded.at(-1), report);
+  const commit = commands.findLast((step) => step.command === 'commit-change');
+  const enrollment = commands.findLast((step) => step.command === 'enroll-change');
+  assert.equal(commit.id, enrollment.id);
+
+  for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'customapp://payload']) {
+    assert.equal(openWindow({ url }).action, 'deny');
+  }
+  assert.deepEqual(external, []);
+  openWindow({ url: 'https://example.org/help' });
+  assert.deepEqual(external, ['https://example.org/help']);
+  let prevented = 0;
+  const event = { preventDefault() { prevented++; } };
+  navigation(event, 'https://example.org/foreign');
+  navigation(event, 'file:///tmp/untrusted.html');
+  navigation(event, trusted.senderFrame.url);
+  assert.equal(prevented, 2);
+  console.log('PASS: required managed profile, local edit rejection, fresh import gate and rollback.');
+}
+
+run().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+}).finally(() => {
+  Module._load = originalLoad;
   fs.rmSync(tmp, { recursive: true, force: true });
-  console.log('\n=== RESULT: ' + pass + ' passed, ' + fail + ' failed ===');
-  process.exitCode = fail ? 1 : 0;
 });

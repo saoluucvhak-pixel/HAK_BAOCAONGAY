@@ -244,15 +244,14 @@ if(t.mode==='light'||t.mode==='dark')h.setAttribute('data-theme',t.mode);}catch(
 
       <section class="section" id="sec-cauhinh">
         <div class="pageHead"><h1>Cấu hình</h1></div>
+        <div class="reportTabs" id="configurationTabs" role="tablist" aria-label="Cấu hình" hidden>
+          <button class="rtab active" id="settingsGeneralTab" role="tab" type="button" aria-selected="true" aria-controls="settingsGeneral">Cài đặt chung</button>
+          <button class="rtab" id="settingsCompanyTab" role="tab" type="button" aria-selected="false" aria-controls="settingsCompany" tabindex="-1">Thông tin công ty</button>
+        </div>
+        <div id="settingsGeneral">
         <div class="dmCard" style="margin-bottom:16px">
           <h3>Định dạng số trên báo cáo</h3>
           <button class="btn small" id="btnPrecisionSettings" type="button">Cài đặt định dạng số</button>
-        </div>
-        <!-- Chỉ hiện khi chạy trong Electron Desktop có preload API; Web vẫn ẩn. -->
-        <div class="dmCard" id="desktopSheetSourceCard" style="display:none;margin-bottom:16px">
-          <h3>Nguồn dữ liệu Google Sheets</h3>
-          <p style="color:var(--muted);font-size:13px;margin:8px 0 14px">Quản lý 4 nguồn Phiếu cân, Đề nghị thanh toán, Hợp đồng NCC và Hồ sơ keo. Kiểm tra kết nối và cột dữ liệu trước khi áp dụng. Nguồn hiện tại được giữ lại nếu kiểm tra thất bại.</p>
-          <button class="btn primary small" id="btnDesktopSheetSources" type="button">⚙ Quản lý nguồn Google Sheets</button>
         </div>
         <div class="dmCard">
           <h3>Sao lưu / Khôi phục dữ liệu đã lưu trên trình duyệt này</h3>
@@ -270,9 +269,22 @@ if(t.mode==='light'||t.mode==='dark')h.setAttribute('data-theme',t.mode);}catch(
             <p style="margin:0 0 8px"><b>3. Xuất báo cáo:</b> mỗi bảng có nút xuất Excel/PDF/In riêng ở góc trên.</p>
             <p style="margin:0 0 8px"><b>4. Danh mục Đại lý/Hỗ trợ:</b> sửa trực tiếp ở tab "Danh mục". Lỡ sửa nhầm thì bấm <b>"↩ Hoàn tác"</b> (hoặc Ctrl+Z), <b>"↪ Làm lại"</b> (Ctrl+Y) để quay lại.</p>
             <p style="margin:0 0 8px"><b>5. Sao lưu/khôi phục dữ liệu:</b> dùng 2 nút ở thẻ phía trên — nên sao lưu định kỳ (vd cuối tháng) để phòng mất dữ liệu khi đổi máy hoặc xoá nhầm trình duyệt.</p>
-            <p style="margin:0 0 8px"><b>6. Đổi tên công ty / link Google Sheet (cho đơn vị khác trong HAK Group):</b> dùng file <code>config.html</code> đi kèm — mở file đó, điền tên công ty và link Google Sheet riêng, bấm tạo là ra 1 file báo cáo mới đã cấu hình sẵn, không cần sửa mã nguồn.</p>
+            <p id="webConfigInstructions" style="margin:0 0 8px"><b>6. Đổi tên công ty / link Google Sheet (cho đơn vị khác trong HAK Group):</b> dùng file <code>config.html</code> đi kèm — mở file đó, điền tên công ty và link Google Sheet riêng, bấm tạo là ra 1 file báo cáo mới đã cấu hình sẵn, không cần sửa mã nguồn.</p>
             <p style="margin:0">Nếu mở file báo cáo bằng double-click mà báo "Lỗi tải dữ liệu... Failed to fetch": mở bằng <code>start.bat</code> (Windows) hoặc <code>start.sh</code> (Mac/Linux) đi kèm thay vì double-click thẳng vào file HTML — xem chi tiết trong <code>README.md</code>.</p>
           </div>
+        </div>
+        </div>
+        <div class="dmCard" id="settingsCompany" role="tabpanel" aria-labelledby="settingsCompanyTab" hidden>
+          <dl class="companyInfoFields">
+            <dt>Tên công ty</dt><dd data-company-field="TenCty"></dd>
+            <dt>Địa chỉ công ty</dt><dd data-company-field="DiaChi"></dd>
+            <dt>Mã số thuế</dt><dd data-company-field="MST"></dd>
+            <dt>Số điện thoại</dt><dd data-company-field="SDT"></dd>
+            <dt>Địa chỉ thu mua</dt><dd data-company-field="DiaChiThuMua"></dd>
+            <dt>Mã HS</dt><dd data-company-field="MaHS"></dd>
+            <dt>Nhà máy</dt><dd data-company-field="NhaMay"></dd>
+          </dl>
+          <button class="btn primary small" id="btnDesktopSheetSources" type="button">Đổi cấu hình công ty…</button>
         </div>
       </section>
 

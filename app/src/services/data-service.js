@@ -9,7 +9,7 @@
  * @module services/data-service
  */
 import { notify } from '../utils/event-bus.js';
-import { CONFIG } from '../config/config.js';
+import { CONFIG, MANAGED_COMPANY } from '../config/config.js';
 import { STATE } from '../store/state.js';
 import { $, esc } from '../utils/dom-utils.js';
 import { dateKey, pad2 } from '../utils/date-utils.js';
@@ -48,9 +48,10 @@ export var REQUIRED_COLUMNS = {
 /** Lỗi có kèm lời giải thích dễ hiểu cho người dùng (tiếng Việt) + chi tiết kỹ thuật gốc. */
 function friendlyFetchError(err) {
   var msg = (err && err.message) || String(err);
+  if (MANAGED_COMPANY) msg = msg.replace(/https?:\/\/[^\s"'<>]+/gi, '[địa chỉ nguồn]');
   if (err && err.name === 'AbortError') return new Error('quá ' + Math.round(timeoutMs() / 1000) + ' giây Google Sheet không phản hồi (mạng chậm/chập chờn)');
   if (/Failed to fetch|NetworkError|Load failed|ERR_/i.test(msg)) return new Error('không kết nối được tới Google Sheet — kiểm tra kết nối Internet (' + msg + ')');
-  return err instanceof Error ? err : new Error(msg);
+  return err instanceof Error && !MANAGED_COMPANY ? err : new Error(msg);
 }
 
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }

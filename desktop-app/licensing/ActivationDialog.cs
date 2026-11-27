@@ -4,7 +4,7 @@ using System.Windows.Forms;
 
 internal static class ActivationDialog
 {
-    internal static bool Run(string requestCode, Action<string> activate, Action<string> import)
+    internal static bool Run(string requestCode, Action<string> verifyResponse, Action<string> import)
     {
         Application.EnableVisualStyles();
         using (var dialog = new Form
@@ -26,9 +26,9 @@ internal static class ActivationDialog
                 Location = new Point(20, 137), Size = new Size(510, 102), Multiline = true,
                 MaxLength = 4096, ScrollBars = ScrollBars.Vertical, AccessibleName = "Mã trả lời"
             };
-            var importFile = new Button { Text = "Nạp file HAK…", Location = new Point(20, 308), Size = new Size(145, 29) };
+            var importFile = new Button { Text = "Nạp file HAK…", Enabled = false, Location = new Point(20, 308), Size = new Size(145, 29) };
             var status = new Label { Location = new Point(20, 249), Size = new Size(510, 47), ForeColor = Color.DarkRed };
-            var confirm = new Button { Text = "Kích hoạt", Location = new Point(318, 308), Size = new Size(105, 29) };
+            var confirm = new Button { Text = "Kiểm tra mã", Location = new Point(318, 308), Size = new Size(105, 29) };
             var cancel = new Button { Text = "Đóng", Location = new Point(433, 308), Size = new Size(97, 29), DialogResult = DialogResult.Cancel };
             copy.Click += (sender, args) =>
             {
@@ -46,8 +46,10 @@ internal static class ActivationDialog
                     status.Text = "Bộ nhớ tạm đang bận. Bấm Ctrl+C để sao chép mã.";
                 }
             };
+            bool approved = false;
             importFile.Click += (sender, args) =>
             {
+                if (!approved) return;
                 using (var picker = new OpenFileDialog { Filter = "Cài đặt công ty HAK (*.haksetup)|*.haksetup" })
                 {
                     if (picker.ShowDialog(dialog) != DialogResult.OK) return;
@@ -67,9 +69,15 @@ internal static class ActivationDialog
             {
                 try
                 {
-                    activate(response.Text);
-                    dialog.DialogResult = DialogResult.OK;
-                    dialog.Close();
+                    verifyResponse(response.Text);
+                    approved = true;
+                    confirm.Enabled = false;
+                    response.ReadOnly = true;
+                    importFile.Enabled = true;
+                    dialog.AcceptButton = importFile;
+                    status.ForeColor = Color.DarkGreen;
+                    status.Text = "Mã hợp lệ. Bấm Nạp file HAK… và chọn file HAK gửi.";
+                    importFile.Focus();
                 }
                 catch (Exception error)
                 {
@@ -77,10 +85,11 @@ internal static class ActivationDialog
                     status.Text = error.Message;
                 }
             };
+            dialog.AcceptButton = confirm;
             dialog.Controls.AddRange(new Control[] {
                 new Label { Text = "1. Gửi mã này cho HAK và giữ cửa sổ mở khi chờ phản hồi", AutoSize = true, Location = new Point(20, 20) },
                 request, copy,
-                new Label { Text = "2. Nạp file HAK gửi lại hoặc dán mã trả lời (Ctrl+V)", AutoSize = true, Location = new Point(20, 108) },
+                new Label { Text = "2. Dán mã trả lời, kiểm tra mã rồi nạp file HAK gửi lại", AutoSize = true, Location = new Point(20, 108) },
                 response, status, importFile, confirm, cancel
             });
             dialog.CancelButton = cancel;
