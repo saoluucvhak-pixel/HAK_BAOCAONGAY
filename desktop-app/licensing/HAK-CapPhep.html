@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HAK · Quản trị giấy phép</title>
+<title>HAK · Cấp phép Báo cáo ngày</title>
 <style>
   :root { font: 16px/1.55 system-ui,sans-serif; color: #14252c; background: #f3f6f7; }
   body { margin: 0; padding: 30px 16px; }
@@ -32,25 +32,22 @@
 <body>
 <main>
   <header>
-    <h1>Quản trị giấy phép HAK</h1>
+    <h1>Cấp phép Báo cáo ngày</h1>
     <p>Dùng trên máy quản trị HAK. Công cụ chạy offline.</p>
   </header>
   <details class="help" id="issuerGuide">
-    <summary>Hướng dẫn cấp phép nhiều app</summary>
-    <h3>1. Chuẩn bị một lần tại HAK</h3>
+    <summary>Hướng dẫn cấp phép Báo cáo ngày cho từng máy</summary>
+    <p>Dùng một bộ cài Báo cáo ngày cho các máy cần cài. Mỗi máy gửi mã yêu cầu riêng và nhận mã phản hồi cùng file riêng.</p>
+    <h3>Chuẩn bị một lần tại HAK</h3>
+    <p>Nếu đã có khóa HAK, dùng lại khóa đó. Nếu mới bắt đầu, mở <strong>Tạo hoặc khôi phục khóa</strong>, đặt mật khẩu và bấm <strong>Tạo khóa chung</strong>. Giữ file sao lưu <code>HAK-KhoaChung.hakkey</code> và mật khẩu tại HAK. Bộ cài Báo cáo ngày 2.6.0 đã có khóa công khai do HAK cung cấp.</p>
+    <h3>Mỗi lần duyệt một máy</h3>
     <ol>
-      <li>Mở <strong>Tạo hoặc khôi phục khóa</strong>, đặt mật khẩu rồi bấm <strong>Tạo khóa chung</strong>. Giữ bản sao <code>HAK-KhoaChung.hakkey</code> đã mã hóa và mật khẩu tại HAK.</li>
-      <li>Bấm <strong>Tải khóa công khai để đóng bộ cài</strong>. Dùng cùng file <code>HAK-PublicKey.jwk</code> cho các app HAK đã tích hợp cấp phép và cho các lần nâng cấp. File này dùng để kiểm tra phản hồi đã được HAK cấp.</li>
-      <li>Bộ cài Báo cáo ngày dùng khóa công khai đã lưu trong kho mã nguồn. Với app mới, cung cấp cùng khóa công khai cho công cụ đóng gói của app đó. Khi dùng GitHub <strong>Release installer</strong>, có thể chỉ định khóa công khai qua biến <code>HAK_LICENSE_PUBLIC_KEY</code> hoặc ô <code>issuer_public_key</code>.</li>
+      <li>Người cài mở Setup, sao chép mã <code>HAK4.…</code> gửi cho HAK và giữ cửa sổ Setup mở.</li>
+      <li>HAK dán mã vào trang này, đối chiếu máy, chọn công ty và hạn dùng. Khi cần thêm công ty, lưu thông tin và link Google Sheets trong mục <strong>Thêm công ty</strong>.</li>
+      <li>Bấm <strong>Tạo mã và file HAK</strong>. Gửi mã phản hồi và file <code>.haksetup</code> cho đúng máy đã gửi yêu cầu. Người cài bấm <strong>Kiểm tra mã</strong>, sau đó chọn <strong>Nạp file HAK…</strong>.</li>
     </ol>
-    <h3>2. Cấp phép cho một máy</h3>
-    <ol>
-      <li>Người cài mở Setup, sao chép mã yêu cầu <code>HAK4.…</code>, gửi HAK và giữ cửa sổ đang mở.</li>
-      <li>Dán mã vào trang này. Đối chiếu <strong>Ứng dụng</strong> và <strong>Máy</strong> hiện dưới ô mã rồi chọn ngày hết hạn. Nếu là Báo cáo ngày, chọn thêm công ty và kiểm tra các nguồn Google Sheets.</li>
-      <li>Bấm <strong>Tạo mã và file HAK</strong>. Gửi cả mã phản hồi và file <code>.haksetup</code>. Người cài kiểm tra mã rồi nạp file vào Setup. Khi chuyển sang cấp cho app khác, dán mã yêu cầu của app đó vào cùng trang này.</li>
-    </ol>
-    <h3>3. Chuyển máy quản trị hoặc khôi phục sau sự cố</h3>
-    <p>Mở HTML trên máy mới, nạp <code>HAK-KhoaChung.hakkey</code> và nhập mật khẩu cũ, rồi bấm <strong>Khôi phục khóa</strong>. Dùng <strong>Sao lưu danh sách công ty</strong> nếu cần chuyển cả hồ sơ công ty.</p>
+    <h3>Khi thay máy quản trị</h3>
+    <p>Mở HTML trên máy mới, nạp <code>HAK-KhoaChung.hakkey</code>, nhập mật khẩu cũ rồi bấm <strong>Khôi phục khóa</strong>. Dùng <strong>Sao lưu danh sách công ty</strong> để chuyển hồ sơ đã lưu.</p>
   </details>
   <section aria-labelledby="issuerTitle">
     <h2 id="issuerTitle">Khóa cấp phép chung HAK</h2>
@@ -176,7 +173,7 @@ function showVault() {
   $('unlockIssuerLabel').hidden = !vault || Boolean(issuerKey);
   report($('issuerStatus'), vault
     ? (issuerKey ? 'Khóa HAK đã mở cho phiên này.' : 'Đã lưu khóa chung HAK trên máy này.')
-    : 'Tạo khóa một lần hoặc nạp bản sao để cấp phép cho các app HAK.');
+    : 'Tạo khóa hoặc khôi phục khóa một lần trên máy quản trị.');
 }
 function issuerAction(handler) {
   return async (event) => {

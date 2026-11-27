@@ -29,10 +29,10 @@ try {
   const page = await context.newPage();
   await page.goto(location);
   const guide = page.locator('#issuerGuide');
-  await guide.getByText('Hướng dẫn cấp phép nhiều app', { exact: true }).click();
+  await guide.getByText('Hướng dẫn cấp phép Báo cáo ngày cho từng máy', { exact: true }).click();
   assert(await guide.getByText('Chuẩn bị một lần tại HAK', { exact: false }).isVisible());
-  assert(await guide.getByText('Dùng cùng file', { exact: false }).isVisible());
-  assert(await guide.getByText('Chuyển máy quản trị hoặc khôi phục sau sự cố', { exact: false }).isVisible());
+  assert(await guide.getByText('Mỗi máy gửi mã yêu cầu riêng', { exact: false }).isVisible());
+  assert(await guide.getByText('Khi thay máy quản trị', { exact: false }).isVisible());
   await page.locator('#issuerDetails > summary').click();
   await page.locator('#newIssuerPassword').fill(password);
   await page.locator('#repeatIssuerPassword').fill(password);
