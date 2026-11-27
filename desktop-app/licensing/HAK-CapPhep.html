@@ -41,7 +41,7 @@
     <ol>
       <li>Mở <strong>Tạo hoặc khôi phục khóa</strong>, đặt mật khẩu rồi bấm <strong>Tạo khóa chung</strong>. Giữ bản sao <code>HAK-KhoaChung.hakkey</code> đã mã hóa và mật khẩu tại HAK.</li>
       <li>Bấm <strong>Tải khóa công khai để đóng bộ cài</strong>. Dùng cùng file <code>HAK-PublicKey.jwk</code> cho các app HAK đã tích hợp cấp phép và cho các lần nâng cấp. File này dùng để kiểm tra phản hồi đã được HAK cấp.</li>
-      <li>Khi đóng gói tại HAK, chọn file công khai trong <code>Dong-Bo-Cai-HAK.cmd</code>. Khi đóng gói qua GitHub, dùng nội dung file công khai cho biến <code>HAK_LICENSE_PUBLIC_KEY</code> hoặc ô <code>issuer_public_key</code> của workflow <strong>Release installer</strong>.</li>
+      <li>Bộ cài Báo cáo ngày dùng khóa công khai đã lưu trong kho mã nguồn. Với app mới, cung cấp cùng khóa công khai cho công cụ đóng gói của app đó. Khi dùng GitHub <strong>Release installer</strong>, có thể chỉ định khóa công khai qua biến <code>HAK_LICENSE_PUBLIC_KEY</code> hoặc ô <code>issuer_public_key</code>.</li>
     </ol>
     <h3>2. Cấp phép cho một máy</h3>
     <ol>

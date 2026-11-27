@@ -1,5 +1,5 @@
 import { createHash, createPublicKey, generateKeyPairSync } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +17,9 @@ if (qa) {
   issuer = pair.publicKey.export({ format: 'jwk' });
   writeFileSync(path.join(dir, 'issuer-qa.pem'), pair.privateKey.export({ format: 'pem', type: 'pkcs8' }), { mode: 0o600 });
 } else {
-  const setting = process.env.HAK_LICENSE_PUBLIC_KEY;
+  const configured = process.env.HAK_LICENSE_PUBLIC_KEY?.trim();
+  const repositoryKey = new URL('licensing/HAK-PublicKey.jwk', root);
+  const setting = configured || (existsSync(repositoryKey) ? readFileSync(repositoryKey, 'utf8') : '');
   if (!setting) throw new Error('Cần khóa công khai HAK-PublicKey.jwk từ HTML quản trị.');
   const jwk = JSON.parse(setting);
   if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519' || Object.hasOwn(jwk, 'd') ||

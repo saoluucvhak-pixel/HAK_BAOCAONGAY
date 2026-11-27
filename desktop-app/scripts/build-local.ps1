@@ -23,7 +23,10 @@ try {
     finally { Pop-Location }
   }
   Run-Tool 'node.exe' @((Join-Path $root '../app/scripts/verify-build.mjs'))
-  $publicKeyPath = Join-Path $env:LOCALAPPDATA 'HAK\Issuer\HAK-PublicKey.jwk'
+  $publicKeyPath = Join-Path $root 'licensing\HAK-PublicKey.jwk'
+  if (-not (Test-Path -LiteralPath $publicKeyPath)) {
+    $publicKeyPath = Join-Path $env:LOCALAPPDATA 'HAK\Issuer\HAK-PublicKey.jwk'
+  }
   if (-not (Test-Path -LiteralPath $publicKeyPath)) {
     Add-Type -AssemblyName System.Windows.Forms
     $picker = New-Object System.Windows.Forms.OpenFileDialog
