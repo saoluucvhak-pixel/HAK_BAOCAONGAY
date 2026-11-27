@@ -4,6 +4,8 @@ name: Release installer
 # Kết quả được đăng lên mục Releases của repo (tải từng file trực tiếp) và nằm trong Artifacts của lần chạy: file Setup .exe, các phần .part (≤ 28 MB), GHEP_FILE.bat, HUONG_DAN_GHEP_FILE.txt.
 on:
   workflow_dispatch:
+  push:
+    branches: [feature/bao-cao-kiem-lam]
 
 permissions:
   contents: write   # tạo GitHub Release
@@ -29,11 +31,24 @@ jobs:
           npm run build
           npm run build:config
 
+      - name: Test forestry and desktop integration
+        if: github.ref_name == 'feature/bao-cao-kiem-lam'
+        run: |
+          node app/tests/test-forestry-report.mjs
+          node app/tests/test-storage-restore.mjs
+          node desktop-app/tests/test-template-refresh.js
+          node desktop-app/tests/test-source-validator.js
+
       - name: Build installer
         working-directory: desktop-app
         run: |
           npm ci
           npm run release
+
+      - name: Verify preview installer and generate checksum
+        if: github.ref_name == 'feature/bao-cao-kiem-lam'
+        shell: pwsh
+        run: ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release
 
       - uses: actions/upload-artifact@v4
         with:
@@ -43,6 +58,8 @@ jobs:
             desktop-app/release/*.part
             desktop-app/release/GHEP_FILE.bat
             desktop-app/release/HUONG_DAN_GHEP_FILE.txt
+            desktop-app/release/SHA256SUMS.txt
+            desktop-app/release/INSTALLER_SECURITY.json
           if-no-files-found: error
           retention-days: 30
 
@@ -54,8 +71,15 @@ jobs:
         run: |
           VERSION=$(node -p "require('./desktop-app/package.json').version")
           TAG="installer-v${VERSION}-${{ github.run_number }}"
-          gh release create "$TAG" \
+          EXTRA_ARGS=()
+          EXTRA_FILES=()
+          if [[ "$GITHUB_REF_NAME" == "feature/bao-cao-kiem-lam" ]]; then
+            TAG="installer-kiem-lam-${GITHUB_SHA:0:12}"
+            EXTRA_ARGS+=(--prerelease)
+            EXTRA_FILES+=(desktop-app/release/SHA256SUMS.txt desktop-app/release/INSTALLER_SECURITY.json)
+          fi
+          gh release create "$TAG" --target "$GITHUB_SHA" "${EXTRA_ARGS[@]}" \
             desktop-app/release/*.exe desktop-app/release/*.part \
-            desktop-app/release/GHEP_FILE.bat desktop-app/release/HUONG_DAN_GHEP_FILE.txt \
+            desktop-app/release/GHEP_FILE.bat desktop-app/release/HUONG_DAN_GHEP_FILE.txt "${EXTRA_FILES[@]}" \
             --title "Bộ cài Báo cáo ngày ${VERSION} (lần ${{ github.run_number }})" \
             --notes "Bộ cài desktop Báo cáo ngày ${VERSION}, đóng từ commit ${{ github.sha }}. Tải các file .part cùng GHEP_FILE.bat vào một thư mục, nhấp đúp GHEP_FILE.bat; hoặc tải thẳng file Setup .exe."
