@@ -21,10 +21,10 @@ const company = readCompanyConfig();
 export const CONFIG = Object.freeze({
   PHIEUCAN: company.PhieuCan || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTj7PHtJtv1iBaF9tCKJ9zgnTyc4j6Hbt9CEYX36sVIDXwJDQUvMGd-O_bc8E-N6iEh5JqH9tytjQLj/pub?output=csv',
   DNTT_CT: company.DNTT || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqRW3Yk2MBgXp1qi29tQZQyn1R-opTUjE5PqBFIH7knAOcr1YvthP_AuXa_10knbaprgtM4i_zPk2i/pub?gid=1612289204&single=true&output=csv',
-  HD_NCC: company.HDNCC || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRmYRMAG3XDhHz74P7L1-NrKyPD8Zozp5lPU9rR-_dirOq5UHfSMNdZ4pq4PF5DpI6nosDBlAwW_a10/pub?gid=1578334272&single=true&output=csv',
-  HOSOKEO: company.Hosokeo || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0mcMT2TsD7lOLSNrTqZPVjJJ395kI54SxSri5-n_VxrfAcC74IKkgCnesT30d1bhx59gJC4esmF7s/pub?gid=0&single=true&output=csv',
-  MA_HS: company.MaHS || '4401220090',
-  NHA_MAY: company.NhaMay || 'CNHAK',
+  HD_NCC: company.HDNCC || (company._hakCompanyProfile ? '' : 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRmYRMAG3XDhHz74P7L1-NrKyPD8Zozp5lPU9rR-_dirOq5UHfSMNdZ4pq4PF5DpI6nosDBlAwW_a10/pub?gid=1578334272&single=true&output=csv'),
+  HOSOKEO: company.Hosokeo || (company._hakCompanyProfile ? '' : 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0mcMT2TsD7lOLSNrTqZPVjJJ395kI54SxSri5-n_VxrfAcC74IKkgCnesT30d1bhx59gJC4esmF7s/pub?gid=0&single=true&output=csv'),
+  MA_HS: company.MaHS || (company._hakCompanyProfile ? '' : '4401220090'),
+  NHA_MAY: company.NhaMay || (company._hakCompanyProfile ? '' : 'CNHAK'),
   TEN_CONG_TY: company.TenCty || 'CÔNG TY TNHH SXTMDV ĐẠI HIỆP',
 
   // Thông tin công ty dùng làm GIÁ TRỊ MẶC ĐỊNH ban đầu cho modal "Thông tin xuất báo cáo ngân

@@ -66,25 +66,38 @@ npm run test:dashboard-fit
 Lần đầu cần Chromium cho Playwright: `npx playwright install chromium`.
 Nếu cố ý thay đổi file xuất: `node tests/test-export-golden.mjs --update` (ghi lại mẫu chuẩn) — chỉ làm khi đã kiểm tra bằng mắt.
 
-## Đóng bộ cài Windows
-```
-cd desktop-app
-npm ci
-npm run release        # → release/BaoCaoNgay_Setup_*.part, GHEP_FILE.bat, HUONG_DAN_GHEP_FILE.txt
-node tests/test-template-refresh.js
-```
-Đóng trên Linux/Mac cần Wine; đóng trực tiếp trên Windows thì không cần.
+## Kích hoạt và cấu hình công ty trên Windows
 
-### Cài trên thiết bị đã được HAK duyệt
+1. **Máy cần cài** mở bộ cài rồi bấm **Sao chép** để gửi mã yêu cầu `HAK-R1.…` cho HAK.
+2. **Quản trị viên HAK** mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html), mở khóa bằng file khóa riêng và mật khẩu, rồi dán mã yêu cầu. Mở **Thông tin công ty và nguồn Google Sheets**, điền tên công ty và các thông tin cần dùng. Dán liên kết CSV cho **Phiếu cân** và **Đề nghị thanh toán**. Có thể để trống **Hợp đồng NCC** và **Hồ sơ keo** khi không dùng hai nguồn này. Chọn ngày hết hạn rồi bấm **Tạo file cài đặt HAK**.
+3. **Máy cần cài** bấm **Nạp file HAK…** rồi chọn `HAK-CaiDat.haksetup`. Có thể đặt nguyên tên file cạnh bộ cài để bộ cài đọc tự động. Nếu ứng dụng đang hoạt động, dùng **Nạp file cài đặt HAK…** trong menu ứng dụng. Sau khi xác minh chữ ký, thời hạn và đúng máy được duyệt, ứng dụng tự đưa cấu hình vào báo cáo.
 
-Bộ cài 2.2.0 xác minh giấy phép trước khi cài. Electron kiểm tra lại mỗi lần mở. Giấy phép gắn với khóa TPM không xuất được trong tài khoản Windows đăng ký. Cần đăng ký bằng đúng tài khoản sẽ chạy báo cáo. Máy Windows cần TPM hoạt động và .NET Framework 4.8.
+Mỗi file chỉ kích hoạt cho máy và tài khoản Windows đã tạo yêu cầu. HAK có thể tạo file và người nhận có thể nạp file khi offline. Ứng dụng cần Internet để lấy dữ liệu mới từ Google Sheets. File có chứa thông tin công ty và liên kết CSV, vì vậy gửi riêng cho đầu mối được duyệt.
 
-1. **Thiết lập một lần trên máy quản trị HAK.** Tạo cặp khóa bằng Node.js theo ví dụ dưới đây. Giữ `private.pem` trong kho quản trị. Nội dung `public.jwk` dùng cho biến Actions `HAK_LICENSE_PUBLIC_KEY` hoặc trường `issuer_public_key` của workflow **Release installer**. Workflow mặc định chỉ tạo artifact. Tùy chọn `publish` đăng lên GitHub Releases.
-2. **Đăng ký máy.** Gửi `HAK-License.exe` và `Register-HAK.cmd` đã đóng cùng bản phát hành. Người dùng mở `Register-HAK.cmd` trong tài khoản đã duyệt rồi gửi `HAK-YeuCau.hakreq` cho HAK qua kênh công ty.
-3. **Phê duyệt và cấp phép.** Đối chiếu yêu cầu với người sử dụng và mã tài sản. Dùng lệnh `issue` bên dưới, ghi mã giấy phép, tài sản và hạn dùng vào sổ cấp phép. Mỗi file giấy phép chỉ khớp khóa TPM đã đăng ký.
-4. **Cài và gia hạn.** Đặt `HAK-GiayPhep.haklic` cạnh bộ cài. Lần sau cùng tài khoản có thể cài đè bằng giấy phép còn hiệu lực đã lưu. Khi ứng dụng yêu cầu gia hạn, chọn file mới ngay trong hộp thoại của Electron.
+### Cấp lại sau khi cài Windows
 
-**Dùng nút bấm:** tải [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html), mở bằng Chrome hoặc Edge rồi chọn **Tạo khóa**. Chỉ gửi `public.jwk` cho bên đóng bộ cài. Giữ `HAK-KhoaRieng.hakkey` và mật khẩu. Sau này dùng mục **Cấp giấy phép cho máy đã duyệt** trong cùng công cụ để ký giấy phép bằng file `.hakkey`.
+Nếu chỉ cài lại ứng dụng trên cùng tài khoản Windows và khóa máy vẫn còn, dùng lại file `HAK-CaiDat.haksetup` còn hạn. Nếu cài lại Windows làm mất khóa máy, thực hiện cấp lại:
+
+1. Máy vừa cài Windows mở bộ cài, sao chép mã yêu cầu mới `HAK-R1.…` và gửi HAK.
+2. Quản trị viên mở `HAK-CapPhep.html` bằng Chrome hoặc Edge. Chọn khóa riêng đã mã hóa dùng để cấp file cũ và nhập mật khẩu. Trong **Cấp lại sau khi cài Windows**, chọn file `.haksetup` cũ và bấm **Nạp cấu hình từ file cũ**. Công cụ xác minh chữ ký và điền lại thông tin công ty cùng các liên kết Google Sheets, kể cả khi giấy phép cũ đã hết hạn.
+3. Kiểm tra thông tin, dán mã yêu cầu mới, chọn ngày hết hạn rồi bấm **Tạo file cài đặt HAK**. Gửi file mới cho người dùng để chọn **Nạp file HAK…**.
+
+Khi không còn file cũ, điền lại cấu hình theo hồ sơ công ty đã duyệt. Giữ một bản file cấp phép ở nơi quản trị viên được phép truy cập để thuận tiện cấp lại.
+
+### Chỉ kích hoạt bằng mã trả lời
+
+1. **Máy cần cài** mở bộ cài và bấm **Sao chép** để gửi mã yêu cầu `HAK-R1.…` cho HAK.
+2. **Quản trị viên HAK** mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html), mở khóa bằng file khóa riêng và mật khẩu, dán mã yêu cầu rồi bấm **Tạo mã trả lời**. Công cụ cấp mã `HAK-A1.…` và mặc định hạn dùng 90 ngày. Có thể thay đổi ngày hết hạn.
+3. **Máy cần cài** dán mã trả lời vào bộ cài và bấm **Kích hoạt**. Electron xác minh lại khi mở app. Đăng ký và cài bằng cùng tài khoản Windows có TPM hoạt động và .NET Framework 4.8.
+
+Mỗi lần mở trang quản trị, chỉ cần mở khóa một lần để xử lý nhiều máy. Đóng trang sẽ khóa lại. Mã dùng cùng một bộ cài đã đóng với khóa công khai của công ty. Khi hết hạn, ứng dụng mở lại cùng hộp thoại để nhập mã mới. Bộ cài vẫn đọc file giấy phép cũ đặt cạnh EXE.
+
+### Đóng bộ cài trên máy quản trị HAK
+
+- Lần đầu, mở `HAK-CapPhep.html` bằng Chrome hoặc Edge. Chọn **Tạo khóa**. Tải `public.jwk` và file khóa riêng đã mã hóa. Giữ khóa riêng và mật khẩu trên máy quản trị. Chỉ chọn `public.jwk` khi đóng bộ cài.
+- Máy đóng gói dùng Windows với Node.js 22.12 trở lên, .NET SDK có bộ tham chiếu .NET Framework 4.8 và phụ thuộc desktop đã chuẩn bị. Chạy `npm ci` trong thư mục `desktop-app` khi chuẩn bị máy. Bộ đóng gói sử dụng bản HTML đã build sẵn trong dự án.
+- Mở `desktop-app/Dong-Bo-Cai-HAK.cmd`. Chọn `public.jwk`, chọn chứng thư ký Windows dạng PFX/P12 của HAK rồi nhập mật khẩu. Bản cài và công cụ quản trị nằm trong `desktop-app/release` sau khi xác minh chữ ký.
+- Quy trình chạy trên máy Windows của HAK và dùng dấu thời gian Authenticode. Lần đầu cần chuẩn bị phụ thuộc và các công cụ đóng gói. Trao mã yêu cầu, nhận file cài đặt HAK và xác minh giấy phép có thể làm offline.
 
 **Dùng dòng lệnh:** ví dụ sau tạo định dạng khóa riêng PEM cho công cụ Node.js. Chạy ở gốc repo trên máy quản trị và lưu khóa riêng vào thư mục có quyền truy cập giới hạn.
 

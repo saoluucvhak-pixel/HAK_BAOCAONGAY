@@ -166,14 +166,15 @@ ipcMain.handle('open-config', (event) => {
   return { ok: true };
 });
 
+function readCompanyConfig() {
+  try { return JSON.parse(fs.readFileSync(CONFIG_JSON, 'utf8')); } catch { return null; }
+}
+
 ipcMain.handle('get-config', (event) => {
-  if (!isTrustedSetupSender(event)) return null;
-  if (!fs.existsSync(CONFIG_JSON)) return null;
-  try { return JSON.parse(fs.readFileSync(CONFIG_JSON, 'utf8')); } catch (e) { return null; }
+  return isTrustedSetupSender(event) ? readCompanyConfig() : null;
 });
 
-ipcMain.handle('save-config', (event, data) => {
-  if (!isTrustedSetupSender(event)) return { ok: false, error: 'Yêu cầu thay đổi cấu hình không đến từ màn hình thiết lập.' };
+function validateCompanyConfig(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: 'Cấu hình gửi lên không hợp lệ.' };
   const cfg = {
     TenCty: String(data.TenCty || '').trim(),
@@ -193,11 +194,15 @@ ipcMain.handle('save-config', (event, data) => {
   if (!cfg.DNTT) return { ok: false, error: 'Cần nhập link Google Sheet "Đề nghị thanh toán" (bắt buộc).' };
   // Kiểm tra lần nữa tại main process: không tin tưởng dữ liệu renderer gửi qua IPC.
   for (const key of ['PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo']) {
-    if (!cfg[key]) continue; // nguồn tùy chọn bỏ trống: giữ logic mặc định cũ.
+    if (!cfg[key]) continue; // Các nguồn tùy chọn được phép để trống.
     const error = validateUrl(cfg[key]);
     if (error) return { ok: false, error: key + ': ' + error };
   }
 
+  return { ok: true, config: cfg };
+}
+
+function persistCompanyConfig(cfg) {
   // Dựng 2 file mới trước khi thay bất kỳ cấu hình đang chạy nào.
   // Nếu bước ghi/đổi tên thất bại, trả lại nguyên trạng từ snapshot.
   const tempReport = REPORT_HTML + '.pending';
@@ -233,8 +238,18 @@ ipcMain.handle('save-config', (event, data) => {
       (rollbackFailed ? ' — CẢNH BÁO: không thể hoàn nguyên đầy đủ, cần kiểm tra bộ nhớ.' : ' — cấu hình cũ đã được giữ lại.') };
   }
 
-  if (mainWindow) mainWindow.loadFile(REPORT_HTML);
   return { ok: true };
+}
+
+ipcMain.handle('save-config', (event, data) => {
+  if (!isTrustedSetupSender(event)) return { ok: false, error: 'Yêu cầu thay đổi cấu hình không đến từ màn hình thiết lập.' };
+  const result = validateCompanyConfig(data);
+  if (!result.ok) return result;
+  const digest = readCompanyConfig()?._hakCompanyProfile;
+  if (digest) result.config._hakCompanyProfile = digest;
+  const saved = persistCompanyConfig(result.config);
+  if (saved.ok && mainWindow) mainWindow.loadFile(REPORT_HTML);
+  return saved;
 });
 
 function buildMenu() {
@@ -249,6 +264,7 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Công cụ hỗ trợ (DevTools)', accelerator: 'CmdOrCtrl+Shift+I', click: () => mainWindow && mainWindow.webContents.toggleDevTools() },
         { type: 'separator' },
+        ...(app.isPackaged ? [{ label: 'Nạp file cài đặt HAK…', click: importCompanyFile }] : []),
         { role: 'quit', label: 'Thoát' }
       ]
     },
@@ -277,45 +293,78 @@ const { createHash } = require('node:crypto');
 const { promisify } = require('node:util');
 const execLicense = promisify(execFile);
 
-async function authorizeInstalledApp() {
+function runLicense(command, args = []) {
   const reference = path.join(__dirname, 'app', 'license-verifier.json');
-  const helper = path.join(process.resourcesPath, 'HAK-License.exe');
-  const run = (...args) => {
-    const { sha256 } = JSON.parse(fs.readFileSync(reference, 'utf8'));
-    if (createHash('sha256').update(fs.readFileSync(helper)).digest('hex') !== sha256) {
-      throw new Error('Công cụ xác minh giấy phép không khớp với bản đóng gói.');
-    }
-    return execLicense(helper, args, { windowsHide: true, timeout: 45000 });
-  };
+  const helper = path.join(process.resourcesPath, 'HAK-License-runtime.exe');
+  const { sha256 } = JSON.parse(fs.readFileSync(reference, 'utf8'));
+  if (createHash('sha256').update(fs.readFileSync(helper)).digest('hex') !== sha256) {
+    throw new Error('Công cụ xác minh giấy phép không khớp với bản đóng gói.');
+  }
+  return execLicense(helper, [command, ...args], { windowsHide: true, timeout: command === 'enroll' ? 0 : 45000 });
+}
+
+function applyVerifiedProfile(stdout) {
+  if (!stdout.trim()) return false;
+  const result = validateCompanyConfig(JSON.parse(Buffer.from(stdout.trim(), 'base64').toString('utf8')));
+  if (!result.ok) throw new Error(result.error);
+  const digest = createHash('sha256').update(JSON.stringify(result.config)).digest('hex');
+  if (readCompanyConfig()?._hakCompanyProfile === digest) return false;
+  result.config._hakCompanyProfile = digest;
+  const saved = persistCompanyConfig(result.config);
+  if (!saved.ok) throw new Error(saved.error);
+  return true;
+}
+
+let importingCompanyFile = false;
+async function importCompanyFile() {
+  if (importingCompanyFile) return;
+  importingCompanyFile = true;
   try {
-    await run('check');
-    if (process.argv.includes('--hak-check-license')) {
-      app.exit(0);
-      return false;
-    }
-    return true;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      filters: [{ name: 'Cài đặt công ty HAK', extensions: ['haksetup'] }], properties: ['openFile']
+    });
+    if (result.canceled) return;
+    await runLicense('accept-kit', [result.filePaths[0]]);
+    const { stdout } = await runLicense('check');
+    if (applyVerifiedProfile(stdout) && mainWindow) mainWindow.loadFile(REPORT_HTML);
   } catch (error) {
-    if (process.argv.includes('--hak-check-license')) {
+    dialog.showErrorBox('Không nạp được file cài đặt HAK', error.stderr?.trim() || error.message);
+  } finally {
+    importingCompanyFile = false;
+  }
+}
+
+async function authorizeInstalledApp() {
+  let verified;
+  const checkOnly = process.argv.includes('--hak-check-license');
+  try {
+    verified = await runLicense('check');
+  } catch (error) {
+    if (checkOnly) {
       console.error(error.stderr?.trim() || error.message);
       app.exit(31);
       return false;
     }
-    const result = await dialog.showMessageBox({
-      type: 'warning', title: 'Giấy phép HAK',
-      message: 'Máy và tài khoản Windows này cần giấy phép HAK còn hiệu lực.',
-      detail: 'Chọn file .haklic được quản trị viên cấp cho đúng máy và tài khoản này.',
-      buttons: ['Chọn giấy phép', 'Thoát'], defaultId: 0, cancelId: 1
-    });
-    if (result.response !== 0) return false;
-    const file = await dialog.showOpenDialog({ filters: [{ name: 'Giấy phép HAK', extensions: ['haklic'] }], properties: ['openFile'] });
-    if (file.canceled) return false;
     try {
-      await run('accept', file.filePaths[0]);
-      return true;
+      await runLicense('enroll');
+      verified = await runLicense('check');
     } catch (failure) {
-      dialog.showErrorBox('Giấy phép HAK bị từ chối', failure.stderr?.trim() || 'Không xác minh được giấy phép.');
+      if (failure.code !== 1) {
+        dialog.showErrorBox('Không mở được màn hình kích hoạt HAK', failure.stderr?.trim() || failure.message);
+      }
       return false;
     }
+  }
+  if (checkOnly) {
+    app.exit(0);
+    return false;
+  }
+  try {
+    applyVerifiedProfile(verified.stdout);
+    return true;
+  } catch (error) {
+    dialog.showErrorBox('Không lưu được cấu hình công ty', error.message);
+    return false;
   }
 }
 

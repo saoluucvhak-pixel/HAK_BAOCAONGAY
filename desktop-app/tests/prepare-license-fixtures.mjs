@@ -20,11 +20,19 @@ execFileSync(process.execPath, [path.join(root, 'licensing', 'admin.mjs'), 'issu
 const key = createPrivateKey(readFileSync(privatePath));
 const original = JSON.parse(readFileSync(agreed, 'utf8'));
 const parsed = JSON.parse(Buffer.from(original.body, 'base64'));
-function fixture(kind, license, signBody) {
+function fixture(filename, license, signBody) {
   const body = Buffer.from(JSON.stringify(license));
   const signature = signBody ? sign('sha256', body, key).toString('base64') : original.signature;
-  writeFileSync(path.join(dir, kind + '.haklic'), JSON.stringify({ body: body.toString('base64'), signature }));
+  writeFileSync(path.join(dir, filename), JSON.stringify({ body: body.toString('base64'), signature }));
 }
-fixture('wrong-device', { ...parsed, device: randomBytes(32).toString('base64') }, true);
-fixture('expired', { ...parsed, issuedAt: parsed.issuedAt - 60, expiresAt: parsed.issuedAt - 1 }, true);
-fixture('tampered', { ...parsed, expiresAt: parsed.expiresAt + 86400 }, false);
+fixture('wrong-device.haklic', { ...parsed, device: randomBytes(32).toString('base64') }, true);
+fixture('expired.haklic', { ...parsed, issuedAt: parsed.issuedAt - 60, expiresAt: parsed.issuedAt - 1 }, true);
+fixture('tampered.haklic', { ...parsed, expiresAt: parsed.expiresAt + 86400 }, false);
+
+const company = {
+  TenCty: 'Công ty HAK QA', DiaChi: 'Đắk Lắk',
+  PhieuCan: 'https://docs.google.com/spreadsheets/d/e/hak-windows-qa-PhieuCan/pub?output=csv',
+  DNTT: 'https://docs.google.com/spreadsheets/d/e/hak-windows-qa-DNTT/pub?output=csv'
+};
+fixture('approved.haksetup', { ...parsed, company }, true);
+fixture('tampered.haksetup', { ...parsed, company }, false);

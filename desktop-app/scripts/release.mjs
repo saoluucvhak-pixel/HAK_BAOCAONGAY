@@ -31,12 +31,21 @@ const requireSignature = process.env.HAK_REQUIRE_SIGNING === '1';
 const signingFlag = requireSignature ? ' --config.forceCodeSigning=true' : '';
 execSync('npm run dist -- --publish never' + signingFlag, { cwd: ROOT, stdio: 'inherit' });
 
+// Công cụ trong resources được xác thực qua SHA-256 bên trong app.asar. Giữ nguyên byte
+// khi đóng gói. Bản dùng riêng trong thư mục registration vẫn được ký Authenticode.
+const expectedVerifier = JSON.parse(fs.readFileSync(path.join(ROOT, 'app', 'license-verifier.json'), 'utf8'));
+const packagedVerifier = fs.readFileSync(path.join(REL, 'win-unpacked', 'resources', 'HAK-License-runtime.exe'));
+if (sha256(packagedVerifier) !== expectedVerifier.sha256) {
+  throw new Error('App đã đóng gói chứa công cụ xác minh giấy phép sai SHA-256.');
+}
+
 const exeName = fs.readdirSync(REL).find((f) => f.endsWith('.exe') && f.includes('Setup'));
 if (!exeName) { console.error('Không thấy file .exe trong release/'); process.exit(1); }
 const registration = path.join(REL, 'registration');
 fs.mkdirSync(registration, { recursive: true });
 fs.copyFileSync(path.join(REL, 'win-unpacked', 'HAK-License.exe'), path.join(registration, 'HAK-License.exe'));
 fs.copyFileSync(path.join(ROOT, 'licensing', 'Register-HAK.cmd'), path.join(registration, 'Register-HAK.cmd'));
+fs.copyFileSync(path.join(ROOT, 'licensing', 'HAK-CapPhep.html'), path.join(REL, 'HAK-CapPhep.html'));
 const exe = fs.readFileSync(path.join(REL, exeName));
 const hash = sha256(exe);
 const parts = [];

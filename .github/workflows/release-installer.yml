@@ -73,6 +73,7 @@ jobs:
             desktop-app/release/*.exe
             desktop-app/release/*.part
             desktop-app/release/GHEP_FILE.bat
+            desktop-app/release/HAK-CapPhep.html
             desktop-app/release/HUONG_DAN_GHEP_FILE.txt
             desktop-app/release/registration/Register-HAK.cmd
             desktop-app/release/registration/HAK-License.exe
@@ -93,7 +94,8 @@ jobs:
           gh release create "$TAG" \
             desktop-app/release/*.exe desktop-app/release/*.part \
             desktop-app/release/GHEP_FILE.bat desktop-app/release/HUONG_DAN_GHEP_FILE.txt \
+            desktop-app/release/HAK-CapPhep.html \
             desktop-app/release/SHA256SUMS.txt desktop-app/release/INSTALLER_SECURITY.json \
             desktop-app/release/registration/HAK-License.exe desktop-app/release/registration/Register-HAK.cmd \
             --title "Bộ cài Báo cáo ngày ${VERSION} (lần ${{ github.run_number }})" \
-            --notes "Bộ cài desktop Báo cáo ngày ${VERSION}, đóng từ commit ${{ github.sha }}, đã xác minh chữ ký Authenticode. Tải các file .part cùng GHEP_FILE.bat vào một thư mục, nhấp đúp GHEP_FILE.bat; hoặc tải thẳng file Setup .exe."
+            --notes "Bộ cài desktop Báo cáo ngày ${VERSION}, đóng từ commit ${{ github.sha }}, đã xác minh chữ ký Authenticode. Tải các file .part cùng GHEP_FILE.bat vào một thư mục, nhấp đúp GHEP_FILE.bat; hoặc tải thẳng file Setup .exe. Quản trị viên dùng HAK-CapPhep.html để cấp và cấp lại file .haksetup sau khi cài Windows."

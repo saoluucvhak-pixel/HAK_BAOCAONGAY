@@ -7,6 +7,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
     <EmbeddedResource Include="$(HakPolicyPath)" LogicalName="hak-license-policy.json" />
   </ItemGroup>
 </Project>

@@ -37,6 +37,7 @@
         }
       ],
       "icon": "build/icon.ico",
+      "signExts": ["!HAK-License-runtime.exe"],
       "signtoolOptions": {
         "signingHashAlgorithms": [
           "sha256"
@@ -66,7 +67,7 @@
     "extraResources": [
       {
         "from": "build/license-bin/HAK-License.exe",
-        "to": "HAK-License.exe"
+        "to": "HAK-License-runtime.exe"
       }
     ]
   }

@@ -73,10 +73,10 @@ function verifyRun(executable, expected) {
   assert.equal(result.status, expected, 'Electron license verification: ' + (result.stderr || result.stdout));
 }
 
-async function openInstalled(offline) {
+async function openInstalled(offline, userProfile = profile) {
   const electron = await _electron.launch({
     executablePath: await installedExecutable(),
-    args: ['--user-data-dir=' + profile, '--host-resolver-rules=MAP docs.google.com ~NOTFOUND'],
+    args: ['--user-data-dir=' + userProfile, '--host-resolver-rules=MAP docs.google.com ~NOTFOUND'],
     timeout: 60_000
   });
   try {
@@ -235,4 +235,23 @@ const licensePath = path.join(process.env.LOCALAPPDATA, 'HAK', 'BaoCaoNgay', 'li
 verifyRun(registeredExe, 0);
 await unlink(licensePath);
 verifyRun(registeredExe, 31);
-console.log('PASS: từ chối 4 ca NSIS, kiểm tra lại ở Electron, nâng cấp và khôi phục dữ liệu.');
+const besideKit = path.join(path.dirname(candidate), 'HAK-CaiDat.haksetup');
+await unlink(besideInstaller);
+await copyFile(path.join(licenses, 'tampered.haksetup'), besideKit);
+install(candidate, 31);
+await copyFile(path.join(licenses, 'approved.haksetup'), besideKit);
+install(candidate);
+verifyRun(await installedExecutable(), 0);
+const configured = await openInstalled(false, path.join(dir, 'company-file-profile'));
+try {
+  const config = JSON.parse(await readFile(path.join(configured.appInfo.userData, 'company-config.json'), 'utf8'));
+  assert.equal(config.TenCty, 'Công ty HAK QA');
+  assert.equal(config.DiaChi, 'Đắk Lắk');
+  assert.equal(config.PhieuCan, Object.keys(sheets)[0]);
+  assert.equal(config.DNTT, Object.keys(sheets)[1]);
+  assert.equal(config.HDNCC, '');
+  assert(configured.page.url().endsWith('/report.html'));
+} finally {
+  await configured.electron.close();
+}
+console.log('PASS: NSIS từ chối file lỗi, nạp cấu hình đã ký, nâng cấp và khôi phục dữ liệu.');

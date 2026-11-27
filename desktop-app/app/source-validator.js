@@ -58,7 +58,7 @@
   }
   async function probeSource(source, value, fetcher, limitMs) {
     const url = String(value || '').trim();
-    if (!url) return { key: source.key, ok: !source.required, skipped: true, message: source.required ? 'Thiếu đường dẫn bắt buộc.' : 'Không cấu hình (giữ nguồn mặc định của mẫu).' };
+    if (!url) return { key: source.key, ok: !source.required, skipped: true, message: source.required ? 'Thiếu đường dẫn bắt buộc.' : 'Không nhập liên kết cho nguồn tùy chọn.' };
     const bad = validateUrl(url);
     if (bad) return { key: source.key, ok: false, message: bad };
     const controller = new AbortController();
