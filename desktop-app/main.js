@@ -277,8 +277,14 @@ const { promisify } = require('node:util');
 const execLicense = promisify(execFile);
 
 async function authorizeInstalledApp() {
-  const helper = path.join(__dirname, 'license', 'HAK-License.exe');
-  const run = (...args) => execLicense(helper, args, { windowsHide: true, timeout: 45000 });
+  const reference = path.join(__dirname, 'license', 'HAK-License.exe');
+  const helper = path.join(process.resourcesPath, 'HAK-License.exe');
+  const run = (...args) => {
+    if (!fs.readFileSync(helper).equals(fs.readFileSync(reference))) {
+      throw new Error('Công cụ xác minh giấy phép không khớp với bản đóng gói.');
+    }
+    return execLicense(helper, args, { windowsHide: true, timeout: 45000 });
+  };
   try {
     await run('check');
     if (process.argv.includes('--hak-check-license')) {
@@ -288,6 +294,7 @@ async function authorizeInstalledApp() {
     return true;
   } catch (error) {
     if (process.argv.includes('--hak-check-license')) {
+      console.error(error.stderr?.trim() || error.message);
       app.exit(31);
       return false;
     }

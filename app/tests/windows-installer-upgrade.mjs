@@ -59,11 +59,23 @@ async function extractLegacy() {
   extract(path.join(payloadDir, bundles[0]), installDir);
 }
 
-async function openInstalled(offline) {
+async function installedExecutable() {
   const names = (await readdir(installDir)).filter((name) => /\.exe$/i.test(name) && !/^(uninstall|hak-license\.exe)/i.test(name));
   assert.equal(names.length, 1, 'Ứng dụng đã cài phải có đúng một file chạy chính.');
+  return path.join(installDir, names[0]);
+}
+
+function verifyRun(executable, expected) {
+  const result = spawnSync(executable, ['--hak-check-license'], {
+    windowsHide: true, timeout: 60_000, encoding: 'utf8'
+  });
+  if (result.error) throw result.error;
+  assert.equal(result.status, expected, 'Electron license verification: ' + (result.stderr || result.stdout));
+}
+
+async function openInstalled(offline) {
   const electron = await _electron.launch({
-    executablePath: path.join(installDir, names[0]),
+    executablePath: await installedExecutable(),
     args: ['--user-data-dir=' + profile, '--host-resolver-rules=MAP docs.google.com ~NOTFOUND'],
     timeout: 60_000
   });
@@ -175,6 +187,8 @@ for (const kind of ['wrong-device', 'tampered', 'expired']) {
 console.log('Cài đè cùng thư mục và mở 2.2.0 ở chế độ offline.');
 await copyFile(path.join(licenses, 'approved.haklic'), besideInstaller);
 install(candidate);
+const registeredExe = await installedExecutable();
+verifyRun(registeredExe, 0);
 const upgraded = await openInstalled(true);
 try {
   assert.equal(upgraded.appInfo.version, '2.2.0');
@@ -218,11 +232,7 @@ try {
 }
 
 const licensePath = path.join(process.env.LOCALAPPDATA, 'HAK', 'BaoCaoNgay', 'license.haklic');
-const mainExecutable = (await readdir(installDir)).find((name) => /\.exe$/i.test(name) && !/^(uninstall|hak-license\.exe)/i.test(name));
-const verifyRun = () => spawnSync(path.join(installDir, mainExecutable), ['--hak-check-license'], {
-  windowsHide: true, timeout: 60_000
-});
-assert.equal(verifyRun().status, 0, 'Electron xác minh giấy phép đã cài.');
+verifyRun(registeredExe, 0);
 await unlink(licensePath);
-assert.equal(verifyRun().status, 31, 'Electron từ chối khi thiếu giấy phép.');
+verifyRun(registeredExe, 31);
 console.log('PASS: từ chối 4 ca NSIS, kiểm tra lại ở Electron, nâng cấp và khôi phục dữ liệu.');

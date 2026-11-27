@@ -69,6 +69,12 @@
       "enableEmbeddedAsarIntegrityValidation": true,
       "onlyLoadAppFromAsar": true,
       "enableNodeOptionsEnvironmentVariable": false
-    }
+    },
+    "extraResources": [
+      {
+        "from": "build/license-bin/HAK-License.exe",
+        "to": "HAK-License.exe"
+      }
+    ]
   }
 }
