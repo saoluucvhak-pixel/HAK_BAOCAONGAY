@@ -21,7 +21,7 @@
  * và phần JS trong `config.html` ở dự án `app/` để đối chiếu — cùng 1 bộ DEFAULTS).
  * @module main
  */
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require('electron');
 // [CHUẨN HAK — 2026-10-29] Ô chọn ngày (Từ ngày/Đến ngày) hiển thị dd/mm/yyyy như chuẩn HAK, bất kể
 // Windows đang để ngôn ngữ gì — ô <input type="date"> theo ngôn ngữ của Chromium. Chỉ đổi hiển thị;
 // giá trị bên trong vẫn là yyyy-mm-dd như trước.
@@ -272,13 +272,58 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.whenReady().then(() => {
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
+const execLicense = promisify(execFile);
+
+async function authorizeInstalledApp() {
+  if (!app.isPackaged) return true;
+  const helper = path.join(path.dirname(process.execPath), 'HAK-License.exe');
+  const run = (...args) => execLicense(helper, args, { windowsHide: true, timeout: 45000 });
+  try {
+    await run('check');
+    if (process.argv.includes('--hak-check-license')) {
+      app.exit(0);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    if (process.argv.includes('--hak-check-license')) {
+      app.exit(31);
+      return false;
+    }
+    const result = await dialog.showMessageBox({
+      type: 'warning', title: 'Giấy phép HAK',
+      message: 'Máy và tài khoản Windows này cần giấy phép HAK còn hiệu lực.',
+      detail: 'Chọn file .haklic được quản trị viên cấp cho đúng máy và tài khoản này.',
+      buttons: ['Chọn giấy phép', 'Thoát'], defaultId: 0, cancelId: 1
+    });
+    if (result.response !== 0) return false;
+    const file = await dialog.showOpenDialog({ filters: [{ name: 'Giấy phép HAK', extensions: ['haklic'] }], properties: ['openFile'] });
+    if (file.canceled) return false;
+    try {
+      await run('accept', file.filePaths[0]);
+      return true;
+    } catch (failure) {
+      dialog.showErrorBox('Giấy phép HAK bị từ chối', failure.stderr?.trim() || 'Không xác minh được giấy phép.');
+      return false;
+    }
+  }
+}
+
+async function startApp() {
+  const authorized = app.isPackaged ? await authorizeInstalledApp() : true;
+  if (!authorized) {
+    app.quit();
+    return;
+  }
   buildMenu();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
-});
+}
+app.whenReady().then(startApp);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

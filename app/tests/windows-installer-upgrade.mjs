@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readdir, readFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, readdir, readFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,13 +31,15 @@ const sheets = Object.fromEntries(Object.entries(sources).map(([key, rows]) => [
   `https://docs.google.com/spreadsheets/d/e/hak-windows-qa-${key}/pub?output=csv`, toCSV(rows)
 ]));
 
-function install(file) {
-  execFileSync('powershell.exe', ['-NoProfile', '-File', installerScript, path.resolve(file), installDir],
+function install(file, expected = 0) {
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-File', installerScript, path.resolve(file), installDir],
     { stdio: 'inherit', timeout: 180_000 });
+  if (result.error) throw result.error;
+  assert.equal(result.status, expected, 'NSIS exit code for ' + path.basename(file));
 }
 
 async function openInstalled(offline) {
-  const names = (await readdir(installDir)).filter((name) => /\.exe$/i.test(name) && !/^uninstall/i.test(name));
+  const names = (await readdir(installDir)).filter((name) => /\.exe$/i.test(name) && !/^(uninstall|hak-license\.exe)/i.test(name));
   assert.equal(names.length, 1, 'Ứng dụng đã cài phải có đúng một file chạy chính.');
   const electron = await _electron.launch({
     executablePath: path.join(installDir, names[0]),
@@ -139,11 +141,22 @@ try {
   await old.electron.close();
 }
 
-console.log('Cài đè cùng thư mục và mở 2.1.0 ở chế độ offline.');
+const licenses = process.env.HAK_QA_LICENSE_DIR;
+assert(licenses, 'Thiếu bộ fixture cấp phép.');
+const besideInstaller = path.join(path.dirname(candidate), 'HAK-GiayPhep.haklic');
+console.log('Từ chối cài khi thiếu giấy phép hoặc giấy phép lỗi.');
+install(candidate, 31);
+for (const kind of ['wrong-device', 'tampered', 'expired']) {
+  await copyFile(path.join(licenses, kind + '.haklic'), besideInstaller);
+  install(candidate, 31);
+}
+
+console.log('Cài đè cùng thư mục và mở 2.2.0 ở chế độ offline.');
+await copyFile(path.join(licenses, 'approved.haklic'), besideInstaller);
 install(candidate);
 const upgraded = await openInstalled(true);
 try {
-  assert.equal(upgraded.appInfo.version, '2.1.0');
+  assert.equal(upgraded.appInfo.version, '2.2.0');
   assert.equal(upgraded.appInfo.userData, old.appInfo.userData);
   await upgraded.page.reload();
   await waitForReport(upgraded.page, true);
@@ -183,4 +196,12 @@ try {
   await restored.electron.close();
 }
 
-console.log('PASS: NSIS 1.0.0 → 2.1.0, cấu hình, offline, TH_VAY, số dư, tổng báo cáo và khôi phục.');
+const licensePath = path.join(process.env.LOCALAPPDATA, 'HAK', 'BaoCaoNgay', 'license.haklic');
+const mainExecutable = (await readdir(installDir)).find((name) => /\.exe$/i.test(name) && !/^(uninstall|hak-license\.exe)/i.test(name));
+const verifyRun = () => spawnSync(path.join(installDir, mainExecutable), ['--hak-check-license'], {
+  windowsHide: true, timeout: 60_000
+});
+assert.equal(verifyRun().status, 0, 'Electron xác minh giấy phép đã cài.');
+await unlink(licensePath);
+assert.equal(verifyRun().status, 31, 'Electron từ chối khi thiếu giấy phép.');
+console.log('PASS: từ chối 4 ca NSIS, kiểm tra lại ở Electron, nâng cấp và khôi phục dữ liệu.');

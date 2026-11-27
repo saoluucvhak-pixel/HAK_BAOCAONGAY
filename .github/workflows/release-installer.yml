@@ -38,14 +38,19 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.HAK_WINDOWS_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.HAK_WINDOWS_CSC_PASSWORD }}
           HAK_REQUIRE_SIGNING: "1"
+          HAK_LICENSE_PUBLIC_KEY: ${{ vars.HAK_LICENSE_PUBLIC_KEY }}
         run: |
+          if (-not $env:HAK_LICENSE_PUBLIC_KEY) { throw 'Configure HAK_LICENSE_PUBLIC_KEY with the company issuer public key.' }
           if (-not $env:WIN_CSC_LINK) { throw 'Configure HAK_WINDOWS_CSC_LINK before publishing a signed installer.' }
           npm ci
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm run release
 
       - name: Verify signature and record SHA-256
-        run: ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature -RequireTimestamp
+        run: |
+          ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature -RequireTimestamp
+          $registration = Get-AuthenticodeSignature -LiteralPath ./desktop-app/release/registration/HAK-License.exe
+          if ($registration.Status -ne 'Valid' -or -not $registration.TimeStamperCertificate) { throw 'Invalid signature on registration tool.' }
 
       - name: Record GitHub build provenance
         uses: actions/attest@v4
@@ -60,6 +65,7 @@ jobs:
             desktop-app/release/*.part
             desktop-app/release/GHEP_FILE.bat
             desktop-app/release/HUONG_DAN_GHEP_FILE.txt
+            desktop-app/release/registration/HAK-License.exe
             desktop-app/release/SHA256SUMS.txt
             desktop-app/release/INSTALLER_SECURITY.json
           if-no-files-found: error
@@ -77,5 +83,6 @@ jobs:
             desktop-app/release/*.exe desktop-app/release/*.part \
             desktop-app/release/GHEP_FILE.bat desktop-app/release/HUONG_DAN_GHEP_FILE.txt \
             desktop-app/release/SHA256SUMS.txt desktop-app/release/INSTALLER_SECURITY.json \
+            desktop-app/release/registration/HAK-License.exe \
             --title "Bộ cài Báo cáo ngày ${VERSION} (lần ${{ github.run_number }})" \
             --notes "Bộ cài desktop Báo cáo ngày ${VERSION}, đóng từ commit ${{ github.sha }}, đã xác minh chữ ký Authenticode. Tải các file .part cùng GHEP_FILE.bat vào một thư mục, nhấp đúp GHEP_FILE.bat; hoặc tải thẳng file Setup .exe."

@@ -29,10 +29,13 @@ for (const f of fs.existsSync(REL) ? fs.readdirSync(REL) : []) {
 console.log('2) Đang đóng bộ cài (electron-builder)...');
 const requireSignature = process.env.HAK_REQUIRE_SIGNING === '1';
 const signingFlag = requireSignature ? ' --config.forceCodeSigning=true' : '';
-execSync('npx electron-builder --win --x64 --publish never' + signingFlag, { cwd: ROOT, stdio: 'inherit' });
+execSync('npm run dist -- --publish never' + signingFlag, { cwd: ROOT, stdio: 'inherit' });
 
 const exeName = fs.readdirSync(REL).find((f) => f.endsWith('.exe') && f.includes('Setup'));
 if (!exeName) { console.error('Không thấy file .exe trong release/'); process.exit(1); }
+const registration = path.join(REL, 'registration');
+fs.mkdirSync(registration, { recursive: true });
+fs.copyFileSync(path.join(REL, 'win-unpacked', 'HAK-License.exe'), path.join(registration, 'HAK-License.exe'));
 const exe = fs.readFileSync(path.join(REL, exeName));
 const hash = sha256(exe);
 const parts = [];
