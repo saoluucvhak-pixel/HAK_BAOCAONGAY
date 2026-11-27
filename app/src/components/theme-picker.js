@@ -1,7 +1,7 @@
 /**
  * [2026-10-29] Chọn giao diện (menu trái): chủ đề màu + chế độ Sáng / Tối / Theo máy.
  * Chủ đề: luxe (mặc định, HAK-Enterprise-Design-System), classic (xanh ngọc lam — token gốc teal của
- * Design System), navy, ngọc bích, neutral. Màu khai báo trong index.html (html[data-skin], data-theme).
+ * Design System), navy, ngọc bích, neutral, kính mờ. Màu khai báo trong index.html (html[data-skin], data-theme).
  *
  * Theo quy tắc Design System: đổi chủ đề KHÔNG ghi vào dữ liệu nghiệp vụ — lưu riêng 1 khoá
  * localStorage (không nằm trong file sao lưu), file Excel/PDF xuất ra giữ màu chuẩn luxe. Đoạn script
@@ -11,7 +11,7 @@
 import { $ } from '../utils/dom-utils.js';
 
 export const THEME_STORAGE_KEY = 'baocaongay_ui_theme';
-export const SKINS = Object.freeze(['luxe', 'classic', 'navy', 'ngoc', 'neutral']);
+export const SKINS = Object.freeze(['luxe', 'classic', 'navy', 'ngoc', 'neutral', 'glass']);
 export const MODES = Object.freeze(['auto', 'light', 'dark']);
 
 /** Đọc lựa chọn đã lưu (lỗi/không có → mặc định luxe + theo máy). */

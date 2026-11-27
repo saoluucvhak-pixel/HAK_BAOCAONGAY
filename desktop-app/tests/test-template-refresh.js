@@ -121,6 +121,18 @@ check('Chặn điều hướng cửa sổ chính ra website và file lạ', prev
 navigationHandler({ preventDefault() { prevented++; } }, require('url').pathToFileURL(reportPath).toString());
 check('Vẫn cho phép điều hướng tới báo cáo do app quản lý', prevented === 2);
 
+const defaultShipping = 'https://docs.google.com/spreadsheets/d/1ZZ2iUwkkKe8wXdztA7mL-v9j6fmgY5c5rlDdI1sNoAk/edit?usp=sharing';
+const shippingTemplate = realTemplate.includes(defaultShipping) ? realTemplate :
+  realTemplate.replace('</body>', '<!--' + defaultShipping + '--></body>');
+fs.writeFileSync(path.join(appDir, 'app', 'index.html'), shippingTemplate);
+const company = handlers['get-config'](trustedSetupEvent);
+const shipping = 'https://docs.google.com/spreadsheets/d/TEST_EXPORT/edit';
+const savedShipping = handlers['save-config'](trustedSetupEvent, { ...company, XuatHang: shipping + '?gid=0' });
+check('Lưu nguồn xuất hàng cùng cấu hình công ty', savedShipping.ok && handlers['get-config'](trustedSetupEvent).XuatHang === shipping + '?gid=0');
+check('Mẫu báo cáo lấy đúng file xuất hàng đã cấu hình', fs.readFileSync(reportPath, 'utf8').includes(shipping) && startApp() === reportPath);
+const rejectedShipping = handlers['save-config'](trustedSetupEvent, { ...company, XuatHang: 'https://example.com/spreadsheets/d/TEST_EXPORT/edit' });
+check('Link xuất hàng sai không ghi đè cấu hình đã lưu', !rejectedShipping.ok && handlers['get-config'](trustedSetupEvent).XuatHang === shipping + '?gid=0');
+
 Module._load = origLoad;
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log('\n=== RESULT: ' + pass + ' passed, ' + fail + ' failed ===');

@@ -1,4 +1,4 @@
-// [2026-10-29] Chọn giao diện (menu trái): 5 chủ đề × Sáng / Tối / Theo máy. Kiểm tra trên bản build:
+// [2026-10-29] Chọn giao diện (menu trái): 6 chủ đề × Sáng / Tối / Theo máy. Kiểm tra trên bản build:
 // đổi màu đúng, lưu lại khi tải trang (áp ngay trong <head>, không chớp màu), không đụng dữ liệu/sao lưu.
 // Chạy: npm run test:theme-picker   (tuỳ chọn: node tests/test-theme-picker.mjs <đường dẫn index.html>)
 import { chromium } from 'playwright';
@@ -10,7 +10,7 @@ const DIST = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__di
 let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x !== undefined ? '  [' + x + ']' : '')); };
 const EXPECT = { // --accent mong đợi (sáng / tối) — khớp bảng màu trong index.html
-  luxe: ['#1d3a63', '#d4b06a'], classic: ['#0e7c86', '#21b5c0'], navy: ['#1e3a8a', '#7aa2ff'], ngoc: ['#047857', '#34d399'], neutral: ['#334155', '#cbd5e1'],
+  luxe: ['#1d3a63', '#d4b06a'], classic: ['#0e7c86', '#21b5c0'], navy: ['#1e3a8a', '#7aa2ff'], ngoc: ['#047857', '#34d399'], neutral: ['#334155', '#cbd5e1'], glass: ['#176b58', '#87ddc3'],
 };
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const ctx = await browser.newContext({ colorScheme: 'light' });
@@ -27,17 +27,17 @@ for (const [skin, [light, dark]] of Object.entries(EXPECT)) {
   check(skin + ': sáng ' + light + ', tối ' + dark, a1 === light && a2 === dark, a1 + ' / ' + a2);
 }
 // Theo máy: máy chuyển sang tối thì tự tối
-await page.selectOption('#themeSkin', 'navy'); await page.selectOption('#themeMode', 'auto');
+await page.selectOption('#themeSkin', 'glass'); await page.selectOption('#themeMode', 'auto');
 await page.emulateMedia({ colorScheme: 'dark' });
-check('Theo máy: máy tối → Navy tối', (await accent()) === EXPECT.navy[1], await accent());
+check('Theo máy: máy tối → Kính mờ tối', (await accent()) === EXPECT.glass[1], await accent());
 await page.emulateMedia({ colorScheme: 'light' });
 // Lưu khi tải lại trang — áp trong <head> trước khi app chạy
-await page.selectOption('#themeSkin', 'ngoc'); await page.selectOption('#themeMode', 'dark');
+await page.selectOption('#themeSkin', 'glass'); await page.selectOption('#themeMode', 'dark');
 await page.reload({ waitUntil: 'domcontentloaded' });
 const early = await page.evaluate(() => [document.documentElement.getAttribute('data-skin'), document.documentElement.getAttribute('data-theme')]);
-check('Tải lại trang: Ngọc bích tối được áp ngay từ <head>', early[0] === 'ngoc' && early[1] === 'dark', early.join(','));
+check('Tải lại trang: Kính mờ tối được áp ngay từ <head>', early[0] === 'glass' && early[1] === 'dark', early.join(','));
 await page.waitForTimeout(1000);
-check('Tải lại trang: 2 ô chọn hiện đúng lựa chọn đã lưu', (await page.inputValue('#themeSkin')) === 'ngoc' && (await page.inputValue('#themeMode')) === 'dark');
+check('Tải lại trang: 2 ô chọn hiện đúng lựa chọn đã lưu', (await page.inputValue('#themeSkin')) === 'glass' && (await page.inputValue('#themeMode')) === 'dark');
 // Không nằm trong file sao lưu dữ liệu
 const backupKeys = await page.evaluate(() => Object.keys(window.app.storageService.exportAll().data));
 check('Lựa chọn giao diện KHÔNG nằm trong file sao lưu dữ liệu', !backupKeys.some((k) => /theme/i.test(k)), backupKeys.join(','));

@@ -89,6 +89,12 @@ export async function restoreData(file) {
 
     // Nạp lại STATE từ dữ liệu vừa khôi phục + vẽ lại UI liên quan — đúng những gì boot() làm
     // lúc khởi động, chỉ khác là chạy lại giữa chừng thay vì lúc tải trang.
+    if (result.restoredKeys.includes('forestrySettings')) {
+      document.dispatchEvent(new Event('forestrysettingschange'));
+    }
+    if (result.restoredKeys.includes('forestryHistory')) {
+      document.dispatchEvent(new Event('forestryhistorychange'));
+    }
     loadDM();
     renderDMTables();
     if (RESULTS) runReport();

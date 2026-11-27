@@ -64,7 +64,7 @@
   </div>
 
   <div class="card">
-    <h2>2. Link Google Sheet (đã "Xuất bản lên web" dạng CSV)</h2>
+    <h2>2. Link Google Sheet</h2>
     <label>Phiếu cân <span class="req">*</span>
       <span class="hint">Bắt buộc — nguồn dữ liệu chính, mọi báo cáo đều dựa vào đây</span>
     </label>
@@ -82,6 +82,11 @@
     </label>
     <input type="url" id="fHDNCC" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
     <div class="source-status" id="statusHDNCC" role="status" aria-live="polite">Chưa kiểm tra kết nối</div>
+
+    <label for="fXuatHang">Xuất hàng (XUATHANG_DN)
+      <span class="hint">Link của cả file Google Sheet, dùng để đọc NL_PC_XH và NL_DH_XB cho Báo cáo kiểm lâm.</span>
+    </label>
+    <input type="url" id="fXuatHang" value="https://docs.google.com/spreadsheets/d/1ZZ2iUwkkKe8wXdztA7mL-v9j6fmgY5c5rlDdI1sNoAk/edit?usp=sharing" placeholder="https://docs.google.com/spreadsheets/d/.../edit">
 
     <label>Hồ sơ keo (Hosokeo)
       <span class="hint">Không bắt buộc — chỉ dùng cho báo cáo BKLS xuất khẩu, để trống nếu chưa có</span>
@@ -119,7 +124,7 @@
 (async function () {
   var msg = document.getElementById('msg');
   var btn = document.getElementById('btnSave');
-  var fields = ['fTenCty','fMaHS','fNhaMay','fPhieuCan','fDNTT','fHDNCC','fHosokeo','fMST','fSDT','fDiaChi','fDiaChiThuMua'];
+  var fields = ['fTenCty','fMaHS','fNhaMay','fPhieuCan','fDNTT','fHDNCC','fXuatHang','fHosokeo','fMST','fSDT','fDiaChi','fDiaChiThuMua'];
 
   var sourceKeys = ['PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo'];
   var checkBtn = document.getElementById('btnCheck');
@@ -174,7 +179,7 @@
     document.getElementById('editNote').style.display = 'block';
     fields.forEach(function (id) {
       var key = id.slice(1); // fTenCty -> TenCty
-      if (existing[key] != null) document.getElementById(id).value = existing[key];
+      if (existing[key] != null && (key !== 'XuatHang' || existing[key])) document.getElementById(id).value = existing[key];
     });
   }
 

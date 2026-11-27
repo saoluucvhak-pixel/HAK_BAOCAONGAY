@@ -68,6 +68,7 @@ const DEFAULTS = {
   DNTT: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqRW3Yk2MBgXp1qi29tQZQyn1R-opTUjE5PqBFIH7knAOcr1YvthP_AuXa_10knbaprgtM4i_zPk2i/pub?gid=1612289204&single=true&output=csv',
   HDNCC: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRmYRMAG3XDhHz74P7L1-NrKyPD8Zozp5lPU9rR-_dirOq5UHfSMNdZ4pq4PF5DpI6nosDBlAwW_a10/pub?gid=1578334272&single=true&output=csv',
   Hosokeo: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0mcMT2TsD7lOLSNrTqZPVjJJ395kI54SxSri5-n_VxrfAcC74IKkgCnesT30d1bhx59gJC4esmF7s/pub?gid=0&single=true&output=csv',
+  XuatHang: 'https://docs.google.com/spreadsheets/d/1ZZ2iUwkkKe8wXdztA7mL-v9j6fmgY5c5rlDdI1sNoAk/edit?usp=sharing',
   BANK_INFO_LITERAL: '{maSoThue:"",diaChi:"",soDienThoai:"",diaChiThuMua:""}',
   WO_INFO_LITERAL: '{maSoThue:"",diaChiThuMua:""}'
 };
@@ -76,6 +77,19 @@ function replaceOnce(text, oldVal, newVal, label) {
   const idx = text.indexOf(oldVal);
   if (idx === -1) throw new Error('Không tìm thấy vị trí "' + label + '" trong file mẫu — file cài đặt có thể bị lỗi, cài đặt lại ứng dụng.');
   return text.slice(0, idx) + newVal + text.slice(idx + oldVal.length);
+}
+
+function normalizeShippingLink(value) {
+  if (!value || value === DEFAULTS.XuatHang) return DEFAULTS.XuatHang;
+  let url;
+  try { url = new URL(value); } catch { /* Báo lỗi theo đúng trường cấu hình. */ }
+  const id = url?.pathname.match(/^\/spreadsheets\/d\/([\w-]+)(?:\/|$)/)?.[1];
+  if (url?.origin !== 'https://docs.google.com' || url.username || url.password || !id || id === 'e') {
+    throw new Error('Nhập link của cả file Google Sheet XUATHANG_DN dạng /spreadsheets/d/…/edit.');
+  }
+  const defaultUrl = new URL(DEFAULTS.XuatHang);
+  if (id === defaultUrl.pathname.split('/')[3]) return DEFAULTS.XuatHang;
+  return 'https://docs.google.com/spreadsheets/d/' + id + '/edit';
 }
 
 /** Sinh lại report.html từ ĐÚNG file mẫu gốc (app/index.html) + dữ liệu cấu hình đã lưu — không
@@ -89,6 +103,10 @@ function buildReportHtml(cfg, dest = REPORT_HTML) {
   html = replaceOnce(html, DEFAULTS.DNTT, cfg.DNTT, 'Link Đề nghị thanh toán');
   if (cfg.HDNCC) html = replaceOnce(html, DEFAULTS.HDNCC, cfg.HDNCC, 'Link HD_NCC');
   if (cfg.Hosokeo) html = replaceOnce(html, DEFAULTS.Hosokeo, cfg.Hosokeo, 'Link Hồ sơ keo');
+  const shippingLink = normalizeShippingLink(cfg.XuatHang);
+  if (shippingLink !== DEFAULTS.XuatHang) {
+    html = replaceOnce(html, DEFAULTS.XuatHang, shippingLink, 'Link XUATHANG_DN');
+  }
   if (cfg.MST || cfg.SDT || cfg.DiaChi || cfg.DiaChiThuMua) {
     const bankInfoNew = '{maSoThue:' + JSON.stringify(cfg.MST || '') + ',diaChi:' + JSON.stringify(cfg.DiaChi || '') + ',soDienThoai:' + JSON.stringify(cfg.SDT || '') + ',diaChiThuMua:' + JSON.stringify(cfg.DiaChiThuMua || '') + '}';
     const woInfoNew = '{maSoThue:' + JSON.stringify(cfg.MST || '') + ',diaChiThuMua:' + JSON.stringify(cfg.DiaChiThuMua || '') + '}';
@@ -213,6 +231,7 @@ ipcMain.handle('save-config', (event, data) => {
     DNTT: String(data.DNTT || '').trim(),
     HDNCC: String(data.HDNCC || '').trim(),
     Hosokeo: String(data.Hosokeo || '').trim(),
+    XuatHang: String(data.XuatHang || '').trim(),
     MST: String(data.MST || '').trim(),
     SDT: String(data.SDT || '').trim(),
     DiaChi: String(data.DiaChi || '').trim(),
