@@ -31,190 +31,40 @@
   #btnCheck{background:#e9f1ff;border:1px solid #b8d2ff;color:#185bb7;margin-bottom:10px}
   .safetyNote{font-size:12px;line-height:1.55;color:#64522a;background:#fff8e5;border:1px solid #f0e0ab;border-radius:8px;padding:10px 12px;margin-top:12px}
   .editNote{background:#eef4ff;border:1px solid #cfe0ff;border-radius:10px;padding:10px 14px;font-size:12.8px;color:#1a3a72;margin-bottom:16px;display:none}
+
+  .company-line{font-size:13.5px;font-weight:600;white-space:nowrap;overflow-x:auto}
+  .company-line:empty,#sourceResults:empty{display:none}
+  #btnTemplate{margin:12px 0;background:#eef4ff;color:#174890}
+  #btnCheck,#btnSave{margin-top:8px}
+  #sourceResults{font-size:12.5px;padding-left:20px;margin:10px 0}
+  #sourceResults .ok{color:#177443}
+  #sourceResults .err,#msg.err{color:#a83228}
+  #msg.ok{color:#177443}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Cấu hình cho công ty của bạn</h1>
-  <p class="sub">Điền 1 lần khi mở app lần đầu — những lần mở sau sẽ vào thẳng báo cáo, không hiện
-    lại màn hình này nữa (có thể đổi lại bất kỳ lúc nào qua menu "Báo cáo ngày → Đổi cấu hình
-    công ty..."). Dữ liệu chỉ lưu trên máy này, không gửi đi đâu cả.</p>
-  <div class="editNote" id="editNote">Đang sửa cấu hình hiện tại — các ô bên dưới đã điền sẵn giá trị đã lưu trước đó.</div>
-
+  <h1>Cấu hình công ty</h1>
+  <p class="sub">Nhập một file Excel (.xlsx) chứa thông tin công ty và 5 nguồn Google Sheets: Phiếu cân, DNTT, HDMB, Xuất hàng và Hồ sơ keo. Muốn đổi cấu hình, nhập file mới.</p>
+  <p id="currentCompany" class="company-line" aria-label="Công ty đang dùng"></p>
   <div class="card">
-    <h2>1. Thông tin công ty</h2>
-    <label>Tên công ty (in trên báo cáo/Excel/PDF) <span class="req">*</span>
-      <span class="hint">Ví dụ: CÔNG TY TNHH HOÀNG ANH KHÔI QUẢNG NAM</span>
-    </label>
-    <input type="text" id="fTenCty" placeholder="CÔNG TY TNHH SXTMDV ĐẠI HIỆP">
-    <div class="row2">
-      <div>
-        <label>Mã HS hàng hóa
-          <span class="hint">In trên báo cáo Xuất hàng/BKLS xuất khẩu</span>
-        </label>
-        <input type="text" id="fMaHS" placeholder="4401220090">
-      </div>
-      <div>
-        <label>Mã nhà máy
-          <span class="hint">In trên báo cáo BKLS xuất khẩu</span>
-        </label>
-        <input type="text" id="fNhaMay" placeholder="CNHAK">
-      </div>
-    </div>
+    <label for="configFile">Nhập file cấu hình</label>
+    <input id="configFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+    <button type="button" id="btnTemplate">Tải mẫu Excel</button>
+    <button type="button" id="btnCheck" disabled>Kiểm tra 5 nguồn Google Sheets</button>
+    <ul id="sourceResults" aria-label="Kết quả kiểm tra nguồn"></ul>
+    <p id="companySummary" class="company-line" aria-label="Công ty đã kiểm tra"></p>
+    <button type="button" id="btnSave" disabled>Xác nhận lưu</button>
+    <p id="msg" role="status" aria-live="polite"></p>
   </div>
-
-  <div class="card">
-    <h2>2. Link Google Sheet</h2>
-    <label>Phiếu cân <span class="req">*</span>
-      <span class="hint">Bắt buộc — nguồn dữ liệu chính, mọi báo cáo đều dựa vào đây</span>
-    </label>
-    <input type="url" id="fPhieuCan" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv">
-    <div class="source-status" id="statusPhieuCan" role="status" aria-live="polite">Chưa kiểm tra kết nối</div>
-
-    <label>Đề nghị thanh toán (DNTT_CT) <span class="req">*</span>
-      <span class="hint">Bắt buộc — dùng cho báo cáo Thanh toán/Công nợ</span>
-    </label>
-    <input type="url" id="fDNTT" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
-    <div class="source-status" id="statusDNTT" role="status" aria-live="polite">Chưa kiểm tra kết nối</div>
-
-    <label>HD_NCC (HDMB — Hợp đồng mua bán)
-      <span class="hint">Không bắt buộc — chỉ dùng cho báo cáo BKLS xuất khẩu, để trống nếu chưa có</span>
-    </label>
-    <input type="url" id="fHDNCC" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
-    <div class="source-status" id="statusHDNCC" role="status" aria-live="polite">Chưa kiểm tra kết nối</div>
-
-    <label for="fXuatHang">Xuất hàng (XUATHANG_DN)
-      <span class="hint">Link của cả file Google Sheet, dùng để đọc NL_PC_XH và NL_DH_XB cho Báo cáo kiểm lâm.</span>
-    </label>
-    <input type="url" id="fXuatHang" value="https://docs.google.com/spreadsheets/d/1ZZ2iUwkkKe8wXdztA7mL-v9j6fmgY5c5rlDdI1sNoAk/edit?usp=sharing" placeholder="https://docs.google.com/spreadsheets/d/.../edit">
-
-    <label>Hồ sơ keo (Hosokeo)
-      <span class="hint">Không bắt buộc — chỉ dùng cho báo cáo BKLS xuất khẩu, để trống nếu chưa có</span>
-    </label>
-    <input type="url" id="fHosokeo" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
-    <div class="source-status" id="statusHosokeo" role="status" aria-live="polite">Chưa kiểm tra kết nối</div>
-    <button id="btnCheck" type="button">Kiểm tra 4 nguồn Google Sheets</button>
-    <p class="safetyNote">Chỉ đọc tiêu đề CSV để kiểm tra, không tải dữ liệu vào bộ nhớ ứng dụng. Nguồn xuất bản lên web có thể được người biết đường dẫn truy cập; tránh xuất bản công khai CCCD, STK và dữ liệu nhạy cảm. Nếu dùng link có phân quyền, công cụ có thể không đọc được và sẽ báo lỗi.</p>
-  </div>
-
-  <div class="card">
-    <h2>3. Thông tin dùng cho các biểu mẫu xuất báo cáo (không bắt buộc)</h2>
-    <div class="row2">
-      <div>
-        <label>Mã số thuế</label>
-        <input type="text" id="fMST" placeholder="0400...">
-      </div>
-      <div>
-        <label>Số điện thoại</label>
-        <input type="text" id="fSDT" placeholder="09...">
-      </div>
-    </div>
-    <label>Địa chỉ (trụ sở)</label>
-    <input type="text" id="fDiaChi" placeholder="...">
-    <label>Địa chỉ nơi tổ chức thu mua</label>
-    <input type="text" id="fDiaChiThuMua" placeholder="...">
-  </div>
-
-  <button id="btnSave">Lưu &amp; mở báo cáo</button>
-  <div id="msg"></div>
 </div>
-
 <script src="./source-validator.js"></script>
+<script src="./exceljs.min.js"></script>
+<script src="./company-import.js"></script>
 <script>
-(async function () {
-  var msg = document.getElementById('msg');
-  var btn = document.getElementById('btnSave');
-  var fields = ['fTenCty','fMaHS','fNhaMay','fPhieuCan','fDNTT','fHDNCC','fXuatHang','fHosokeo','fMST','fSDT','fDiaChi','fDiaChiThuMua'];
-
-  var sourceKeys = ['PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo'];
-  var checkBtn = document.getElementById('btnCheck');
-  var lastVerified = '';
-  function values() {
-    var result = {};
-    fields.forEach(function (id) { result[id.slice(1)] = document.getElementById(id).value.trim(); });
-    return result;
-  }
-  function signature(data) { return JSON.stringify(sourceKeys.map(function (k) { return data[k]; })); }
-  async function verify(data) {
-    checkBtn.disabled = true;
-    checkBtn.textContent = 'Đang kiểm tra nguồn...';
-    sourceKeys.forEach(function (key) {
-      var status = document.getElementById('status' + key);
-      status.className = 'source-status';
-      status.textContent = 'Đang kiểm tra...';
-    });
-    try {
-      var result = await window.HAKSourceValidator.checkAll(data);
-      result.forEach(function (item) {
-        var el = document.getElementById('status' + item.key);
-        el.className = 'source-status ' + (item.ok ? 'ok' : 'err');
-        el.textContent = (item.ok ? '✓ ' : '✗ ') + item.message;
-      });
-      var ok = result.every(function (item) { return item.ok; });
-      lastVerified = ok ? signature(data) : '';
-      return ok;
-    } finally {
-      checkBtn.disabled = false;
-      checkBtn.textContent = 'Kiểm tra 4 nguồn Google Sheets';
-    }
-  }
-  sourceKeys.forEach(function (key) {
-    document.getElementById('f' + key).addEventListener('input', function () {
-      lastVerified = '';
-      var el = document.getElementById('status' + key);
-      el.className = 'source-status';
-      el.textContent = 'Đã sửa đường dẫn — cần kiểm tra lại';
-    });
-  });
-  checkBtn.addEventListener('click', async function () {
-    var data = values();
-    var ok = await verify(data);
-    msg.className = ok ? 'ok' : 'err';
-    msg.textContent = ok ? 'Cả 4 nguồn đã được kiểm tra. Có thể lưu cấu hình.' : 'Chưa thể lưu: nguồn bắt buộc hoặc cột dữ liệu không hợp lệ.';
-  });
-
-  // Nếu đã có cấu hình lưu trước (đang mở lại để SỬA), điền sẵn lại vào form.
-  var existing = await window.api.getConfig();
-  if (existing) {
-    document.getElementById('editNote').style.display = 'block';
-    fields.forEach(function (id) {
-      var key = id.slice(1); // fTenCty -> TenCty
-      if (existing[key] != null && (key !== 'XuatHang' || existing[key])) document.getElementById(id).value = existing[key];
-    });
-  }
-
-  btn.addEventListener('click', async function () {
-    msg.className = ''; msg.textContent = '';
-    var data = values();
-
-    if (!data.TenCty) { msg.className = 'err'; msg.textContent = 'Cần nhập Tên công ty.'; return; }
-    if (!data.PhieuCan) { msg.className = 'err'; msg.textContent = 'Cần nhập link Google Sheet "Phiếu cân" (bắt buộc).'; return; }
-    if (!data.DNTT) { msg.className = 'err'; msg.textContent = 'Cần nhập link Google Sheet "Đề nghị thanh toán" (bắt buộc).'; return; }
-
-    btn.disabled = true; btn.textContent = 'Đang kiểm tra nguồn...';
-    try {
-      if (lastVerified !== signature(data) && !(await verify(data))) {
-        msg.className = 'err';
-        msg.textContent = 'Không thể lưu khi có nguồn lỗi. Cấu hình đang sử dụng chưa bị thay đổi.';
-        return;
-      }
-      btn.textContent = 'Đang lưu...';
-      var result = await window.api.saveConfig(data);
-      if (!result.ok) {
-        msg.className = 'err'; msg.textContent = 'Lỗi: ' + result.error;
-        return;
-      }
-      msg.className = 'ok'; msg.textContent = 'Đã lưu — đang mở báo cáo...';
-    } catch (e) {
-      msg.className = 'err';
-      msg.textContent = 'Lỗi kiểm tra nguồn: ' + (e.message || String(e));
-    } finally {
-      btn.disabled = false; btn.textContent = 'Lưu & mở báo cáo';
-    }
-    // main.js sẽ tự điều hướng cửa sổ sang báo cáo đã cấu hình sau khi lưu xong.
-
-  });
-})();
+window.api.getConfig().then(current => window.HAKCompanyImport.mount({
+  current, confirm: data => window.api.saveConfig(data),
+}));
 </script>
 </body>
 </html>

@@ -1,4 +1,6 @@
 // Công thức kiểm lâm theo Power Query trong BaoCaoKiemLam_DH.xlsx.
+import { normalizeForestryModel } from '../config/forestry-defaults.js';
+
 const DAY_MS = 86400000;
 
 function formatKeyDate(value) {
@@ -28,6 +30,19 @@ export const FORESTRY_SOURCES = {
   dispatch: { label: 'NL_PC_XH', dates: ['Ngày xuất'], fields: ['Ngày xuất', 'Khối lượng (Tấn)', 'SỐ TKHQ'], numbers: ['Khối lượng (Tấn)'] },
   orders: { label: 'NL_DH_XB', dates: ['Ngày đơn hàng'], fields: ['Ngày đơn hàng', 'SỐ TKHQ', 'KL_BDMT', 'ĐƠN GIÁ (USD)'], numbers: ['STT', 'KL_BDMT', 'ĐƠN GIÁ (USD)', 'ĐỘ KHÔ', 'ĐỘ KHÔ NHÀ MÁY'] },
 };
+
+const monthsPerPeriod = { M: 1, Q: 3, '6T': 6, Y: 12 };
+
+export function forestryPeriodRange(kind, year, index = 1) {
+  const months = monthsPerPeriod[kind];
+  if (!Number.isInteger(months) || !Number.isInteger(year) || year < 1900 || year > 9999 ||
+      !Number.isInteger(index) || index < 1 || index > 12 / months) return null;
+  const month = (index - 1) * months;
+  return {
+    from: new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10),
+    to: new Date(Date.UTC(year, month + months, 0)).toISOString().slice(0, 10),
+  };
+}
 
 export function validateForestryPeriod(from, to) {
   const days = (Date.parse(to) - Date.parse(from)) / DAY_MS + 1;
@@ -65,15 +80,15 @@ function groupByDate(rows, field) {
   return groups;
 }
 
-export function buildForestryReports({ calendar, settings, intake, dispatch, orders }, { from, to, opening, selected }) {
+export function buildForestryReports({ calendar, settings, intake, dispatch, orders }, { from, to, opening, selected, commodityCode = '' }) {
   const days = validateForestryPeriod(from, to);
   if (!Number.isFinite(opening)) throw new Error('Nhập tồn đầu kỳ hợp lệ.');
-  const parameters = settings.filter(row => row['Mẫu']).map(row => ({ ...row, 'Mẫu': row['Mẫu'].toUpperCase() }));
+  const parameters = settings.filter(row => row['Mẫu']).map(row => ({ ...row, 'Mẫu': normalizeForestryModel(row['Mẫu']) }));
   if (!parameters.length) throw new Error('Thamso_RPKL chưa có dòng cấu hình Mẫu.');
   const matchingCalendar = calendar.filter(row => row['Ngày trong năm'] >= from && row['Ngày trong năm'] <= to);
   const codes = new Set(parameters.map(row => row['Mẫu']));
-  let dates = matchingCalendar.map(row => ({ ...row, 'Mẫu': row['Mẫu'].toUpperCase() }));
-  const defaultCode = codes.has('MAU07') ? 'MAU07' : codes.size === 1 ? parameters[0]['Mẫu'] : '';
+  let dates = matchingCalendar.map(row => ({ ...row, 'Mẫu': normalizeForestryModel(row['Mẫu']) }));
+  const defaultCode = codes.has('MAU04') ? 'MAU04' : codes.size === 1 ? parameters[0]['Mẫu'] : '';
   if (!dates.length && defaultCode) {
     dates = Array.from({ length: days }, (_, index) => ({
       'Ngày trong năm': new Date(Date.parse(from) + index * DAY_MS).toISOString().slice(0, 10),
@@ -82,7 +97,7 @@ export function buildForestryReports({ calendar, settings, intake, dispatch, ord
   }
   if (new Set(dates.map(row => row['Ngày trong năm'])).size !== days ||
       dates.length !== days || dates.some(row => !codes.has(row['Mẫu']))) {
-    throw new Error('Thamso_Ngay_MAU07 cần đúng một dòng có mã Mẫu hợp lệ cho mỗi ngày trong kỳ.');
+    throw new Error('Lịch tham số cần đúng một dòng có mã Mẫu hợp lệ cho mỗi ngày trong kỳ.');
   }
   if (new Set(dates.map(row => row['Mẫu'])).size > 1) {
     throw new Error('Kỳ có nhiều mã Mẫu. Chọn kỳ chỉ có một mã để nhập đúng tồn đầu kỳ.');
@@ -102,7 +117,7 @@ export function buildForestryReports({ calendar, settings, intake, dispatch, ord
   );
   const exportParameters = parameters.find(row => row['Mẫu'] === 'MAU14') ?? applicable[0];
   return selected.flatMap(key => key === 'M04_14'
-    ? [dailyReport(ledger), exportReport(orders, exportParameters, from, to)]
+    ? [dailyReport(ledger), exportReport(orders, exportParameters, from, to, commodityCode)]
     : [periodReport(ledger, key, to)]);
 }
 
@@ -178,9 +193,9 @@ function dailyReport(ledger) {
   return { name: 'RP_MAU04', headers, rows: incoming.concat(outgoing) };
 }
 
-function exportReport(orders, p, from, to) {
+function exportReport(orders, p, from, to, commodityCode) {
   const headers = ['STT', 'SỐ TKHQ', 'TÊN HH_TKHQ', 'Tên thông thường', 'Tên khoa học',
-    'Đơn vị tính (MT)', 'Khối lượng NK', 'Trị giá NK (USD)', 'Đơn vị tính (BDMT)', 'KL_BDMT', 'Trị giá (USD)'];
+    'Đơn vị tính (MT)', 'Khối lượng NK', 'Trị giá NK (USD)', 'Đơn vị tính (BDMT)', 'KL_BDMT', 'Trị giá (USD)', 'Mã số hàng hóa'];
   const rows = orders.filter(row => row['Ngày đơn hàng'] >= from && row['Ngày đơn hàng'] <= to)
     .map((row, index) => [
       row.STT || index + 1, row['SỐ TKHQ'],
@@ -189,6 +204,7 @@ function exportReport(orders, p, from, to) {
       p['Đơn vị tính (MT)'] || 'Tấn', p['Khối lượng NK'] ?? '', p['Trị giá NK (USD)'] ?? '',
       p['Đơn vị tính (BDMT)'] || 'BDMT', row.KL_BDMT,
       row['ĐƠN GIÁ (USD)'] * row.KL_BDMT,
+      p['Mã số hàng hóa'] || commodityCode,
     ]);
   return { name: 'RP_MAU14', headers, rows };
 }
@@ -197,10 +213,15 @@ const PERIODS = {
   M: { suffix: ['LOC_THÁNG', 'Ngày báo cáo', 'Tháng báo cáo', 'Năm báo cáo'], group: (year, month) => [
     String(month).padStart(2, '0') + '/' + year, month, year,
   ] },
+  Q: { suffix: ['LOC_QUÝ', 'Ngày báo cáo', 'Quý báo cáo', 'Năm báo cáo'], group: (year, month) => {
+    const quarter = Math.ceil(month / 3);
+    return ['Q' + quarter + '/' + year, quarter, year];
+  } },
   '6T': { suffix: ['LOC_6T', 'Ngày báo cáo', 'Thời điểm báo cáo', 'Năm báo cáo'], group: (year, month) => {
     const half = month <= 6 ? 1 : 2;
     return ['6T' + half + '/' + year, half, year];
   } },
+  CUSTOM: { suffix: ['LOC_KỲ', 'Ngày báo cáo'], group: () => ['Tùy chọn'] },
   Y: { suffix: ['LOC_Y', 'Ngày báo cáo'], group: year => [year] },
 };
 

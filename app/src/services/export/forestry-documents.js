@@ -67,6 +67,10 @@ export function forestryWorkbook(ExcelJS, pages) {
       let maxLines = 1;
       values.forEach((value, column) => {
         const cell = write(row, column + 1, value, { size: 10, align: typeof value === 'number' ? 'right' : 'center' });
+        if (page.dateColumns?.includes(column)) {
+          cell.alignment = { ...cell.alignment, wrapText: false, shrinkToFit: true };
+          return;
+        }
         const isSerial = column === 0 && page.number !== '04';
         if (typeof value === 'number' && !isSerial) cell.numFmt = page.number === '14' ? '#,##0.00' : '#,##0.000';
         const lines = String(value ?? '').split('\n').reduce((count, line) =>
@@ -112,11 +116,11 @@ function paragraph(value = '', { size = 22, align = 'center', bold = false, ital
     (bold ? '<w:b/>' : '') + (italic ? '<w:i/>' : '') + '<w:sz w:val="' + size + '"/></w:rPr>' + text + '</w:r></w:p>';
 }
 
-function wordCell(content, width, { span = 1, merge = '' } = {}) {
+function wordCell(content, width, { span = 1, merge = '', noWrap = false } = {}) {
   return '<w:tc><w:tcPr><w:tcW w:w="' + width + '" w:type="dxa"/>' +
     (span > 1 ? '<w:gridSpan w:val="' + span + '"/>' : '') +
     (merge ? '<w:vMerge w:val="' + merge + '"/>' : '') +
-    '<w:vAlign w:val="center"/></w:tcPr>' + content + '</w:tc>';
+    (noWrap ? '<w:noWrap/>' : '') + '<w:vAlign w:val="center"/></w:tcPr>' + content + '</w:tc>';
 }
 
 function wordTable(widths, rows, bordered) {
@@ -158,7 +162,7 @@ function bodyTable(page, width) {
       const numeric = typeof value === 'number' && (index !== 0 || page.number === '04');
       return wordCell(paragraph(numeric ? numberFormat.format(value) : value, {
         size: fontSize, align: numeric ? 'right' : 'center',
-      }), widths[index]);
+      }), widths[index], { noWrap: page.dateColumns?.includes(index) });
     }).join('') + '</w:tr>').join('');
   return wordTable(widths, header + data, true);
 }

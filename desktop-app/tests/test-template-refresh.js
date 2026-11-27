@@ -125,13 +125,15 @@ const defaultShipping = 'https://docs.google.com/spreadsheets/d/1ZZ2iUwkkKe8wXdz
 const shippingTemplate = realTemplate.includes(defaultShipping) ? realTemplate :
   realTemplate.replace('</body>', '<script>window.shippingProbe=' + JSON.stringify(defaultShipping) + '</script></body>');
 fs.writeFileSync(path.join(appDir, 'app', 'index.html'), shippingTemplate);
-const company = handlers['get-config'](trustedSetupEvent);
+const readCompanyConfig = () => JSON.parse(fs.readFileSync(path.join(userData, 'company-config.json'), 'utf8'));
+const company = readCompanyConfig();
+check('Màn hình nhập không nhận lại các link đã lưu', !Object.hasOwn(handlers['get-config'](trustedSetupEvent), 'PhieuCan'));
 const shipping = 'https://docs.google.com/spreadsheets/d/TEST_EXPORT/edit';
 const savedShipping = handlers['save-config'](trustedSetupEvent, { ...company, XuatHang: shipping + '?gid=0' });
-check('Lưu nguồn xuất hàng cùng cấu hình công ty', savedShipping.ok && handlers['get-config'](trustedSetupEvent).XuatHang === shipping + '?gid=0');
+check('Lưu nguồn xuất hàng cùng cấu hình công ty', savedShipping.ok && readCompanyConfig().XuatHang === shipping + '?gid=0');
 check('Mẫu báo cáo lấy đúng file xuất hàng đã cấu hình', fs.readFileSync(reportPath, 'utf8').includes(shipping) && startApp() === reportPath);
 const rejectedShipping = handlers['save-config'](trustedSetupEvent, { ...company, XuatHang: 'https://example.com/spreadsheets/d/TEST_EXPORT/edit' });
-check('Link xuất hàng sai không ghi đè cấu hình đã lưu', !rejectedShipping.ok && handlers['get-config'](trustedSetupEvent).XuatHang === shipping + '?gid=0');
+check('Link xuất hàng sai không ghi đè cấu hình đã lưu', !rejectedShipping.ok && readCompanyConfig().XuatHang === shipping + '?gid=0');
 
 const quotedCompany = 'CÔNG TY "HAK" <ĐẠI HIỆP>';
 const savedQuoted = handlers['save-config'](trustedSetupEvent, { ...company, TenCty: quotedCompany, XuatHang: shipping });

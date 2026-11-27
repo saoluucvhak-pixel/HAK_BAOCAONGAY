@@ -5,7 +5,8 @@ const M04 = {
   number: '04', description: 'Sổ theo dõi nhập, xuất lâm sản',
   title: 'SỔ THEO DÕI NHẬP, XUẤT LÂM SẢN', unit: 'TÊN ĐƠN VỊ LẬP SỔ',
   landscape: true,
-  widths: [9, 12, 12, 9, 9, 8, 12, 10, 13, 11, 11, 11, 10, 13, 11, 9, 8, 9],
+  widths: [9, 15, 12, 9, 9, 8, 12, 10, 13, 15, 11, 11, 10, 13, 11, 9, 8, 9],
+  dateColumns: [1, 9],
   heights: [19, 20, 93],
   headers: [
     [col(0, 'Lâm sản tồn đầu kỳ (1)', 1, 3), col(1, 'Lâm sản nhập trong kỳ', 8),
@@ -72,6 +73,7 @@ function displayDate(value) {
 }
 
 function periodLabel(report, value, from, to) {
+  if (report.endsWith('_CUSTOM')) return 'Từ ngày ' + displayDate(from) + ' đến ngày ' + displayDate(to);
   const period = String(value);
   const [first, second] = period.split('/');
   const year = Number(second ?? first);
@@ -82,6 +84,11 @@ function periodLabel(report, value, from, to) {
     month = Number(first);
     months = 1;
     label = 'Tháng ' + month + ' năm ' + year;
+  } else if (report.endsWith('_Q')) {
+    const quarter = Number(first.slice(1));
+    month = (quarter - 1) * 3 + 1;
+    months = 3;
+    label = 'Quý ' + quarter + ' năm ' + year;
   } else if (report.endsWith('_6T')) {
     month = first === '6T1' ? 1 : 7;
     months = 6;
@@ -96,7 +103,7 @@ function periodLabel(report, value, from, to) {
 function exportRows14(rows, commodityCode) {
   const groups = new Map();
   for (const row of rows) {
-    const product = [commodityCode, row[2], row[3], row[4], row[5], row[8]];
+    const product = [row[11] || commodityCode, row[2], row[3], row[4], row[5], row[8]];
     const key = JSON.stringify(product);
     if (!groups.has(key)) groups.set(key, [groups.size + 1, ...product.slice(0, 5), '', '', product[5], 0, 0]);
     const total = groups.get(key);
@@ -133,7 +140,8 @@ export function forestryPrintPages(reports, { from, to, company, commodityCode, 
       periods.get(row[9]).push(row);
     }
     return [...periods].map(([period, rows]) => ({
-      ...M29, company, name: report.name + '_' + String(period).replace('/', '-'),
+      ...M29, company,
+      name: report.name.endsWith('_CUSTOM') ? report.name : report.name + '_' + String(period).replace('/', '-'),
       period: periodLabel(report.name, period, from, to),
       rows: rows.map((row, index) => [index + 1, ...row.slice(1, 9)]),
     }));

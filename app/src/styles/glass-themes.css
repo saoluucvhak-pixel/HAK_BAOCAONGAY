@@ -1,0 +1,105 @@
+/* Glass skins share the application's color tokens. Solid colors precede effects. */
+:root:is([data-skin="frost"], [data-skin="forest"], [data-skin="night"]) {
+  color-scheme: light dark;
+  --panel: light-dark(#ffffff, #142735);
+  --ink: light-dark(#102940, #edfbff);
+  --muted: light-dark(#3c5367, #aec9d7);
+  --line: light-dark(#a6becc, #456779);
+  --side-ink: var(--ink);
+  --side-active: var(--accent);
+  --side-hover: var(--accent-soft);
+  --accent-ink: light-dark(#ffffff, #09212a);
+  --ok: light-dark(#176242, #91e7b4);
+  --err: light-dark(#a22638, #ffacb5);
+  --warn: light-dark(#78440b, #ffd092);
+  --champ: var(--accent);
+  --champL: var(--accent-2);
+  --card1: var(--accent);
+  --card2: var(--ok);
+  --card3: var(--warn);
+  --card4: var(--err);
+  --shadow: 0 2px 6px #071e3412, 0 12px 28px #071e3418;
+  --button-line: light-dark(#587b90, #83a9bc);
+}
+
+:root:is([data-skin="frost"], [data-skin="forest"], [data-skin="night"])[data-theme="light"] { color-scheme: light; }
+:root:is([data-skin="frost"], [data-skin="forest"], [data-skin="night"])[data-theme="dark"] { color-scheme: dark; }
+
+:root[data-skin="frost"] {
+  --bg: light-dark(#edf6fc, #112235);
+  --side: light-dark(#dfedf7, #19334a);
+  --side-top: light-dark(#f1f9ff, #1c374f);
+  --accent: light-dark(#175c9c, #9ed3ff);
+  --accent-2: light-dark(#134c82, #c0e4ff);
+  --accent-soft: light-dark(#dbeeff, #2b4860);
+  --head: light-dark(#e1eef8, #233d54);
+  --hover: light-dark(#f0f7fc, #20394e);
+  --glass-glow: light-dark(#cadeee, #203b57);
+}
+
+:root[data-skin="forest"] {
+  --bg: light-dark(#edf7ee, #12281f);
+  --panel: light-dark(#ffffff, #183229);
+  --muted: light-dark(#3f594d, #b5d0c3);
+  --side: light-dark(#d9edde, #1b392c);
+  --side-top: light-dark(#eff9f0, #203e31);
+  --accent: light-dark(#20653e, #9ce3b3);
+  --accent-2: light-dark(#194f31, #bdf5cf);
+  --accent-soft: light-dark(#d6ebdd, #2d4f3f);
+  --head: light-dark(#deefe3, #274738);
+  --hover: light-dark(#ecf7ee, #234035);
+  --glass-glow: light-dark(#c6e1cd, #264937);
+}
+
+:root[data-skin="night"] {
+  --bg: light-dark(#e8f2f5, #0d1d2c);
+  --side: light-dark(#d5e8ee, #112e40);
+  --side-top: light-dark(#edf7fa, #193b4e);
+  --accent: light-dark(#176277, #59dcea);
+  --accent-2: light-dark(#104d60, #91edf5);
+  --accent-soft: light-dark(#d5ebf0, #224858);
+  --head: light-dark(#dceef3, #1c3c4d);
+  --hover: light-dark(#eaf5f8, #1a3547);
+  --glass-glow: light-dark(#c3e0e9, #1a354c);
+}
+
+@media screen {
+  :root:is([data-skin="frost"], [data-skin="forest"], [data-skin="night"]) {
+    & body {
+      background-color: var(--bg);
+      background-image: radial-gradient(ellipse at 14% 6%, var(--glass-glow), transparent 50%);
+      background-attachment: fixed;
+    }
+
+    & :is(.side, .topbar) { backdrop-filter: none; }
+    & .side { background: var(--side); }
+    & .topbar { background: var(--side-top); }
+    & .side :is(.brand, .item:hover, .item.active) { color: var(--side-ink); }
+    & .side :is(.foot, .brand small, .themeBox label) { opacity: 1; }
+    & .side .item.active { background: var(--accent-soft); }
+
+    & :is(.themeBox select, .themeBox option, .modalGrid select, #forestryRegulation) {
+      background: var(--panel);
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    & :is(.panel, .dmCard, .modalBox, .dataTbl, .scrollWrap) { background-color: var(--panel); }
+    & .dataTbl tbody tr:hover { background-color: var(--hover); }
+    & .dataTbl th { background-color: var(--head); }
+    & .modalOverlay { backdrop-filter: none; }
+    & .loanSourceNote { background-color: var(--head); }
+    & .btn:not(.primary, .danger) { border-color: var(--button-line); }
+    & .btn.danger.confirm { color: light-dark(#ffffff, #231016); }
+    & :is(button, input, select, textarea, a):focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    @supports ((backdrop-filter: blur(14px)) and (background: color-mix(in srgb, white, transparent))) {
+      & :is(.side, .topbar) { backdrop-filter: blur(14px); }
+      & .side { background: color-mix(in srgb, var(--side) 91%, transparent); }
+      & .topbar { background: color-mix(in srgb, var(--side-top) 93%, transparent); }
+    }
+  }
+}

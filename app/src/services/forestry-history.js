@@ -1,5 +1,5 @@
 const DAY_MS = 86400000;
-const MODELS = new Set(['M04_14', 'M', '6T', 'Y']);
+const MODELS = new Set(['M04_14', 'M', 'Q', '6T', 'Y', 'CUSTOM']);
 
 function isDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;

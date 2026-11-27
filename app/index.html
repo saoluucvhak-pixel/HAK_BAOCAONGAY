@@ -16,14 +16,22 @@
 <script>
 /* [2026-10-29] Áp chủ đề đã chọn NGAY khi mở trang (trước khi vẽ) để không bị chớp màu mặc định.
    Chỉ đọc 1 khoá localStorage; lỗi (chế độ riêng tư, bị chặn) → dùng mặc định. Xem components/theme-picker.js. */
-(function(){try{var t=JSON.parse(localStorage.getItem('baocaongay_ui_theme')||'{}'),h=document.documentElement;
-if(/^(classic|navy|ngoc|neutral|glass)$/.test(t.skin))h.setAttribute('data-skin',t.skin);
-if(t.mode==='light'||t.mode==='dark')h.setAttribute('data-theme',t.mode);}catch(e){}})();
+(() => {
+  const root = document.documentElement;
+  root.dataset.skin = 'frost';
+  try {
+    const saved = JSON.parse(localStorage.getItem('baocaongay_ui_theme'));
+    if (saved?.skin === 'luxe') root.removeAttribute('data-skin');
+    else if (/^(classic|navy|ngoc|neutral|glass|frost|forest|night)$/.test(saved?.skin)) root.dataset.skin = saved.skin;
+    if (saved?.mode === 'light' || saved?.mode === 'dark') root.dataset.theme = saved.mode;
+    else if (saved?.skin === 'night' && saved.mode !== 'auto') root.dataset.theme = 'dark';
+  } catch { /* Dùng giao diện mặc định. */ }
+})();
 </script>
 <style>
 /* ==========================================================================
    [CHUẨN HAK — 2026-10-29] Màu theo chủ đề "luxe" (navy + champagne, nền ngà) của
-   HAK-Enterprise-Design-System (tokens/luxe.css, commit 69ac08a) — mặc định của mọi app HAK.
+   HAK-Enterprise-Design-System (tokens/luxe.css, commit 69ac08a) — giữ làm nền token Luxe.
    Giá trị chép NGUYÊN từ token gốc ([data-skin="luxe"] sáng / [data-skin="luxe"][data-theme="dark"]
    tối); chữ phụ dùng --mut-aa để đạt tương phản AA. tests/test-hak-theme.mjs đối chiếu từng giá trị
    với file token trong node_modules để không lệch chuẩn. Giữ nguyên tên biến/class cũ của app.
@@ -233,15 +241,19 @@ a{color:var(--accent)}
 /* ---------- Sidebar ---------- */
 .side{width:260px;flex:0 0 260px;background:linear-gradient(180deg,var(--side-top) 0%,var(--side) 100%);color:var(--side-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;box-shadow:4px 0 24px rgba(0,0,0,.12)}
 .side .brand{padding:20px 20px 14px;font-weight:700;font-size:16px;letter-spacing:.02em;color:#fff;display:flex;flex-direction:column;gap:2px}
-.side .brand::before{content:"";display:block;width:42px;height:42px;border-radius:12px;margin-bottom:10px;background:linear-gradient(135deg,var(--champL),var(--champ));box-shadow:0 4px 12px rgba(184,163,173,.4)}
+.brandMark{position:relative;display:block;width:44px;height:44px;border-radius:12px;margin-bottom:10px;background:linear-gradient(150deg,#d9f49e,#75c59b);box-shadow:0 4px 12px #09251c30}
+.brandMark::before,.brandMark::after{content:"";position:absolute;inset:6px 10px;background:#164636;clip-path:polygon(50% 0,75% 34%,65% 34%,86% 63%,73% 63%,100% 89%,57% 89%,57% 100%,43% 100%,43% 89%,0 89%,27% 63%,14% 63%,35% 34%,25% 34%)}
+.brandMark::after{inset:13px 4px 6px 24px;background:#367e5b;z-index:0}
+.brandMark::before{z-index:1}
 .side .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--side-ink);opacity:.75;margin-top:2px;letter-spacing:0}
 .side nav{flex:1;padding:8px 12px}
-.side .item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--side-ink);white-space:nowrap;font-size:13.5px;font-weight:500;margin-bottom:2px;transition:all .15s}
+.side .item{width:100%;border:0;background:transparent;text-align:left;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--side-ink);white-space:nowrap;font-size:13.5px;font-weight:500;margin-bottom:2px;transition:all .15s}
 .side .item:hover{background:var(--side-hover);color:#fff}
 .side .item.active{background:linear-gradient(90deg,color-mix(in srgb,var(--side-active) 28%,transparent),color-mix(in srgb,var(--side-active) 8%,transparent));color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--side-active)}
 .side .item .ic{width:20px;text-align:center;font-size:14px}
 .side .foot{padding:14px 16px 18px;font-size:11px;color:var(--side-ink);opacity:.7;border-top:1px solid rgba(255,255,255,.08)}
-.side-toggle{display:none}
+.side-toggle,.side-close{display:none}
+[data-rpanel="config-appearance"] select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:0}
 
 /* ---------- Main ---------- */
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -419,22 +431,31 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
 .modalBox h3{margin:0 0 6px;font-size:16px;font-weight:700}
 .modalNote{font-size:12.5px;color:var(--muted);margin:0 0 14px}
 #forestryForm fieldset,#forestrySettings fieldset{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+#forestryUpdatedLabel{font-size:11.5px;font-weight:600;color:var(--muted)}
+#forestryUpdated{font-variant-numeric:tabular-nums}
 #forestryForm fieldset>label{display:inline-block;margin:4px 12px 4px 0}
 #forestryForm .modalGrid label{display:grid;gap:4px;min-width:0}
 #forestryForm input{min-width:0}
+#forestryForm label[hidden]{display:none}
+#forestryForm .modalGrid select{min-width:0;font:inherit}
+#forestryForm .forestryPeriodGrid:has([name="customFrom"]:enabled)>label:first-child{grid-column:1 / -1}
+#forestryPeriodRange:empty{display:none}
+#forestryPeriodRange{display:block;margin-top:10px}
 #forestryResults .panel,.forestryHistory{margin-top:12px}
 .modalGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
 .modalGrid .f{display:flex;flex-direction:column;gap:4px}
 .modalGrid .f.wide{grid-column:1 / -1}
 .modalGrid label{font-size:11.5px;color:var(--muted);font-weight:600}
-.modalGrid input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
-.modalGrid input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 .2rem var(--accent-soft)}
+#forestryForm .modalGrid :is(input,select){min-height:36px}
+.modalGrid input,#forestryForm .modalGrid select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.modalGrid input:focus,#forestryForm .modalGrid select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 .2rem var(--accent-soft)}
 .modalActions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 @media (max-width:560px){.modalGrid{grid-template-columns:1fr}}
 
 @media (max-width:880px){
-  .side{position:fixed;left:-270px;transition:left .2s;z-index:20;box-shadow:0 0 30px rgba(0,0,0,.4)}
-  .side.open{left:0}
+  .side{position:fixed;left:0;width:min(260px,100%);height:100dvh;visibility:hidden;transform:translateX(-100%);transition:transform .2s,visibility .2s;z-index:20;box-shadow:0 0 30px rgba(0,0,0,.4)}
+  .side.open{visibility:visible;transform:none}
+  .side-close{display:block;align-self:flex-start;margin:0 14px 4px}
   .side-toggle{display:inline-flex;align-items:center;gap:6px}
   .topbar .row{gap:8px}
   .topbar input,.topbar select{min-width:96px}
@@ -460,25 +481,30 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
   .printSheet.active{display:block !important}
 }
 </style>
+<link rel="stylesheet" href="/src/styles/glass-themes.css">
 </head>
 <body>
 
 <div class="app">
   <!-- ================= SIDEBAR ================= -->
   <aside class="side" id="side">
-    <div class="brand">HỆ THỐNG BÁO CÁO<small id="brandCompanyName">Công ty TNHH SXTMDV Đại Hiệp</small></div>
-    <nav id="navList">
-      <div class="item active" data-target="dashboard"><span class="ic">&#9632;</span> Dashboard</div>
-      <div class="item" data-target="baocao"><span class="ic">&#9776;</span> Báo cáo tổng hợp</div>
-      <div class="item" data-target="lamsan"><span class="ic">&#127795;</span> Tổng hợp lâm sản</div>
-      <div class="item" data-target="kiemlam"><span class="ic">&#127807;</span> Báo cáo kiểm lâm</div>
-      <div class="item" data-target="nganhang"><span class="ic">&#127974;</span> Báo cáo ngân hàng</div>
-      <div class="item" data-target="danhmuc"><span class="ic">&#128203;</span> Danh mục</div>
-      <div class="item" data-target="cauhinh"><span class="ic">&#9881;</span> Cấu hình</div>
+    <div class="brand"><span class="brandMark" aria-hidden="true"></span>HỆ THỐNG BÁO CÁO<small id="brandCompanyName">Công ty TNHH SXTMDV Đại Hiệp</small></div>
+    <button type="button" class="btn side-close" id="sideClose">Đóng menu</button>
+    <nav id="navList" aria-label="Điều hướng chính">
+      <button type="button" class="item active" data-target="dashboard"><span class="ic">&#9632;</span> Dashboard</button>
+      <button type="button" class="item" data-target="baocao"><span class="ic">&#9776;</span> Báo cáo tổng hợp</button>
+      <button type="button" class="item" data-target="lamsan"><span class="ic">&#127795;</span> Tổng hợp lâm sản</button>
+      <button type="button" class="item" data-target="kiemlam"><span class="ic">&#127807;</span> Báo cáo kiểm lâm</button>
+      <button type="button" class="item" data-target="nganhang"><span class="ic">&#127974;</span> Báo cáo ngân hàng</button>
+      <button type="button" class="item" data-target="danhmuc"><span class="ic">&#128203;</span> Danh mục</button>
+      <button type="button" class="item" data-target="cauhinh"><span class="ic">&#9881;</span> Cấu hình</button>
     </nav>
     <div class="themeBox" role="group" aria-label="Giao diện">
       <label for="themeSkin">Giao diện</label>
       <select id="themeSkin">
+        <option value="frost">Kính Sương</option>
+        <option value="forest">Kính Lục</option>
+        <option value="night">Kính Đêm</option>
         <option value="luxe">Luxe — navy &amp; vàng</option>
         <option value="classic">Classic — xanh ngọc lam</option>
         <option value="navy">Navy — xanh hải quân</option>
@@ -499,7 +525,7 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
   <div class="main">
     <div class="topbar">
       <div class="row">
-        <button class="btn side-toggle" id="sideToggle">&#9776; Menu</button>
+        <button class="btn side-toggle" id="sideToggle" type="button" aria-controls="side" aria-expanded="false">&#9776; Menu</button>
         <div class="f"><label>Từ ngày</label><input type="date" id="fFrom"></div>
         <div class="f"><label>Đến ngày</label><input type="date" id="fTo"></div>
         <div class="f"><label>Đại lý</label><select id="fDL"><option value="">Tất cả</option></select></div>
@@ -597,9 +623,24 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
       <section class="section" id="sec-kiemlam">
         <div class="pageHead"><h2>Báo cáo kiểm lâm</h2></div>
         <form id="forestryForm" class="panel">
+          <fieldset>
+            <legend>Kỳ báo cáo</legend>
+            <div class="modalGrid forestryPeriodGrid">
+              <label>Loại kỳ <select name="periodType">
+                <option value="M">Tháng</option>
+                <option value="Q">Quý</option>
+                <option value="6T">6 tháng</option>
+                <option value="Y">Năm</option>
+                <option value="CUSTOM">Kỳ tùy chọn</option>
+              </select></label>
+              <label>Năm <input type="number" name="year" min="1900" max="9999" required></label>
+              <label id="forestryPeriodChoice"><span id="forestryPeriodLabel">Tháng</span> <select name="periodIndex"></select></label>
+              <label hidden>Từ ngày <input type="date" name="customFrom" required disabled></label>
+              <label hidden>Đến ngày <input type="date" name="customTo" required disabled></label>
+            </div>
+            <output id="forestryPeriodRange" aria-live="polite"></output>
+          </fieldset>
           <div class="modalGrid">
-            <label>Từ ngày <input type="date" name="from" required></label>
-            <label>Đến ngày <input type="date" name="to" required></label>
             <label>Tồn đầu kỳ (tấn) <input type="number" name="opening" step="any" required></label>
             <label>Số sổ (Mẫu 04) <input type="text" name="bookNumber"></label>
           </div>
@@ -610,13 +651,11 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
           <fieldset>
             <legend>Mẫu báo cáo</legend>
             <label><input type="checkbox" name="reports" value="M04_14" checked> Mẫu 04 và 14</label>
-            <label><input type="checkbox" name="reports" value="M"> Mẫu 29 tháng</label>
-            <label><input type="checkbox" name="reports" value="6T"> Mẫu 29 sáu tháng</label>
-            <label><input type="checkbox" name="reports" value="Y"> Mẫu 29 năm</label>
+            <label><input type="checkbox" name="reports" value="M29"> Mẫu 29 theo kỳ đã chọn</label>
           </fieldset>
           <fieldset>
             <legend>Nguồn Google Sheet</legend>
-            <p class="loanSourceNote">App đọc NL_PC_XH và NL_DH_XB từ link XUATHANG_DN trong Cấu hình → Tham số báo cáo lâm sản. Dữ liệu nhập hàng lấy từ Hồ sơ keo.</p>
+            <p class="loanSourceNote">App đọc NL_PC_XH và NL_DH_XB từ link XUATHANG_DN trong file cấu hình công ty đã nhập. Dữ liệu nhập hàng lấy từ Hồ sơ keo.</p>
           </fieldset>
           <div class="tools">
             <button class="btn primary" type="submit">Lập báo cáo kiểm lâm</button>
@@ -630,7 +669,7 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
           <h3>Báo cáo đã tạo</h3>
           <div class="scrollWrap">
             <table class="dataTbl" aria-label="Báo cáo kiểm lâm đã tạo">
-              <thead><tr><th scope="col">Ngày lập</th><th scope="col">Kỳ báo cáo</th><th scope="col">Mẫu</th><th scope="col">Tồn đầu (tấn)</th><th scope="col">Tồn cuối (tấn)</th></tr></thead>
+              <thead><tr><th scope="col">Ngày lập</th><th scope="col">Kỳ báo cáo</th><th scope="col">Mẫu</th><th scope="col">Quy định</th><th scope="col">Tồn đầu (tấn)</th><th scope="col">Tồn cuối (tấn)</th></tr></thead>
               <tbody id="forestryHistory"></tbody>
             </table>
           </div>
@@ -729,13 +768,14 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
         <div class="pageHead"><h1>Cấu hình</h1></div>
         <div class="reportTabs" aria-label="Mục cấu hình">
           <button class="rtab active" type="button" data-rtab="config-general">Chung</button>
+          <button class="rtab" type="button" data-rtab="config-appearance">Giao diện</button>
           <button class="rtab" type="button" data-rtab="config-forestry">Tham số báo cáo lâm sản</button>
         </div>
         <div class="reportPanel active" data-rpanel="config-general">
         <!-- Chỉ hiện khi chạy trong Electron Desktop có preload API; Web vẫn ẩn. -->
         <div class="dmCard" id="desktopSheetSourceCard" style="display:none;margin-bottom:16px">
           <h3>Nguồn dữ liệu Google Sheets</h3>
-          <p style="color:var(--muted);font-size:13px;margin:8px 0 14px">Quản lý 4 nguồn Phiếu cân, Đề nghị thanh toán, Hợp đồng NCC và Hồ sơ keo. Kiểm tra kết nối và cột dữ liệu trước khi áp dụng. Nguồn hiện tại được giữ lại nếu kiểm tra thất bại.</p>
+          <p style="color:var(--muted);font-size:13px;margin:8px 0 14px">Nhập file Excel chứa 5 nguồn Phiếu cân, Đề nghị thanh toán, Hợp đồng NCC, Xuất hàng và Hồ sơ keo. Kiểm tra kết nối và cột dữ liệu trước khi áp dụng. Nguồn hiện tại được giữ lại nếu kiểm tra thất bại.</p>
           <button class="btn primary small" id="btnDesktopSheetSources" type="button">⚙ Quản lý nguồn Google Sheets</button>
         </div>
         <div class="dmCard">
@@ -754,22 +794,47 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
             <p style="margin:0 0 8px"><b>3. Xuất báo cáo:</b> mỗi bảng có nút xuất Excel/PDF/In riêng ở góc trên.</p>
             <p style="margin:0 0 8px"><b>4. Danh mục Đại lý/Hỗ trợ:</b> sửa trực tiếp ở tab "Danh mục". Lỡ sửa nhầm thì bấm <b>"↩ Hoàn tác"</b> (hoặc Ctrl+Z), <b>"↪ Làm lại"</b> (Ctrl+Y) để quay lại.</p>
             <p style="margin:0 0 8px"><b>5. Sao lưu/khôi phục dữ liệu:</b> dùng 2 nút ở thẻ phía trên — nên sao lưu định kỳ (vd cuối tháng) để phòng mất dữ liệu khi đổi máy hoặc xoá nhầm trình duyệt.</p>
-            <p style="margin:0 0 8px"><b>6. Đổi tên công ty / link Google Sheet (cho đơn vị khác trong HAK Group):</b> dùng file <code>config.html</code> đi kèm — mở file đó, điền tên công ty và link Google Sheet riêng, bấm tạo là ra 1 file báo cáo mới đã cấu hình sẵn, không cần sửa mã nguồn.</p>
+            <p style="margin:0 0 8px"><b>6. Đổi tên công ty / link Google Sheet (cho đơn vị khác trong HAK Group):</b> dùng file <code>config.html</code> đi kèm — mở file đó, nhập Excel cấu hình, kiểm tra nguồn rồi xác nhận là ra 1 file báo cáo mới đã cấu hình sẵn, không cần sửa mã nguồn.</p>
             <p style="margin:0">Nếu mở file báo cáo bằng double-click mà báo "Lỗi tải dữ liệu... Failed to fetch": mở bằng <code>start.bat</code> (Windows) hoặc <code>start.sh</code> (Mac/Linux) đi kèm thay vì double-click thẳng vào file HTML — xem chi tiết trong <code>README.md</code>.</p>
           </div>
         </div>
         </div>
+        <div class="reportPanel" data-rpanel="config-appearance">
+          <div class="panel modalGrid">
+            <label class="f">Chủ đề <select id="settingsThemeSkin"></select></label>
+            <label class="f">Chế độ sáng / tối <select id="settingsThemeMode"></select></label>
+          </div>
+        </div>
         <div class="reportPanel" data-rpanel="config-forestry">
           <form id="forestrySettings" class="panel">
-            <div class="modalGrid">
-              <label class="f wide">Link Google Sheet XUATHANG_DN <input name="shipping" type="url" required></label>
-              <label class="f wide">Căn cứ <input name="basis" type="text" placeholder="Theo Thông tư số …"></label>
-              <label class="f">Ngày hiệu lực <input name="effectiveFrom" type="date"></label>
-              <label class="f">Ngày hết hiệu lực <input name="effectiveTo" type="date"></label>
-            </div>
-            <p>Ngày cập nhật <output id="forestryUpdated">Chưa có lần lưu</output></p>
-            <p class="loanSourceNote">Các thông số ban đầu lấy từ Thamso_RPKL. Ngày bắt đầu và kết thúc kỳ trong file nguồn là ngày báo cáo, tách riêng với ngày hiệu lực của văn bản.</p>
-            <div id="forestryParameterFields"></div>
+            <fieldset>
+              <legend>Quy định</legend>
+              <div class="tools">
+                <label for="forestryRegulation">Quy định đã lưu</label>
+                <select id="forestryRegulation"></select>
+                <button class="btn small" type="button" id="forestryAddRegulation">Thêm quy định</button>
+              </div>
+              <div class="modalGrid">
+                <div class="f wide">
+                  <span id="forestryUpdatedLabel">Ngày cập nhật</span>
+                  <output id="forestryUpdated" aria-labelledby="forestryUpdatedLabel">Chưa có lần lưu</output>
+                </div>
+                <label class="f">Mã quy định <input name="regulationCode" readonly></label>
+                <label class="f">Loại văn bản <select name="documentType">
+                  <option value="">Chọn loại văn bản</option>
+                  <option>Thông tư</option><option>Quyết định</option><option>Văn bản hợp nhất</option>
+                </select></label>
+                <label class="f wide">Số / ký hiệu văn bản <input name="documentNumber" type="text"></label>
+                <label class="f wide">Căn cứ <input name="basis" type="text" placeholder="Theo Thông tư số …"></label>
+                <label class="f">Ngày hiệu lực <input name="effectiveFrom" type="date" aria-describedby="forestryValidityHint"></label>
+                <label class="f">Ngày hết hiệu lực <input name="effectiveTo" type="date" aria-describedby="forestryValidityHint"></label>
+              </div>
+              <p class="loanSourceNote" id="forestryValidityHint">Ngày cập nhật tự ghi khi lưu tham số. Có thể để trống ngày hết hiệu lực nếu chưa xác định.</p>
+            </fieldset>
+            <fieldset>
+              <legend>Tham số báo cáo dùng chung</legend>
+              <div id="forestryParameterFields"></div>
+            </fieldset>
             <button class="btn primary" type="submit">Lưu tham số</button>
             <p id="forestrySettingsStatus" role="status" aria-live="polite"></p>
           </form>

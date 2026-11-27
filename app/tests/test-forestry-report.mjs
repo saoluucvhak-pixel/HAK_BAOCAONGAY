@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { isForestryHistoryEntry, latestForestryClosing } from '../src/services/forestry-history.js';
-import { FORESTRY_SOURCES, buildForestryReports, normalizeForestrySheet } from '../src/services/forestry-report.js';
+import { forestryPrintPages } from '../src/services/export/forestry-layout.js';
+import { FORESTRY_SOURCES, buildForestryReports, forestryPeriodRange, normalizeForestrySheet } from '../src/services/forestry-report.js';
 
 const data = {
   calendar: [],
@@ -31,7 +32,7 @@ for (const report of [halfYear, annual]) {
 const [withCalendar, withCustomExport] = buildForestryReports({
   ...data,
   settings: [
-    { 'Mẫu': 'MAU07', 'Tiêu hao SX': 0.05 },
+    { 'Mẫu': 'MAU04', 'Tiêu hao SX': 0.05 },
     { 'Mẫu': 'MAU14', 'Tên thông thường': 'Tên hàng từ tham số mẫu 14' },
   ],
 }, { ...options, selected: ['M04_14'] });
@@ -54,7 +55,7 @@ const preciseIntake = [
 ];
 const precise = buildForestryReports({
   ...data, intake: preciseIntake, dispatch: [], orders: [],
-  settings: [{ 'Mẫu': 'MAU07', 'Tiêu hao SX': 0.025, 'Đơn vị tính (MT)': 'Tấn tươi', 'Diễn giải hồ sơ nhập': 'BKLS' }],
+  settings: [{ 'Mẫu': 'MAU04', 'Tiêu hao SX': 0.025, 'Đơn vị tính (MT)': 'Tấn tươi', 'Diễn giải hồ sơ nhập': 'BKLS' }],
 }, options);
 assert.equal(precise[0].rows.length, 5);
 assert.equal(precise[0].rows[2][8], 'BKLS BK-03');
@@ -69,9 +70,11 @@ assert.equal(monthly.rows[1][6], 0); // Cả kỳ không nhập: Tổng cộng n
 const [, declaration] = buildForestryReports({
   ...data,
   orders: [{ ...data.orders[0], STT: 8, KL_BDMT: 1.2345, 'ĐƠN GIÁ (USD)': 2.3456, 'Khối lượng NK': 99 }],
-  settings: [{ ...data.settings[0], 'Mẫu': 'MAU07' }, { 'Mẫu': 'MAU14', 'Khối lượng NK': 4, 'Trị giá NK (USD)': 10, 'Đơn vị tính (BDMT)': 'Tấn khô kiệt' }],
+  settings: [{ ...data.settings[0], 'Mẫu': 'MAU04' }, { 'Mẫu': 'MAU14', 'Khối lượng NK': 4, 'Trị giá NK (USD)': 10, 'Mã số hàng hóa': '0401.22', 'Đơn vị tính (BDMT)': 'Tấn khô kiệt' }],
 }, { ...options, selected: ['M04_14'] });
-assert.deepEqual(declaration.rows[0].slice(6), [4, 10, 'Tấn khô kiệt', 1.2345, 1.2345 * 2.3456]);
+assert.deepEqual(declaration.rows[0].slice(6), [4, 10, 'Tấn khô kiệt', 1.2345, 1.2345 * 2.3456, '0401.22']);
+assert.equal(forestryPrintPages([declaration], { ...options, commodityCode: '4401.22' })[0].rows[0][1], '0401.22');
+assert.equal(forestryPrintPages([m14], { ...options, commodityCode: '4401.22' })[0].rows[0][1], '4401.22');
 assert.equal(declaration.rows[0][0], 8);
 console.log('OK: Mẫu 04, 14, 29 tháng/6 tháng/năm và kiểm tra dữ liệu nguồn.');
 
@@ -82,3 +85,27 @@ assert.equal(isForestryHistoryEntry({ ...history, createdAt: 'invalid' }), false
 assert.equal(latestForestryClosing([history], '2026-02-02', scope), undefined);
 assert.equal(latestForestryClosing([history], '2026-02-01', { ...scope, intake: 'OTHER' }), undefined);
 assert.equal(latestForestryClosing([history], '2026-02-01', scope), history);
+
+assert.deepEqual(forestryPeriodRange('M', 2024, 2), { from: '2024-02-01', to: '2024-02-29' });
+assert.deepEqual(forestryPeriodRange('Q', 2026, 2), { from: '2026-04-01', to: '2026-06-30' });
+assert.deepEqual(forestryPeriodRange('6T', 2026, 2), { from: '2026-07-01', to: '2026-12-31' });
+assert.deepEqual(forestryPeriodRange('Y', 2026), { from: '2026-01-01', to: '2026-12-31' });
+assert.equal(forestryPeriodRange('Q', 2026, 5), null);
+assert.equal(forestryPeriodRange('M', 0, 2), null);
+const quarterRange = forestryPeriodRange('Q', 2026, 1);
+const quarterly = buildForestryReports(data, { ...quarterRange, opening: 10, selected: ['Q'] });
+assert.deepEqual(quarterly[0].rows.map(row => [row[4], row[8], row[9]]), [[10, 81, 'Q1/2026']]);
+assert.equal(forestryPrintPages(quarterly, quarterRange)[0].period, 'Quý 1 năm 2026');
+assert.equal(isForestryHistoryEntry({ ...history, ...quarterRange, selected: ['Q'] }), true);
+
+const custom = buildForestryReports(data, { ...options, selected: ['CUSTOM'] });
+assert.deepEqual(custom[0].rows.map(row => [row[4], row[8]]), [[10, 81]]);
+const [customPage] = forestryPrintPages(custom, options);
+assert.equal(customPage.period, 'Từ ngày 31/01/2026 đến ngày 01/02/2026');
+assert.ok(customPage.name.length <= 31);
+assert.equal(isForestryHistoryEntry({ ...history, selected: ['CUSTOM'] }), true);
+assert.throws(() => buildForestryReports(data, { ...options, from: options.to, to: options.from, selected: ['CUSTOM'] }), /kỳ báo cáo hợp lệ/);
+
+const legacySettings = [{ 'Mẫu': 'MAU07', 'Tiêu hao SX': 0.05 }, { 'Mẫu': 'MAU14' }];
+const legacyCalendar = [options.from, options.to].map(date => ({ 'Ngày trong năm': date, 'Mẫu': 'MAU07' }));
+assert.deepEqual(buildForestryReports({ ...data, calendar: legacyCalendar, settings: legacySettings }, options)[0], m04);

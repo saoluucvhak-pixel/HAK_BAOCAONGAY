@@ -148,7 +148,7 @@ function showSection(target){
   $$('.item', $('#navList')).forEach(function(it){ it.classList.toggle('active', it.dataset.target===target); });
   $$('.section').forEach(function(s){ s.classList.remove('active'); });
   $('#sec-'+target).classList.add('active');
-  $('#side').classList.remove('open');
+  setNavigationOpen(false);
 }
 function initDefaultDates(){
   var d = new Date();
@@ -167,10 +167,26 @@ function on(selector, event, handler){
   if (!el){ logger.warn('[initEvents] Không tìm thấy phần tử "'+selector+'" — bỏ qua gắn sự kiện "'+event+'".'); return; }
   el.addEventListener(event, handler);
 }
+function setNavigationOpen(open) {
+  $('#side').classList.toggle('open', open);
+  $('#sideToggle').setAttribute('aria-expanded', String(open));
+}
 function initEvents(){
   $$('.item', $('#navList')).forEach(function(it){ it.addEventListener('click', function(){ showSection(it.dataset.target); }); });
   $$('.rtab').forEach(function(b){ b.addEventListener('click', function(){ showReportTab(b.dataset.rtab); }); });
-  on('#sideToggle', 'click', function(){ $('#side').classList.toggle('open'); });
+  on('#sideToggle', 'click', () => {
+    const open = !$('#side').classList.contains('open');
+    setNavigationOpen(open);
+    if (open) $('#sideClose').focus();
+  });
+  const closeNavigation = () => {
+    setNavigationOpen(false);
+    $('#sideToggle').focus();
+  };
+  on('#sideClose', 'click', closeNavigation);
+  on('#side', 'keydown', event => {
+    if (event.key === 'Escape' && $('#side').classList.contains('open')) closeNavigation();
+  });
   on('#btnLapBC', 'click', runReport);
   on('#btnReload', 'click', loadAllData);
   // Chỉ bản Desktop có cầu nối Electron mới mở được trình quản lý nguồn.

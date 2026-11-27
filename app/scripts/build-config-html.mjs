@@ -26,5 +26,19 @@ if (!marker.test(cfg)) {
   process.exit(1);
 }
 cfg = cfg.replace(marker, 'const APP_TEMPLATE_B64 = "' + b64 + '";');
+const importBlock = /<!-- HAK_COMPANY_IMPORT_START -->[\s\S]*?<!-- HAK_COMPANY_IMPORT_END -->/;
+if (!importBlock.test(cfg)) throw new Error('Thiếu khối nhúng công cụ nhập cấu hình.');
+const desktopUi = path.join(ROOT, '..', 'desktop-app', 'app');
+const excelPath = path.join(ROOT, 'node_modules', 'exceljs', 'dist', 'exceljs.min.js');
+fs.copyFileSync(excelPath, path.join(desktopUi, 'exceljs.min.js'));
+fs.copyFileSync(path.join(ROOT, 'node_modules', 'exceljs', 'LICENSE'), path.join(desktopUi, 'exceljs.LICENSE'));
+const importScripts = ['source-validator.js', 'exceljs.min.js', 'company-import.js'].map(filename => {
+  const source = fs.readFileSync(path.join(desktopUi, filename), 'utf8');
+  if (/<\/script/i.test(source)) throw new Error('Không thể nhúng script: ' + filename);
+  return '<script>\n' + source + '</script>';
+});
+cfg = cfg.replace(importBlock, () => [
+  '<!-- HAK_COMPANY_IMPORT_START -->', ...importScripts, '<!-- HAK_COMPANY_IMPORT_END -->',
+].join('\n'));
 fs.writeFileSync(CONFIG_HTML, cfg);
 console.log('Đã nhúng dist/index.html (' + html.length + ' ký tự) vào config.html — kích thước config.html mới: ' + fs.statSync(CONFIG_HTML).size + ' bytes.');

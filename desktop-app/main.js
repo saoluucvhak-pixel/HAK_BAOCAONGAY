@@ -28,7 +28,7 @@ const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 app.commandLine.appendSwitch('lang', 'vi');
 const path = require('path');
 const fs = require('fs');
-const { validateUrl } = require('./app/source-validator.js');
+const { validateUrl, shippingSheetId } = require('./app/source-validator.js');
 
 let mainWindow = null;
 
@@ -89,14 +89,8 @@ function replaceString(text, oldVal, newVal, label) {
 
 function normalizeShippingLink(value) {
   if (!value || value === DEFAULTS.XuatHang) return DEFAULTS.XuatHang;
-  let url;
-  try { url = new URL(value); } catch { /* Báo lỗi theo đúng trường cấu hình. */ }
-  const id = url?.pathname.match(/^\/spreadsheets\/d\/([\w-]+)(?:\/|$)/)?.[1];
-  if (url?.origin !== 'https://docs.google.com' || url.username || url.password || !id || id === 'e') {
-    throw new Error('Nhập link của cả file Google Sheet XUATHANG_DN dạng /spreadsheets/d/…/edit.');
-  }
-  const defaultUrl = new URL(DEFAULTS.XuatHang);
-  if (id === defaultUrl.pathname.split('/')[3]) return DEFAULTS.XuatHang;
+  const id = shippingSheetId(value);
+  if (id === shippingSheetId(DEFAULTS.XuatHang)) return DEFAULTS.XuatHang;
   return 'https://docs.google.com/spreadsheets/d/' + id + '/edit';
 }
 
@@ -225,7 +219,10 @@ ipcMain.handle('open-config', (event) => {
 ipcMain.handle('get-config', (event) => {
   if (!isTrustedSetupSender(event)) return null;
   if (!fs.existsSync(CONFIG_JSON)) return null;
-  try { return JSON.parse(fs.readFileSync(CONFIG_JSON, 'utf8')); } catch (e) { return null; }
+  try {
+    const { TenCty, MST, DiaChi, SDT } = JSON.parse(fs.readFileSync(CONFIG_JSON, 'utf8'));
+    return { TenCty, MST, DiaChi, SDT };
+  } catch { return null; }
 });
 
 ipcMain.handle('save-config', (event, data) => {

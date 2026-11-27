@@ -7,3 +7,7 @@ app/test-results/
 *.part
 *.exe
 *.blockmap
+
+# ExcelJS được chép từ dependency khi build:config.
+desktop-app/app/exceljs.min.js
+desktop-app/app/exceljs.LICENSE

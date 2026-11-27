@@ -6,7 +6,7 @@ import { dispatchSheetId, readForestrySettings } from './forestry-settings.js';
 import { CONFIG } from '../config/config.js';
 import { fetchCSVText } from '../services/data-service.js';
 import { ensureExportLibs } from '../services/export-libs.js';
-import { FORESTRY_SOURCES, buildForestryReports, normalizeForestrySheet, validateForestryPeriod } from '../services/forestry-report.js';
+import { FORESTRY_SOURCES, buildForestryReports, forestryPeriodRange, normalizeForestrySheet, validateForestryPeriod } from '../services/forestry-report.js';
 import { csvToObjects, parseCSV } from '../utils/csv-utils.js';
 import { downloadBlob } from '../utils/dom-utils.js';
 
@@ -116,7 +116,15 @@ const dateTime = new Intl.DateTimeFormat('vi-VN', {
   dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
 });
 const dateLabel = date => date.split('-').reverse().join('/');
-const reportLabels = { M04_14: '04, 14', M: '29 tháng', '6T': '29 sáu tháng', Y: '29 năm' };
+const reportLabels = { M04_14: '04, 14', M: '29 tháng', Q: '29 quý', '6T': '29 sáu tháng', Y: '29 năm', CUSTOM: '29 kỳ tùy chọn' };
+
+const periodChoices = {
+  M: { label: 'Tháng', options: Array.from({ length: 12 }, (_, i) => 'Tháng ' + (i + 1)) },
+  Q: { label: 'Quý', options: ['Quý I', 'Quý II', 'Quý III', 'Quý IV'] },
+  '6T': { label: 'Nửa năm', options: ['6 tháng đầu năm', '6 tháng cuối năm'] },
+  Y: { label: '', options: [] },
+  CUSTOM: { label: '', options: [] },
+};
 
 function readHistory() {
   const entries = storageService.get(historyKey, []);
@@ -134,46 +142,106 @@ export function initForestryReports() {
   const historyTable = document.getElementById('forestryHistory');
   const submitButton = form.querySelector('[type="submit"]');
   const sources = Object.entries(FORESTRY_SOURCES);
-  form.elements.from.value = document.getElementById('fFrom').value;
-  form.elements.to.value = document.getElementById('fTo').value;
+  const periodChoice = document.getElementById('forestryPeriodChoice');
+  const periodLabel = document.getElementById('forestryPeriodLabel');
+  const periodRange = document.getElementById('forestryPeriodRange');
+  const elements = form.elements;
+  const currentDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+  const [currentYear, currentMonth] = currentDate.split('-').map(Number);
+  elements.year.value = currentYear;
 
   let result;
   let exporting = false;
-  let prior;
-  let carriedOpening = false;
-  let openingSourceId;
+  let openingReference;
+  let manualOpening = false;
+  let range;
+
+  function renderPeriodChoices() {
+    const kind = elements.periodType.value;
+    const { label, options } = periodChoices[kind];
+    const custom = kind === 'CUSTOM';
+    elements.year.disabled = custom;
+    elements.year.parentElement.hidden = custom;
+    for (const input of [elements.customFrom, elements.customTo]) {
+      input.disabled = !custom;
+      input.parentElement.hidden = !custom;
+    }
+    if (custom && !elements.customFrom.value && !elements.customTo.value && range) {
+      elements.customFrom.value = range.from;
+      elements.customTo.value = range.to;
+    }
+    periodLabel.textContent = label;
+    periodChoice.hidden = !options.length;
+    elements.periodIndex.disabled = !options.length;
+    elements.periodIndex.replaceChildren(...options.map((text, i) => new Option(text, i + 1)));
+    if (kind === 'M') elements.periodIndex.value = currentMonth;
+    if (kind === 'Q') elements.periodIndex.value = Math.ceil(currentMonth / 3);
+    if (kind === '6T') elements.periodIndex.value = Math.ceil(currentMonth / 6);
+  }
+
+  function refreshPeriod() {
+    const start = range?.from;
+    const custom = elements.periodType.value === 'CUSTOM';
+    range = custom
+      ? { from: elements.customFrom.value, to: elements.customTo.value }
+      : forestryPeriodRange(elements.periodType.value, Number(elements.year.value), Number(elements.periodIndex.value || 1));
+    periodRange.textContent = '';
+    if (custom && range.from && range.to) {
+      try { validateForestryPeriod(range.from, range.to); }
+      catch (error) { periodRange.textContent = error.message; }
+    } else if (!custom) {
+      periodRange.textContent = range
+        ? 'Từ ngày ' + dateLabel(range.from) + ' đến ngày ' + dateLabel(range.to)
+        : 'Chọn năm hợp lệ.';
+    }
+    if (start !== range?.from) manualOpening = false;
+    refreshOpening();
+  }
+
   function refreshOpening() {
     let source = '';
-    try { source = dispatchSheetId(readForestrySettings().shipping); } catch { /* Đợi link hợp lệ. */ }
-    if (carriedOpening && source !== openingSourceId) {
-      form.elements.opening.value = '';
-      carriedOpening = false;
+    try { source = dispatchSheetId(CONFIG.XUATHANG_DN); } catch { /* Đợi link hợp lệ. */ }
+    const prior = latestForestryClosing(readHistory(), range?.from, { source, company: CONFIG.TEN_CONG_TY, intake: CONFIG.HOSOKEO });
+    let legacy;
+    if (range?.from) {
+      try {
+        legacy = readForestrySettings(range.from, range.from).rows.find(row => row['Mẫu'] === 'MAU04' &&
+          row.IN_Tungay === range.from && Number.isFinite(row['Tồn đầu ngày']));
+      } catch { /* Chỉ gợi ý số tồn khi tìm được đúng quy định. */ }
     }
-    openingSourceId = source;
-    prior = latestForestryClosing(readHistory(), form.elements.from.value, { source, company: CONFIG.TEN_CONG_TY, intake: CONFIG.HOSOKEO });
-    priorButton.disabled = !prior;
+    openingReference = prior
+      ? { value: prior.closing, label: 'Lấy tồn cuối kỳ trước' }
+      : legacy ? { value: legacy['Tồn đầu ngày'], label: 'Dùng tồn đã lưu trước đây' } : undefined;
+    priorButton.disabled = !openingReference;
+    priorButton.textContent = openingReference?.label ?? 'Lấy tồn cuối kỳ trước';
+    if (!manualOpening) elements.opening.value = prior?.closing ?? '';
     openingSource.textContent = prior
-      ? 'Tồn cuối gần nhất: ' + number.format(prior.closing) + ' tấn, ngày ' + dateLabel(prior.to) + '.'
-      : 'Chưa có tồn cuối của ngày liền trước cùng nguồn nhập, xuất và đơn vị. Hãy đối chiếu rồi nhập tồn đầu kỳ.';
+      ? 'Tồn cuối ngày ' + dateLabel(prior.to) + ' là ' + number.format(prior.closing) + ' tấn.'
+      : legacy ? 'Có số tồn đã lưu trước đây cho ngày ' + dateLabel(range.from) + ': ' +
+        number.format(legacy['Tồn đầu ngày']) + ' tấn. Hãy đối chiếu trước khi dùng.'
+      : 'Nhập tồn đầu kỳ nếu chưa có tồn cuối của ngày liền trước.';
   }
+
+  renderPeriodChoices();
+  refreshPeriod();
   function renderHistory() {
     historyTable.replaceChildren();
     const entries = readHistory();
     const stored = storageService.get(historyKey, []);
     if (!Array.isArray(stored) || stored.length !== entries.length) {
       const notice = historyTable.insertRow().insertCell();
-      notice.colSpan = 5;
+      notice.colSpan = 6;
       notice.textContent = 'Có mục lịch sử lâm sản không hợp lệ đang được bỏ qua.';
     }
     if (!entries.length) {
       const empty = historyTable.insertRow().insertCell();
-      empty.colSpan = 5;
+      empty.colSpan = 6;
       empty.textContent = 'Chưa có báo cáo đã tạo.';
     }
     for (const entry of entries) {
       appendRow(historyTable, [dateTime.format(new Date(entry.createdAt)),
         dateLabel(entry.from) + ' – ' + dateLabel(entry.to), entry.selected.map(key => reportLabels[key]).join('; '),
-        number.format(entry.opening), Number.isFinite(entry.closing) ? number.format(entry.closing) : '—'], 'td');
+        entry.regulationCode ?? '—', number.format(entry.opening), Number.isFinite(entry.closing) ? number.format(entry.closing) : '—'], 'td');
     }
     refreshOpening();
   }
@@ -183,9 +251,9 @@ export function initForestryReports() {
   }
   renderHistory();
   priorButton.addEventListener('click', () => {
-    if (!prior) return;
-    form.elements.opening.value = prior.closing;
-    carriedOpening = true;
+    if (!openingReference) return;
+    elements.opening.value = openingReference.value;
+    manualOpening = true;
     invalidateReport();
   });
   let revision = 0;
@@ -198,12 +266,9 @@ export function initForestryReports() {
   }
   form.addEventListener('input', event => {
     if (event.target.name === 'bookNumber') return;
-    if (event.target.name === 'opening') carriedOpening = false;
-    if (event.target.name === 'from') {
-      if (carriedOpening) form.elements.opening.value = '';
-      carriedOpening = false;
-      refreshOpening();
-    }
+    if (event.target.name === 'opening') manualOpening = true;
+    if (event.target.name === 'periodType') renderPeriodChoices();
+    if (['periodType', 'year', 'periodIndex', 'customFrom', 'customTo'].includes(event.target.name)) refreshPeriod();
     invalidateReport();
   });
   document.addEventListener('forestryhistorychange', renderHistory);
@@ -215,10 +280,9 @@ export function initForestryReports() {
     event.preventDefault();
     const currentRevision = ++revision;
     const values = new FormData(form);
-    const from = values.get('from');
-    const to = values.get('to');
-    const opening = Number(values.get('opening'));
-    const selected = values.getAll('reports');
+    const { from, to } = range ?? {};
+    const opening = elements.opening.valueAsNumber;
+    const selected = values.getAll('reports').map(key => key === 'M29' ? elements.periodType.value : key);
     result = undefined;
     output.replaceChildren();
     submitButton.disabled = true;
@@ -226,13 +290,10 @@ export function initForestryReports() {
     status.textContent = 'Đang đọc Google Sheet…';
     try {
       validateForestryPeriod(from, to);
+      if (!Number.isFinite(opening)) throw new Error('Nhập tồn đầu kỳ hợp lệ.');
       if (!selected.length) throw new Error('Chọn ít nhất một mẫu báo cáo.');
-      const config = readForestrySettings();
-      if ((config.effectiveFrom && from < config.effectiveFrom) ||
-          (config.effectiveTo && to > config.effectiveTo)) {
-        throw new Error('Kỳ báo cáo nằm ngoài thời gian hiệu lực ở Cấu hình → Tham số báo cáo lâm sản.');
-      }
-      const source = dispatchSheetId(config.shipping);
+      const config = readForestrySettings(from, to);
+      const source = dispatchSheetId(CONFIG.XUATHANG_DN);
       const urls = {
         intake: CONFIG.HOSOKEO,
         dispatch: dispatchSheetUrl(source, FORESTRY_SOURCES.dispatch.label),
@@ -241,14 +302,14 @@ export function initForestryReports() {
       const data = Object.fromEntries(await Promise.all(sources.map(async ([key, source]) =>
         [key, await loadSource(source, urls[key])])));
       if (currentRevision !== revision) return;
-      const reports = buildForestryReports({ ...data, calendar: [], settings: config.rows }, { from, to, opening, selected });
+      const reports = buildForestryReports({ ...data, calendar: [], settings: config.rows }, { from, to, opening, selected, commodityCode: CONFIG.MA_HS });
       showResults(output, reports);
       result = { reports, from, to };
       updateExportButtons();
-      const entry = { createdAt: new Date().toISOString(), source, company: CONFIG.TEN_CONG_TY, intake: CONFIG.HOSOKEO, from, to, selected, opening, closing: closingStock(reports) };
+      const entry = { createdAt: new Date().toISOString(), source, company: CONFIG.TEN_CONG_TY, intake: CONFIG.HOSOKEO, from, to, selected, opening, regulationCode: config.code, closing: closingStock(reports) };
       const savedHistory = storageService.set(historyKey, [entry, ...readHistory()]);
       renderHistory();
-      status.textContent = 'Đã lập ' + reports.length + ' bảng từ Google Sheet.' +
+      status.textContent = 'Đã lập ' + reports.length + ' bảng theo quy định ' + config.code + '.' +
         (savedHistory ? '' : ' Không lưu được lịch sử trên trình duyệt này.');
     } catch (error) {
       if (currentRevision === revision) status.textContent = 'Lỗi lập báo cáo: ' + error.message;
