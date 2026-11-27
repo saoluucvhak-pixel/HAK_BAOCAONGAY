@@ -1,4 +1,4 @@
-import { createPublicKey } from 'node:crypto';
+import { createHash, createPublicKey } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -20,4 +20,7 @@ writeFileSync(policyFile, JSON.stringify({ n, e, qa }));
 const out = fileURLToPath(new URL('build/license-bin/', root));
 execFileSync('dotnet', ['build', fileURLToPath(new URL('licensing/HakLicense.csproj', root)),
   '-c', 'Release', '-o', out, '-p:HakPolicyPath=' + policyFile], { stdio: 'inherit' });
-if (!readFileSync(new URL('build/license-bin/HAK-License.exe', root)).length) throw new Error('Thiếu công cụ cấp phép Windows.');
+const verifier = readFileSync(new URL('build/license-bin/HAK-License.exe', root));
+if (!verifier.length) throw new Error('Thiếu công cụ cấp phép Windows.');
+const sha256 = createHash('sha256').update(verifier).digest('hex');
+writeFileSync(new URL('app/license-verifier.json', root), JSON.stringify({ sha256 }));

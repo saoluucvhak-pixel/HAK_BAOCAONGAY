@@ -13,3 +13,4 @@ desktop-app/licensing/bin/
 desktop-app/licensing/obj/
 *.hakreq
 *.haklic
+desktop-app/app/license-verifier.json

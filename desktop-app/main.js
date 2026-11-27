@@ -273,14 +273,16 @@ function buildMenu() {
 }
 
 const { execFile } = require('node:child_process');
+const { createHash } = require('node:crypto');
 const { promisify } = require('node:util');
 const execLicense = promisify(execFile);
 
 async function authorizeInstalledApp() {
-  const reference = path.join(__dirname, 'license', 'HAK-License.exe');
+  const reference = path.join(__dirname, 'app', 'license-verifier.json');
   const helper = path.join(process.resourcesPath, 'HAK-License.exe');
   const run = (...args) => {
-    if (!fs.readFileSync(helper).equals(fs.readFileSync(reference))) {
+    const { sha256 } = JSON.parse(fs.readFileSync(reference, 'utf8'));
+    if (createHash('sha256').update(fs.readFileSync(helper)).digest('hex') !== sha256) {
       throw new Error('Công cụ xác minh giấy phép không khớp với bản đóng gói.');
     }
     return execLicense(helper, args, { windowsHide: true, timeout: 45000 });
