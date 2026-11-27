@@ -94,10 +94,10 @@ Mỗi lần mở trang quản trị, chỉ cần mở khóa một lần để x�
 
 ### Đóng bộ cài trên máy quản trị HAK
 
-- Lần đầu, mở `HAK-CapPhep.html` bằng Chrome hoặc Edge. Chọn **Tạo khóa**. Tải `public.jwk` và file khóa riêng đã mã hóa. Giữ khóa riêng và mật khẩu trên máy quản trị. Chỉ chọn `public.jwk` khi đóng bộ cài.
-- Máy đóng gói dùng Windows với Node.js 22.12 trở lên, .NET SDK có bộ tham chiếu .NET Framework 4.8 và phụ thuộc desktop đã chuẩn bị. Chạy `npm ci` trong thư mục `desktop-app` khi chuẩn bị máy. Bộ đóng gói sử dụng bản HTML đã build sẵn trong dự án.
-- Mở `desktop-app/Dong-Bo-Cai-HAK.cmd`. Chọn `public.jwk`, chọn chứng thư ký Windows dạng PFX/P12 của HAK rồi nhập mật khẩu. Bản cài và công cụ quản trị nằm trong `desktop-app/release` sau khi xác minh chữ ký.
-- Quy trình chạy trên máy Windows của HAK và dùng dấu thời gian Authenticode. Lần đầu cần chuẩn bị phụ thuộc và các công cụ đóng gói. Trao mã yêu cầu, nhận file cài đặt HAK và xác minh giấy phép có thể làm offline.
+- Máy đóng gói dùng Windows với Node.js 22.12 trở lên và .NET SDK có bộ tham chiếu .NET Framework 4.8.
+- Mở `desktop-app/Dong-Bo-Cai-HAK.cmd` và đặt mật khẩu quản trị khi được hỏi. Công cụ lưu khóa riêng đã mã hóa tại `%LOCALAPPDATA%\HAK\Issuer\HAK-KhoaRieng.hakkey`, tự đưa phần khóa công khai vào bộ cài và xuất bộ cài cùng `HAK-CapPhep.html` trong `desktop-app/release`.
+- Khi cần đóng lại bộ cài, nhập mật khẩu đã dùng. Khi duyệt máy, mở `HAK-CapPhep.html`, chọn cùng file `.hakkey` và cấp file phản hồi như trên. Sao lưu file khóa đã mã hóa để giữ khả năng cấp phép nếu máy quản trị được cài lại.
+- Bộ cài đóng cục bộ theo cách này dùng xác minh giấy phép HAK theo máy và được kiểm tra SHA-256. Bộ cài có thể hiện cảnh báo nhà phát hành chưa xác định trên Windows.
 
 **Dùng dòng lệnh:** ví dụ sau tạo định dạng khóa riêng PEM cho công cụ Node.js. Chạy ở gốc repo trên máy quản trị và lưu khóa riêng vào thư mục có quyền truy cập giới hạn.
 

@@ -192,7 +192,7 @@ submit($('createForm'), $('createStatus'), async () => {
   };
   $('createForm').reset();
   $('keyDownloads').hidden = false;
-  report($('createStatus'), 'Đã tạo khóa. Gửi public.jwk để đóng bộ cài. Giữ file khóa riêng trên máy quản trị HAK.');
+  report($('createStatus'), 'Đã tạo khóa. Giữ file khóa riêng và mật khẩu trên máy quản trị HAK.');
 });
 $('downloadPublic').addEventListener('click', () => download('public.jwk', generatedKeys.publicKey));
 $('downloadPrivate').addEventListener('click', () => download('HAK-KhoaRieng.hakkey', generatedKeys.privateKey));

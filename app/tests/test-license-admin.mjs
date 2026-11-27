@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createPublicKey, randomBytes, verify } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { launchChromium } from './browser-launcher.mjs';
 
 const tool = new URL('../../desktop-app/licensing/HAK-CapPhep.html', import.meta.url);
@@ -147,6 +151,33 @@ try {
   assert(data.issuedAt > parsedKit.expiresAt);
   assert(data.expiresAt > data.issuedAt);
   assert(verify('sha256', replacementBody, issuer, Buffer.from(replacement.signature, 'base64')));
+
+  const localDir = await mkdtemp(path.join(tmpdir(), 'hak-local-issuer-'));
+  try {
+    const issuerFile = path.join(localDir, 'HAK-KhoaRieng.hakkey');
+    const script = fileURLToPath(new URL('../../desktop-app/scripts/local-issuer.mjs', import.meta.url));
+    const localOptions = { env: { ...process.env, HAK_LOCAL_ISSUER_PASSWORD: password }, encoding: 'utf8' };
+    const publicJwk = execFileSync(process.execPath, [script, issuerFile], localOptions);
+    const savedIssuer = await readFile(issuerFile);
+    assert.equal(execFileSync(process.execPath, [script, issuerFile], localOptions), publicJwk);
+    const wrong = spawnSync(process.execPath, [script, issuerFile], {
+      env: { ...localOptions.env, HAK_LOCAL_ISSUER_PASSWORD: 'wrong-passphrase' }
+    });
+    assert.equal(wrong.status, 1);
+    assert.deepEqual(await readFile(issuerFile), savedIssuer);
+
+    await page.reload();
+    await page.locator('#privateFile').setInputFiles(issuerFile);
+    await page.locator('#issuePassword').fill(password);
+    await codeInput.fill(requestCode);
+    await page.getByRole('button', { name: 'Tạo mã trả lời' }).click();
+    await reply.waitFor({ state: 'visible' });
+    const [localPrefix, localBody, localProof] = (await reply.inputValue()).split('.');
+    assert(verify('sha256', Buffer.from(request.product + '\n' + localPrefix + '.' + localBody),
+      createPublicKey({ key: JSON.parse(publicJwk), format: 'jwk' }), Buffer.from(localProof, 'base64url')));
+  } finally {
+    await rm(localDir, { recursive: true, force: true });
+  }
 
   console.log('PASS: offline issuance, legacy activation, tamper detection and reissue after reinstall from an expired setup file.');
 } finally {
