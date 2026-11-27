@@ -31,6 +31,9 @@ const profile = {
 let active = null;
 let pending = null;
 let failCommit = false;
+let allowLogin = true;
+let accountMode = 'direct';
+let reportContents;
 let loaded = [];
 let commands = [];
 let ready;
@@ -55,6 +58,7 @@ const electron = {
       on(name, fn) { if (name === 'will-navigate') navigation = fn; },
       session: { on() {} }
     };
+    reportContents = this.webContents;
     this.on = () => {};
   }, { getAllWindows: () => [] }),
   Menu: { setApplicationMenu() {}, buildFromTemplate: () => ({}) },
@@ -72,6 +76,19 @@ Module._load = function (name) {
       switch (command) {
         case 'check':
           callback(null, { stdout: active ? encode(active) : '' });
+          return;
+        case 'login':
+          if (!allowLogin) {
+            callback(Object.assign(new Error('Login canceled'), { code: 1 }));
+            return;
+          }
+          break;
+        case 'account-mode':
+          callback(null, { stdout: accountMode });
+          return;
+        case 'configure-account':
+          accountMode = id === 'enable' ? 'account' : 'direct';
+          callback(null, { stdout: accountMode });
           return;
         case 'enroll-change':
           if (pending) callback(null, { stdout: encode(pending) });
@@ -111,6 +128,11 @@ async function run() {
   assert.equal(quits, 1);
 
   active = profile;
+  allowLogin = false;
+  await start();
+  assert.deepEqual(loaded, [], 'Hủy đăng nhập không được mở báo cáo');
+  assert.equal(quits, 2);
+  allowLogin = true;
   await start();
   assert.equal(switches.lang, 'vi');
   assert.deepEqual(loaded, [report]);
@@ -125,8 +147,14 @@ async function run() {
   assert.equal(JSON.parse(fs.readFileSync(config, 'utf8')).TenCty, profile.TenCty);
   assert(fs.readFileSync(report, 'utf8').includes('NEW-TEMPLATE'));
 
-  const trusted = { senderFrame: { url: pathToFileURL(report).href } };
+  const trusted = { sender: reportContents, senderFrame: { url: pathToFileURL(report).href } };
   const untrusted = { senderFrame: { url: 'https://untrusted.example/' } };
+  assert.equal((await handlers['account-mode'](untrusted)).ok, false);
+  assert.equal((await handlers['configure-account'](trusted, 'unexpected')).ok, false);
+  assert.deepEqual(await handlers['account-mode'](trusted), { ok: true, mode: 'direct' });
+  assert.deepEqual(await handlers['configure-account'](trusted, 'enable'), { ok: true, mode: 'account' });
+  assert.deepEqual(await handlers['configure-account'](trusted, 'disable'), { ok: true, mode: 'direct' });
+
   const before = commands.length;
   assert.equal((await handlers['open-config'](untrusted)).ok, false);
   assert.equal(commands.length, before);
@@ -163,7 +191,7 @@ async function run() {
   navigation(event, 'file:///tmp/untrusted.html');
   navigation(event, trusted.senderFrame.url);
   assert.equal(prevented, 2);
-  console.log('PASS: required managed profile, local edit rejection, fresh import gate and rollback.');
+  console.log('PASS: login gate, trusted account settings, managed profiles and rollback.');
 }
 
 run().catch((error) => {

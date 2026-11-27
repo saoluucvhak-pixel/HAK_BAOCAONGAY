@@ -24,12 +24,26 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
     window.__opened = 0;
-    window.api = { openConfig: async () => { window.__opened++; return { ok: true, canceled: true }; } };
+    window.__disableApproved = false;
+    window.api = {
+      openConfig: async () => { window.__opened++; return { ok: true, canceled: true }; },
+      getAccountMode: async () => ({ ok: true, mode: 'direct' }),
+      configureAccount: async (action) => action === 'disable' && !window.__disableApproved
+        ? { ok: true, canceled: true }
+        : { ok: true, mode: action === 'enable' ? 'account' : 'direct' }
+    };
     window.fetch = async (url) => { throw new Error('Failed to fetch ' + url); };
     window.__bcFetchTimeoutMs = 200;
   });
   await page.goto(pathToFileURL(file).href);
   await page.locator('[data-target="cauhinh"]').click();
+  await page.getByRole('button', { name: 'Bật đăng nhập' }).click();
+  const disable = page.getByRole('button', { name: 'Tắt đăng nhập' });
+  await disable.click();
+  assert(await disable.isVisible());
+  await page.evaluate(() => { window.__disableApproved = true; });
+  await disable.click();
+  await page.getByRole('button', { name: 'Bật đăng nhập' }).waitFor();
   await page.getByRole('tab', { name: 'Thông tin công ty' }).click();
   const panel = page.getByRole('tabpanel', { name: 'Thông tin công ty' });
   assert.match(await panel.innerText(), /CÔNG TY TEST/);

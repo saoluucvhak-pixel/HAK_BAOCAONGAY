@@ -54,6 +54,12 @@ jobs:
           node-version: 22
       - run: node desktop-app/tests/test-template-refresh.js
       - run: node desktop-app/tests/test-source-validator.js
+      - name: Verify the local Windows account store
+        run: |
+          $testDir = Join-Path $env:RUNNER_TEMP 'hak-account-tests'
+          dotnet build desktop-app/tests/account-store/AccountStoreTests.csproj -c Release -o $testDir
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & (Join-Path $testDir 'AccountStoreTests.exe')
       - name: Smoke test installer audit on a signed Windows system executable
         shell: pwsh
         run: |

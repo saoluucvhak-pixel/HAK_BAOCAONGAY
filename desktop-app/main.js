@@ -90,6 +90,34 @@ ipcMain.handle('open-config', (event) => {
   return importCompanyFile();
 });
 
+let configuringAccount = false;
+async function accountAction(event, action) {
+  if (!app.isPackaged || !mainWindow || event?.sender !== mainWindow.webContents ||
+      !event.senderFrame || !isTrustedAppUrl(event.senderFrame.url)) {
+    return { ok: false, error: 'Nguồn yêu cầu không được phép.' };
+  }
+  if (configuringAccount) return { ok: false, error: 'Đang mở cài đặt tài khoản.' };
+  configuringAccount = true;
+  try {
+    const { stdout } = await (action
+      ? runLicense('configure-account', [action])
+      : runLicense('account-mode'));
+    const mode = stdout.trim();
+    if (mode !== 'account' && mode !== 'direct') throw new Error('Không đọc được chế độ tài khoản.');
+    return { ok: true, mode };
+  } catch (error) {
+    if (action && error.code === 1 && !error.stderr?.trim()) return { ok: true, canceled: true };
+    return { ok: false, error: error.stderr?.trim() || error.message };
+  } finally {
+    configuringAccount = false;
+  }
+}
+ipcMain.handle('account-mode', (event) => accountAction(event));
+ipcMain.handle('configure-account', (event, action) => {
+  if (action !== 'enable' && action !== 'disable') return { ok: false, error: 'Lựa chọn không hợp lệ.' };
+  return accountAction(event, action);
+});
+
 function validateCompanyConfig(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: 'Cấu hình gửi lên không hợp lệ.' };
   const cfg = {
@@ -201,7 +229,7 @@ function runLicense(command, args = []) {
   if (createHash('sha256').update(fs.readFileSync(helper)).digest('hex') !== sha256) {
     throw new Error('Công cụ xác minh giấy phép không khớp với bản đóng gói.');
   }
-  return execLicense(helper, [command, ...args], { windowsHide: true, timeout: command.startsWith('enroll') ? 0 : 45000 });
+  return execLicense(helper, [command, ...args], { windowsHide: true, timeout: /^(enroll|login$|configure-account$)/.test(command) ? 0 : 45000 });
 }
 
 function readVerifiedProfile(stdout) {
@@ -276,6 +304,13 @@ async function authorizeInstalledApp() {
     const profile = readVerifiedProfile(verified.stdout);
     if (checkOnly) {
       app.exit(0);
+      return false;
+    }
+    try {
+      await runLicense('login');
+    } catch (error) {
+      if (error.code !== 1 || error.stderr?.trim())
+        dialog.showErrorBox('Không thể đăng nhập', error.stderr?.trim() || error.message);
       return false;
     }
     applyProfile(profile);
