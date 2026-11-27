@@ -88,9 +88,9 @@ Tài khoản dùng cục bộ trong hồ sơ Windows hiện tại. Ứng dụng 
 
 ### Phát hành bản nâng cấp
 
-Chạy `desktop-app/Dong-Bo-Cai-HAK.cmd` trên Windows có Node.js 22.12+ và .NET SDK. Chọn `HAK-PublicKey.jwk` lần đầu. Công cụ lưu khóa công khai tại `%LOCALAPPDATA%\HAK\Issuer` để dùng lại.
+Chạy `desktop-app/Dong-Bo-Cai-HAK.cmd` trên Windows có Node.js 22.12+ và .NET SDK. Công cụ dùng `desktop-app/licensing/HAK-PublicKey.jwk` đã lưu trong kho. Nếu khóa công khai chưa có trong kho, công cụ cho chọn file và lưu tại `%LOCALAPPDATA%\HAK\Issuer` để dùng lại.
 
-Nếu đóng gói bằng GitHub Actions, nhập nội dung **khóa công khai** vào tham số `issuer_public_key` hoặc biến kho `HAK_LICENSE_PUBLIC_KEY`. Chọn `publish=true` trên nhánh `main` để phát hành Setup. Khóa riêng và mật khẩu bảo vệ khóa ở lại HAK. Bộ cài chưa ký Authenticode và phát hành kèm SHA-256.
+GitHub Actions dùng khóa công khai đã lưu trong kho khi chạy **Release installer**. Tham số `issuer_public_key` hoặc biến kho `HAK_LICENSE_PUBLIC_KEY` có thể chỉ định khóa công khai khác. Chọn `publish=true` trên nhánh `main` để phát hành Setup. Khóa riêng và mật khẩu bảo vệ khóa ở lại HAK. Bộ cài chưa ký Authenticode và phát hành kèm SHA-256.
 
 ### Đo hiệu năng báo cáo
 

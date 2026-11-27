@@ -15,6 +15,11 @@
   label { display: block; font-weight: 650; margin-bottom: .7rem; }
   input, select { display: block; box-sizing: border-box; margin-top: .25rem; width: 100%; padding: .55rem; border: 1px solid #99afb6; border-radius: 5px; font: inherit; }
   details { margin-bottom: .85rem; }
+  .help { background: #fff; border: 1px solid #d5e0e3; border-radius: 10px; margin-top: 18px; padding: 14px 20px; }
+  .help summary { cursor: pointer; font-weight: 700; }
+  .help h3 { margin: .9rem 0 .25rem; font-size: 1rem; }
+  .help ol { margin: .25rem 0 .85rem; padding-left: 1.35rem; }
+  .help li + li { margin-top: .35rem; }
   button { border: 0; border-radius: 5px; background: #005864; color: #fff; font: inherit; font-weight: 650; padding: .55rem .85rem; cursor: pointer; }
   button:disabled { opacity: .55; cursor: wait; }
   button.secondary { background: #e5f0f2; color: #17424a; margin: .8rem .4rem 0 0; }
@@ -30,6 +35,23 @@
     <h1>Quản trị giấy phép HAK</h1>
     <p>Dùng trên máy quản trị HAK. Công cụ chạy offline.</p>
   </header>
+  <details class="help" id="issuerGuide">
+    <summary>Hướng dẫn cấp phép nhiều app</summary>
+    <h3>1. Chuẩn bị một lần tại HAK</h3>
+    <ol>
+      <li>Mở <strong>Tạo hoặc khôi phục khóa</strong>, đặt mật khẩu rồi bấm <strong>Tạo khóa chung</strong>. Giữ bản sao <code>HAK-KhoaChung.hakkey</code> đã mã hóa và mật khẩu tại HAK.</li>
+      <li>Bấm <strong>Tải khóa công khai để đóng bộ cài</strong>. Dùng cùng file <code>HAK-PublicKey.jwk</code> cho các app HAK đã tích hợp cấp phép và cho các lần nâng cấp. File này dùng để kiểm tra phản hồi đã được HAK cấp.</li>
+      <li>Bộ cài Báo cáo ngày dùng khóa công khai đã lưu trong kho mã nguồn. Với app mới, cung cấp cùng khóa công khai cho công cụ đóng gói của app đó. Khi dùng GitHub <strong>Release installer</strong>, có thể chỉ định khóa công khai qua biến <code>HAK_LICENSE_PUBLIC_KEY</code> hoặc ô <code>issuer_public_key</code>.</li>
+    </ol>
+    <h3>2. Cấp phép cho một máy</h3>
+    <ol>
+      <li>Người cài mở Setup, sao chép mã yêu cầu <code>HAK4.…</code>, gửi HAK và giữ cửa sổ đang mở.</li>
+      <li>Dán mã vào trang này. Đối chiếu <strong>Ứng dụng</strong> và <strong>Máy</strong> hiện dưới ô mã rồi chọn ngày hết hạn. Nếu là Báo cáo ngày, chọn thêm công ty và kiểm tra các nguồn Google Sheets.</li>
+      <li>Bấm <strong>Tạo mã và file HAK</strong>. Gửi cả mã phản hồi và file <code>.haksetup</code>. Người cài kiểm tra mã rồi nạp file vào Setup. Khi chuyển sang cấp cho app khác, dán mã yêu cầu của app đó vào cùng trang này.</li>
+    </ol>
+    <h3>3. Chuyển máy quản trị hoặc khôi phục sau sự cố</h3>
+    <p>Mở HTML trên máy mới, nạp <code>HAK-KhoaChung.hakkey</code> và nhập mật khẩu cũ, rồi bấm <strong>Khôi phục khóa</strong>. Dùng <strong>Sao lưu danh sách công ty</strong> nếu cần chuyển cả hồ sơ công ty.</p>
+  </details>
   <section aria-labelledby="issuerTitle">
     <h2 id="issuerTitle">Khóa cấp phép chung HAK</h2>
     <p id="issuerStatus" class="status" role="status"></p>

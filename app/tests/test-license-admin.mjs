@@ -28,7 +28,12 @@ try {
   const context = await browser.newContext({ offline: true, acceptDownloads: true });
   const page = await context.newPage();
   await page.goto(location);
-  await page.getByText('Tạo hoặc khôi phục khóa', { exact: true }).click();
+  const guide = page.locator('#issuerGuide');
+  await guide.getByText('Hướng dẫn cấp phép nhiều app', { exact: true }).click();
+  assert(await guide.getByText('Chuẩn bị một lần tại HAK', { exact: false }).isVisible());
+  assert(await guide.getByText('Dùng cùng file', { exact: false }).isVisible());
+  assert(await guide.getByText('Chuyển máy quản trị hoặc khôi phục sau sự cố', { exact: false }).isVisible());
+  await page.locator('#issuerDetails > summary').click();
   await page.locator('#newIssuerPassword').fill(password);
   await page.locator('#repeatIssuerPassword').fill(password);
   const backup = await download(page, 'Tạo khóa chung', 'HAK-KhoaChung.hakkey');
@@ -62,13 +67,13 @@ try {
   const envelope = JSON.parse(file);
   const altered = { ...envelope, body: (envelope.body[0] === 'A' ? 'B' : 'A') + envelope.body.slice(1) };
   assert.throws(() => openCompany(JSON.stringify(altered), publicKey, recipient), /Invalid signature/);
-  await page.getByText('Sao lưu danh sách công ty', { exact: true }).click();
+  await page.locator('summary').filter({ hasText: /^Sao lưu danh sách công ty$/ }).click();
   const profiles = await download(page, 'Tải danh sách', 'HAK-DanhSachCongTy.json');
 
   // Restore the single HAK key and the company list in a fresh offline browser.
   const recovered = await (await browser.newContext({ offline: true, acceptDownloads: true })).newPage();
   await recovered.goto(location);
-  await recovered.getByText('Tạo hoặc khôi phục khóa', { exact: true }).click();
+  await recovered.locator('#issuerDetails > summary').click();
   await recovered.locator('#restoreIssuer').setInputFiles({
     name: 'HAK-KhoaChung.hakkey', mimeType: 'application/json', buffer: backup
   });
@@ -78,7 +83,7 @@ try {
   await recovered.locator('#restoreIssuerPassword').fill(password);
   await recovered.getByRole('button', { name: 'Khôi phục khóa' }).click();
   await recovered.waitForFunction(() => document.querySelector('#issuerStatus').textContent.includes('đã mở'));
-  await recovered.getByText('Sao lưu danh sách công ty', { exact: true }).click();
+  await recovered.locator('summary').filter({ hasText: /^Sao lưu danh sách công ty$/ }).click();
   await recovered.locator('#importCompanies').setInputFiles({
     name: 'HAK-DanhSachCongTy.json', mimeType: 'application/json', buffer: profiles
   });
