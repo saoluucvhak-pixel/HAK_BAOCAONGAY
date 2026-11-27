@@ -24,6 +24,7 @@
   button { border: 0; border-radius: 5px; background: #005864; color: #fff; font: inherit; font-weight: 650; padding: .55rem .85rem; cursor: pointer; }
   button:disabled { opacity: .55; cursor: wait; }
   button.secondary { background: #e5f0f2; color: #17424a; margin: .8rem .4rem 0 0; }
+  .company-json { overflow: auto; padding: .85rem; background: #f3f6f7; border-radius: 5px; }
   .file-help { margin: .35rem 0 .85rem; }
   .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .85rem; }
   .actions button.secondary { margin: 0; }
@@ -97,12 +98,25 @@
       <button class="secondary" id="exportVerificationKey" type="button" aria-describedby="verificationFileHelp">Tải khóa xác minh HAK</button>
       <p class="file-help" id="verificationFileHelp">Tải file <code>HAK-PublicKey.jwk</code> cho người tích hợp app. Setup và app dùng khóa công khai này để kiểm tra chữ ký trên phản hồi do HAK cấp. Thuật toán xác minh nằm trong mã nguồn của app.</p>
     </div>
-    <details class="profiles">
-      <summary>Sao lưu danh sách công ty</summary>
-      <button class="secondary" id="exportCompanies" type="button">Tải danh sách</button>
-      <label>Nạp danh sách công ty
-        <input id="importCompanies" type="file" accept=".json,application/json">
+    <details class="profiles" id="companyBackupDetails">
+      <summary>Sao lưu và nạp danh sách công ty</summary>
+      <p class="file-help">Để chuyển danh sách sang máy khác, tải <code>HAK-DanhSachCongTy.json</code> ở máy cũ rồi chọn file đó ở máy mới. Để nhập danh sách mới, tải <code>HAK-MauDanhSachCongTy.json</code>, điền thông tin rồi chọn file đã lưu.</p>
+      <div class="actions">
+        <button class="secondary" id="exportCompanies" type="button">Tải bản sao danh sách</button>
+        <button class="secondary" id="exportCompanyTemplate" type="button">Tải mẫu JSON để điền</button>
+      </div>
+      <details>
+        <summary>Xem cấu trúc JSON và cách điền</summary>
+        <p class="file-help">Mở file mẫu bằng trình soạn thảo văn bản. Lưu dưới dạng <code>.json</code> với mã hóa UTF-8. Giữ nguyên <code>format</code> và tên các trường. Điền giá trị trong dấu ngoặc kép. Mỗi khối trong <code>companies</code> là một công ty. Để thêm công ty, sao chép khối đó và đặt dấu phẩy giữa các khối.</p>
+        <p><strong>Bắt buộc</strong> · <code>TenCty</code> là tên công ty, <code>PhieuCan</code> là link CSV phiếu cân, <code>DNTT</code> là link CSV đề nghị thanh toán. Dùng link xuất CSV có <code>output=csv</code> hoặc <code>format=csv</code>.</p>
+        <p><strong>Có thể để trống</strong> · <code>DiaChi</code> là địa chỉ công ty, <code>MST</code> là mã số thuế, <code>SDT</code> là số điện thoại, <code>DiaChiThuMua</code> là địa chỉ thu mua, <code>MaHS</code> là mã HS, <code>NhaMay</code> là nhà máy, <code>HDNCC</code> là link CSV hợp đồng nhà cung cấp và <code>Hosokeo</code> là link CSV hồ sơ keo.</p>
+        <pre class="company-json"><code id="companyTemplatePreview"></code></pre>
+      </details>
+      <label>Chọn file danh sách công ty (.json)
+        <input id="importCompanies" type="file" accept=".json,application/json" aria-describedby="companyImportHelp">
       </label>
+      <p class="file-help" id="companyImportHelp">HTML thêm hồ sơ mới và giữ dữ liệu của công ty đã lưu trùng tên. File chứa thông tin công ty và link Google Sheets dưới dạng văn bản.</p>
+      <p class="status" id="companyBackupStatus" role="status"></p>
     </details>
   </details>
 
@@ -119,7 +133,7 @@
       <li>Người cài dán mã phản hồi, bấm <strong>Kiểm tra mã</strong>, chọn <strong>Nạp file HAK…</strong>, rồi tiếp tục cài. Nếu đã đóng và mở lại bộ cài hoặc đang cài cho máy khác, bắt đầu từ mã yêu cầu mới.</li>
     </ol>
     <h3>Khi chuyển máy quản trị</h3>
-    <p>Bấm <strong>Tạo bản sao phục hồi cấp phép</strong> trên máy cũ. Trên máy mới, chọn file <code>HAK-PhucHoiCapPhep.hakkey</code> vừa tải, nhập mật khẩu rồi bấm <strong>Phục hồi cấp phép</strong>. Nếu cần chuyển hồ sơ công ty, dùng <strong>Sao lưu danh sách công ty</strong> để tải trên máy cũ và nạp trên máy mới. File danh sách chứa thông tin công ty và link Google Sheets dưới dạng văn bản, nên lưu nội bộ.</p>
+    <p>Bấm <strong>Tạo bản sao phục hồi cấp phép</strong> trên máy cũ. Trên máy mới, chọn file <code>HAK-PhucHoiCapPhep.hakkey</code> vừa tải, nhập mật khẩu rồi bấm <strong>Phục hồi cấp phép</strong>. Nếu cần chuyển hồ sơ công ty, dùng <strong>Sao lưu và nạp danh sách công ty</strong> để tải trên máy cũ và nạp trên máy mới. File danh sách chứa thông tin công ty và link Google Sheets dưới dạng văn bản, nên lưu nội bộ.</p>
   </details>
 
   <details class="help" id="integrationGuide">
@@ -320,8 +334,8 @@ async function createSetup(wire, request, company, issuedAt, expiresAt, key) {
 try { showVault(); }
 catch (error) { report($('issuerStatus'), error.message, true); }
 
-function download(filename, value) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(value)], { type: 'application/json' }));
+function download(filename, value, indent) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, indent)], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
@@ -397,20 +411,20 @@ function showCompanyList(companies, selected = '') {
 }
 
 function companyBackup(companies) {
-  return { format: profilesFormat, companies: [...companies.values()] };
+  return { format: profilesFormat, companies: [...companies] };
 }
 
 function saveCompanies(companies) {
-  localStorage.setItem(profilesFormat, JSON.stringify(companyBackup(companies)));
+  localStorage.setItem(profilesFormat, JSON.stringify(companyBackup(companies.values())));
 }
 
-function companyAction(action) {
+function companyAction(action, status = $('issueStatus')) {
   return async (event) => {
     try {
       const message = await action(event);
-      if (message) report($('issueStatus'), message);
+      if (message) report(status, message);
     } catch (error) {
-      report($('issueStatus'), error.message, true);
+      report(status, error.message, true);
     }
   };
 }
@@ -448,18 +462,28 @@ $('saveCompany').addEventListener('click', companyAction(() => {
   showCompanyList(companies, key);
   return 'Đã lưu ' + company.TenCty + '.';
 }));
+const companyTemplate = companyBackup([Object.fromEntries(companyFields.map((field) => [field, '']))]);
+$('companyTemplatePreview').textContent = JSON.stringify(companyTemplate, null, 2);
+$('exportCompanyTemplate').addEventListener('click', () => {
+  download('HAK-MauDanhSachCongTy.json', companyTemplate, 2);
+});
 $('exportCompanies').addEventListener('click', companyAction(() => {
   const companies = readCompanies();
   if (!companies.size) throw new Error('Chưa có công ty nào để tải.');
-  download('HAK-DanhSachCongTy.json', companyBackup(companies));
-}));
+  download('HAK-DanhSachCongTy.json', companyBackup(companies.values()), 2);
+  return 'Đã tải HAK-DanhSachCongTy.json.';
+}, $('companyBackupStatus')));
 $('importCompanies').addEventListener('change', companyAction(async (event) => {
   const input = event.currentTarget;
   const file = input.files[0];
   input.value = '';
   if (!file) return;
   if (file.size > 5 * 1024 * 1024) throw new Error('File danh sách công ty vượt quá 5 MB.');
-  const incoming = decodeCompanies(JSON.parse(await file.text()));
+  const contents = await file.text();
+  let data;
+  try { data = JSON.parse(contents); }
+  catch { throw new Error('File chưa đúng cú pháp JSON. Kiểm tra dấu ngoặc kép và dấu phẩy theo mẫu.'); }
+  const incoming = decodeCompanies(data);
   const companies = readCompanies();
   let added = 0;
   for (const [key, company] of incoming) {
@@ -470,7 +494,7 @@ $('importCompanies').addEventListener('change', companyAction(async (event) => {
   saveCompanies(companies);
   showCompanyList(companies, $('savedCompany').value);
   return 'Đã thêm ' + added + ' công ty. Các công ty trùng tên giữ dữ liệu đang lưu.';
-}));
+}, $('companyBackupStatus')));
 try {
   showCompanyList(readCompanies());
 } catch {

@@ -120,8 +120,8 @@ try {
   assert(!(await page.locator('#copyReply').isVisible()));
   assert(!(await page.locator('#downloadSetup').isVisible()));
   assert.equal(await page.locator('#replyCode').inputValue(), '');
-  await page.locator('summary').filter({ hasText: /^Sao lưu danh sách công ty$/ }).click();
-  const profiles = await download(page, 'Tải danh sách', 'HAK-DanhSachCongTy.json');
+  await page.locator('summary').filter({ hasText: /^Sao lưu và nạp danh sách công ty$/ }).click();
+  const profiles = await download(page, 'Tải bản sao danh sách', 'HAK-DanhSachCongTy.json');
 
   // Restore the single HAK key and the company list in a fresh offline browser.
   const recovered = await (await browser.newContext({ offline: true, acceptDownloads: true })).newPage();
@@ -131,7 +131,7 @@ try {
   await recovered.waitForFunction(() => document.querySelector('#restoreStatus').textContent.includes('Sai mật khẩu'));
   await selectBackup(recovered, password, downloadedBackup, recoveryFilename);
   await recovered.waitForFunction(() => document.querySelector('#issuerStatus').textContent.includes('đã mở'));
-  await recovered.locator('summary').filter({ hasText: /^Sao lưu danh sách công ty$/ }).click();
+  await recovered.locator('summary').filter({ hasText: /^Sao lưu và nạp danh sách công ty$/ }).click();
   await recovered.locator('#importCompanies').setInputFiles({
     name: 'HAK-DanhSachCongTy.json', mimeType: 'application/json', buffer: profiles
   });
@@ -140,6 +140,28 @@ try {
   await recovered.locator('#savedCompany').selectOption({ label: 'Công ty thứ hai' });
   const restoredProfile = await issue(recovered, anotherReport, publicKey);
   assert.equal(openCompany(restoredProfile, publicKey, anotherReport).TenCty, 'Công ty thứ hai');
+
+  // A maintainer can download, fill, and import the exact template displayed on the page.
+  const templateName = 'HAK-MauDanhSachCongTy.json';
+  await recovered.getByText('Xem cấu trúc JSON và cách điền', { exact: true }).click();
+  const sample = await download(recovered, 'Tải mẫu JSON để điền', templateName);
+  const template = JSON.parse(sample);
+  assert.equal(await recovered.locator('#companyTemplatePreview').textContent(), sample.toString());
+  assert.equal(template.format, 'hak-company-profiles-v1');
+  assert.equal(template.companies.length, 1);
+  const companyInput = recovered.locator('#importCompanies');
+  await companyInput.setInputFiles({ name: templateName, mimeType: 'application/json', buffer: Buffer.from('{') });
+  await recovered.waitForFunction(() => document.querySelector('#companyBackupStatus').textContent.includes('chưa đúng cú pháp JSON'));
+  await companyInput.setInputFiles({ name: templateName, mimeType: 'application/json', buffer: sample });
+  await recovered.waitForFunction(() => document.querySelector('#companyBackupStatus').textContent.includes('Nhập tên công ty'));
+  template.companies.push({ ...template.companies[0], TenCty: 'Công ty thứ hai', PhieuCan: url, DNTT: url });
+  Object.assign(template.companies[0], { TenCty: 'Công ty nhập từ mẫu', PhieuCan: url, DNTT: url });
+  await companyInput.setInputFiles({ name: templateName, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(template)) });
+  await recovered.waitForFunction(() => document.querySelector('#companyBackupStatus').textContent.includes('Đã thêm 1 công ty'));
+  assert(await recovered.locator('#savedCompany option').filter({ hasText: 'Công ty nhập từ mẫu' }).count());
+  const merged = JSON.parse(await download(recovered, 'Tải bản sao danh sách', 'HAK-DanhSachCongTy.json'));
+  assert.equal(merged.companies.find((entry) => entry.TenCty === 'Công ty thứ hai').PhieuCan, url.replace('HAK_TEST', 'HAK_SECOND'));
+
   const anotherApp = newRequest('com.hakgroup.quan-ly-kho');
   const newFile = await issue(recovered, anotherApp, publicKey);
   assert.match(await recovered.locator('#requestSummary').textContent(), /Ứng dụng chưa có tên hiển thị · Mã app com\.hakgroup\.quan-ly-kho/);
