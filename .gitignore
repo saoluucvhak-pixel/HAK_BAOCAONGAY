@@ -11,3 +11,4 @@ app/test-results/
 # ExcelJS được chép từ dependency khi build:config.
 desktop-app/app/exceljs.min.js
 desktop-app/app/exceljs.LICENSE
+desktop-app/app/company-setup-tokens.css

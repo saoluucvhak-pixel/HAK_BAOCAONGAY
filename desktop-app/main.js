@@ -288,13 +288,34 @@ ipcMain.handle('save-forestry-export', async (event, payload) => {
   }
 });
 
+let reportTheme = {};
+function openSetupWithTheme() {
+  mainWindow.loadFile(SETUP_HTML, { query: reportTheme });
+}
+
+ipcMain.handle('set-report-theme', (event, theme) => {
+  if (!isReportSender(event)) return;
+  const skin = theme?.skin;
+  const mode = theme?.mode;
+  if (typeof skin === 'string' && /^(luxe|classic|navy|ngoc|neutral|glass|frost|forest|night)$/.test(skin) &&
+      ['auto', 'light', 'dark'].includes(mode)) reportTheme = { skin, mode };
+});
+
+ipcMain.handle('back-to-report', event => {
+  if (!isTrustedSetupSender(event) || !mainWindow || !fs.existsSync(REPORT_HTML)) {
+    return { ok: false, error: 'Chưa có báo cáo để mở.' };
+  }
+  mainWindow.loadFile(REPORT_HTML);
+  return { ok: true };
+});
+
 ipcMain.handle('open-config', (event) => {
   // Chỉ trang báo cáo được tạo trong thư mục dữ liệu ứng dụng mới được yêu cầu mở cấu hình.
   if (!event || !event.senderFrame || !isTrustedAppUrl(event.senderFrame.url)) {
     return { ok: false, error: 'Nguồn yêu cầu không được phép.' };
   }
   if (!mainWindow) return { ok: false, error: 'Không có cửa sổ báo cáo.' };
-  mainWindow.loadFile(SETUP_HTML);
+  openSetupWithTheme();
   return { ok: true };
 });
 
@@ -381,7 +402,7 @@ function buildMenu() {
         { label: 'In...', accelerator: 'CmdOrCtrl+P', click: () => mainWindow && mainWindow.webContents.print({ silent: false }) },
         { label: 'Tải lại', accelerator: 'CmdOrCtrl+R', click: () => mainWindow && mainWindow.reload() },
         { type: 'separator' },
-        { label: 'Đổi cấu hình công ty...', click: () => mainWindow && mainWindow.loadFile(SETUP_HTML) },
+        { label: 'Đổi cấu hình công ty...', click: () => mainWindow && openSetupWithTheme() },
         { type: 'separator' },
         { label: 'Công cụ hỗ trợ (DevTools)', accelerator: 'CmdOrCtrl+Shift+I', click: () => mainWindow && mainWindow.webContents.toggleDevTools() },
         { type: 'separator' },

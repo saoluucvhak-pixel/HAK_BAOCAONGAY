@@ -436,7 +436,9 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
 #forestryUpdated{font-variant-numeric:tabular-nums}
 #forestryForm fieldset>label{display:inline-block;margin:4px 12px 4px 0}
 #forestryForm .modalGrid label{display:grid;gap:4px;min-width:0}
-#forestryFolderPath{overflow-wrap:anywhere}
+.forestry-action-row{margin-top:12px;align-items:center}
+.forestry-action-row .btn{min-height:40px}
+.forestry-action-row .loanSourceNote{margin:0;min-height:40px;display:flex;align-items:center;overflow-wrap:anywhere;min-width:0;max-width:100%}
 #forestryForm input{min-width:0}
 #forestryForm label[hidden]{display:none}
 #forestryForm .modalGrid select{min-width:0;font:inherit}
@@ -646,8 +648,8 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
             <label>Tồn đầu kỳ (tấn) <input type="number" name="opening" step="any" required></label>
             <label>Số sổ (Mẫu 04) <input type="text" name="bookNumber"></label>
           </div>
-          <div class="tools">
-            <button class="btn small" type="button" id="forestryUsePrior" disabled>Lấy tồn cuối kỳ trước</button>
+          <div class="tools forestry-action-row">
+            <button class="btn" type="button" id="forestryUsePrior" disabled>Lấy tồn cuối kỳ trước</button>
             <span id="forestryOpeningSource" class="loanSourceNote" aria-live="polite"></span>
           </div>
           <fieldset>
@@ -664,8 +666,8 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
             <button class="btn" type="button" id="forestryExport" disabled>Xuất Excel</button>
             <button class="btn" type="button" id="forestryWord" disabled>Xuất Word</button>
           </div>
-          <div id="forestryFolderOptions" class="tools" hidden>
-            <button class="btn small" type="button" id="forestryChooseFolder">Chọn thư mục lưu</button>
+          <div id="forestryFolderOptions" class="tools forestry-action-row" hidden>
+            <button class="btn" type="button" id="forestryChooseFolder">Chọn thư mục lưu</button>
             <output id="forestryFolderPath" class="loanSourceNote" aria-live="polite"></output>
           </div>
           <p id="forestryStatus" role="status" aria-live="polite"></p>

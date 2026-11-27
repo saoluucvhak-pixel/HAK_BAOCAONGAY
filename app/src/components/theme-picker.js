@@ -36,6 +36,7 @@ export function initThemePicker() {
   }
   function render(theme) {
     applyTheme(theme);
+    window.api?.setReportTheme?.(theme)?.catch(() => {});
     for (const { skin, mode } of pickers) {
       skin.value = theme.skin;
       mode.value = theme.mode;

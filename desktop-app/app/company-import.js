@@ -90,9 +90,12 @@
     return [company.TenCty, company.MST ? 'MST ' + company.MST : '', company.DiaChi, company.SDT].filter(Boolean).join(' · ');
   }
 
-  function mount({ current, confirm }) {
+  function mount({ current, confirm, back }) {
     const $ = id => document.getElementById(id);
     const fileInput = $('configFile');
+    const chooseFile = $('btnChooseFile');
+    const fileName = $('fileName');
+    const backButton = $('btnBack');
     const check = $('btnCheck');
     const save = $('btnSave');
     const summary = $('companySummary');
@@ -106,7 +109,20 @@
       status.className = kind;
     }
 
-    if (current?.TenCty) $('currentCompany').textContent = companyLine(current);
+    function showCompany(element, company) {
+      element.textContent = element.title = companyLine(company);
+    }
+    if (current?.TenCty) showCompany($('currentCompany'), current);
+    chooseFile.addEventListener('click', () => fileInput.click());
+    backButton.hidden = !current?.TenCty || typeof back !== 'function';
+    backButton.addEventListener('click', async () => {
+      try {
+        const result = await back();
+        if (!result?.ok) throw new Error(result?.error || 'Chưa có báo cáo để mở.');
+      } catch (error) {
+        message(error.message, 'err');
+      }
+    });
     $('btnTemplate').addEventListener('click', async () => {
       try {
         const workbook = await templateWorkbook();
@@ -131,6 +147,7 @@
       results.replaceChildren();
       message('');
       if (!file) return;
+      fileName.textContent = file.name;
       try {
         if (file.size > 256 * 1024) throw new Error('File cấu hình vượt quá 256 KB.');
         const data = await parseConfig(await file.arrayBuffer());
@@ -166,7 +183,7 @@
           return;
         }
         verified = data;
-        summary.textContent = companyLine(data);
+        showCompany(summary, data);
         $('currentCompany').hidden = true;
         save.disabled = false;
         message('Cả 5 nguồn đạt. Kiểm tra dòng công ty rồi xác nhận lưu.', 'ok');
@@ -180,14 +197,15 @@
       if (!verified || verified !== pending) return;
       const data = verified;
       const ticket = revision;
-      save.disabled = check.disabled = fileInput.disabled = true;
+      save.disabled = check.disabled = fileInput.disabled = chooseFile.disabled = backButton.disabled = true;
       try {
         const result = await confirm(data);
         if (!result?.ok) throw new Error(result?.error || 'Không lưu được cấu hình.');
         pending = verified = undefined;
-        $('currentCompany').textContent = companyLine(data);
+        showCompany($('currentCompany'), data);
         $('currentCompany').hidden = false;
         summary.textContent = '';
+        fileName.textContent = 'Chưa chọn tệp .xlsx';
         results.replaceChildren();
         message(result.message || 'Đã lưu cấu hình.', 'ok');
       } catch (error) {
@@ -196,7 +214,7 @@
           save.disabled = check.disabled = false;
         }
       } finally {
-        fileInput.disabled = false;
+        fileInput.disabled = chooseFile.disabled = backButton.disabled = false;
       }
     });
   }

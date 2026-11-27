@@ -144,6 +144,11 @@ check('Tên công ty có dấu nháy và ký tự HTML được mã hóa đúng'
   quotedReport.includes(JSON.stringify(quotedCompany).replace(/</g, '\\u003c')));
 async function testForestryExport() {
   const reportEvent = { senderFrame: { url: require('url').pathToFileURL(reportPath).toString() } };
+  check('Từ chối quay lại từ trang ngoài', !handlers['back-to-report'](untrustedEvent).ok);
+  const beforeBack = fs.readFileSync(path.join(userData, 'company-config.json'));
+  check('Quay lại báo cáo từ màn hình thiết lập', handlers['back-to-report'](trustedSetupEvent).ok && loaded.at(-1) === reportPath);
+  check('Quay lại giữ cấu hình công ty đang dùng',
+    fs.readFileSync(path.join(userData, 'company-config.json')).equals(beforeBack));
   const choose = handlers['choose-forestry-export-folder'];
   const save = handlers['save-forestry-export'];
   const payload = { from: '2026-11-01', to: '2026-11-27', format: 'xlsx', bytes: Uint8Array.of(80, 75, 3, 4) };

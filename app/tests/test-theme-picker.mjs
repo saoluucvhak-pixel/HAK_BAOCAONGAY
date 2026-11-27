@@ -60,6 +60,8 @@ check('Đổi giao diện từ menu cập nhật Cấu hình', (await page.input
 
 for (const skin of ['frost', 'forest', 'night']) {
   await page.selectOption('#themeSkin', skin);
+  const background = await page.locator('body').evaluate(el => getComputedStyle(el).backgroundImage);
+  check(skin + ': ảnh nền được nhúng trong bản ngoại tuyến', background.includes('data:image/webp;base64,'));
   for (const mode of ['light', 'dark']) {
     await page.selectOption('#themeMode', mode);
     const minimum = await page.evaluate(() => {
