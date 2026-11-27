@@ -1,7 +1,7 @@
 // [2026-10-29] Báo cáo ngân hàng: tab "Tổng hợp thanh toán" (= query THTT_NH, từ DNTT_CT) và chọn phiếu
 // nhập kho để in ("cho chọn phiếu in hoặc chọn tất cả"). Kiểm tra trên bản build, đếm trang PDF thật.
 // Chạy: npm run test:bank-tabs   (tuỳ chọn: node tests/test-bank-tabs.mjs <đường dẫn index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -16,10 +16,9 @@ let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x !== undefined ? '  [' + x + ']' : '')); };
 const pdfPages = (f) => +execFileSync('pdfinfo', [f]).toString().match(/Pages:\s+(\d+)/)[1];
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await (await browser.newContext({ acceptDownloads: true, viewport: { width: 1366, height: 900 } })).newPage();
 const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-const dialogs = []; page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
 await page.route('https://docs.google.com/**', (r) => { const k = Object.keys(ID).find((x) => r.request().url().includes(ID[x])); return r.fulfill({ status: 200, contentType: 'text/csv', body: CSV[k] || '' }); });
 await page.goto('file://' + DIST); await page.waitForTimeout(2500);
 await page.evaluate(() => { document.querySelector('#fFrom').value = '2024-01-01'; document.querySelector('#fTo').value = '2025-12-31'; document.querySelector('#btnLapBC').click(); });
@@ -49,7 +48,7 @@ await page.click('.item[data-target="nganhang"]');
   await page.uncheck('#pnkPickAll');
   check('Bỏ "Chọn tất cả" → 0 phiếu được chọn', (await page.$$eval('.pnkPickChk:checked', (c) => c.length)) === 0 && /Đã chọn 0/.test(await page.textContent('#pnkPickCount')));
   await page.click('#btnBankPdf'); await page.waitForTimeout(500);
-  check('Không chọn phiếu nào → báo, không tạo file', dialogs.some((m) => /Chưa chọn phiếu/.test(m)), dialogs.join(' | '));
+  check('Không chọn phiếu nào → báo, không tạo file', await page.locator('.toast-warning').filter({ hasText: /Chưa chọn phiếu/ }).count() === 1);
   const chks = await page.$$('.pnkPickChk'); await chks[0].check(); await chks[2].check();
   check('Chọn 2 phiếu → đếm "Đã chọn 2"', /Đã chọn 2 \//.test(await page.textContent('#pnkPickCount')));
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#btnBankPdf')]);

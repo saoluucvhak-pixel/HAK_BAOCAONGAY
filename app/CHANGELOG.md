@@ -5,6 +5,16 @@
 > PERF-01/02/03, BUG-01/02/03, sửa tên công ty — nằm trong `package/CHANGELOG.md`, không lặp
 > lại ở đây.
 
+## [2.1.0] — 27/11/2026
+
+- Playwright chọn Chromium theo `CHROMIUM_PATH`, đường dẫn CI cũ nếu có, rồi đến Chromium đã cài bởi Playwright. ESLint sạch cảnh báo.
+- Thông báo nổi cho thao tác khoản vay, tải Google Sheets hoặc bộ nhớ offline, xuất file, hoàn tác/làm lại và gán tàu. Thông báo có nút đóng và tự ẩn sau 3,5 giây.
+- Thêm Cấu hình → Cài đặt định dạng số. Tiền, khối lượng (kg/tấn) và cách viết số âm đồng bộ giữa bảng, thẻ tổng, bản in, Excel và PDF. Tùy chọn lưu bằng StorageService. Khi chưa lưu tùy chọn, khối lượng theo kg tiếp tục hiển thị số nguyên ở các cột cân cũ.
+- Biểu đồ Dashboard cập nhật màu dữ liệu và trục theo chủ đề đang dùng, cả khi thiết bị chuyển sáng/tối.
+- Trên 10.000 phiếu cân, các hàm tổng hợp chạy trong Web Worker nhúng. Yêu cầu lập mới thay thế yêu cầu đang chạy. Nếu Worker lỗi, app tính lại trên luồng chính.
+- Excel cập nhật tiến trình theo sheet và nhóm dòng. PDF hiện tiến trình theo bước, với cập nhật theo nhóm trang khi tạo phiếu nhập kho hàng loạt. Bước dàn trang của jsPDF vẫn chạy đồng bộ.
+- Vite nhúng mã, CSS và Worker vào `app/dist/index.html`. Bản cấu hình và mẫu Electron dùng cùng bản build này.
+
 ## [Phase 4.12] — 30/10/2026 — Rà soát toàn bộ code app
 
 ### Sửa

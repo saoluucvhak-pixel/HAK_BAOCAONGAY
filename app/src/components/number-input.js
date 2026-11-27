@@ -96,7 +96,7 @@ export function makeVNNumberInput(inp, initial, decimals) {
   }
   inp.addEventListener('input', function () {
     const r = reformatTyping(inp.value, inp.selectionStart == null ? inp.value.length : inp.selectionStart, decimals);
-    if (r.value !== inp.value) { inp.value = r.value; try { inp.setSelectionRange(r.caret, r.caret); } catch (e) { /* ô không còn focus */ } }
+    if (r.value !== inp.value) { inp.value = r.value; try { inp.setSelectionRange(r.caret, r.caret); } catch { /* ô không còn focus */ } }
   });
   // Rời ô: chuẩn hoá hiển thị (vd "1.234," → "1.234", "0,50" → "0,5").
   inp.addEventListener('blur', function () { inp.value = formatVNNumber(parseVNNumber(inp.value), decimals); });

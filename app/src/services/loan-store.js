@@ -78,9 +78,9 @@ function openDb() {
       clearTimeout(timer);
       const db = req.result;
       // Nếu kết nối xuất hiện sau timeout thì không sử dụng; phải đóng để tránh kho bị khoá.
-      if (settled) { try { db.close(); } catch (e) { /* đã đóng */ } return; }
+      if (settled) { try { db.close(); } catch { /* đã đóng */ } return; }
       settled = true;
-      db.onversionchange = () => { try { db.close(); } catch (e) { /* đã đóng */ } dbPromise = null; };
+      db.onversionchange = () => { try { db.close(); } catch { /* đã đóng */ } dbPromise = null; };
       resolve(db);
     };
     req.onerror = () => { clearTimeout(timer); if (!settled) { settled = true; reject(new Error('Lỗi mở kho khoản vay: ' + (req.error && req.error.message))); } };
@@ -98,7 +98,7 @@ function tx(mode, fn, storeName) {
     const t = db.transaction(names, mode);
     // 1 kho ⇒ truyền kho đó; nhiều kho ⇒ truyền { tên: kho } (ghi nhiều kho trong CÙNG 1 giao dịch).
     const store = Array.isArray(storeName) ? Object.fromEntries(names.map((n) => [n, t.objectStore(n)])) : t.objectStore(names[0]);
-    try { result = fn(store, (e) => { failed = e; t.abort(); }); } catch (e) { failed = e; try { t.abort(); } catch (x) { /* đã huỷ */ } }
+    try { result = fn(store, (e) => { failed = e; t.abort(); }); } catch (e) { failed = e; try { t.abort(); } catch { /* đã huỷ */ } }
     t.oncomplete = () => resolve(typeof result === 'function' ? result() : result);
     t.onabort = () => reject(failed || new Error('Ghi dữ liệu khoản vay bị huỷ: ' + (t.error && t.error.message)));
     t.onerror = () => { /* onabort sẽ báo lỗi */ };
@@ -231,7 +231,7 @@ export function restoreLoans(backup) {
   if (soPhu && (soPhu.schema !== SOPHU_SCHEMA || !Array.isArray(soPhu.rows))) return Promise.reject(new Error('Phần "sổ phụ cũ" trong file sao lưu không đúng định dạng.'));
   const rows = backup.schema === LOAN_SCHEMA ? backup.rows.filter((r) => r && r.id && r.schema === LOAN_SCHEMA)
     : backup.rows.map((r) => convertSoPhuRecord(r)).filter(Boolean);
-  const hasOpening = Object.prototype.hasOwnProperty.call(backup, 'soDuDauSo');
+  const hasOpening = Object.hasOwn(backup, 'soDuDauSo');
   const op = backup.soDuDauSo;
   if (hasOpening && op != null && (typeof op.ngay !== 'string' || typeof op.soTien !== 'number')) return Promise.reject(new Error('Phần "số dư đầu kỳ" trong file sao lưu không đúng định dạng.'));
   return tx('readwrite', (stores) => {

@@ -2,7 +2,7 @@
 // bị cắt mất chữ "đ"). Tái hiện đúng thao tác: lập báo cáo khi đang ở tab khác (Dashboard bị ẩn) rồi mới
 // mở Dashboard; thử nhiều bề rộng màn hình + đổi kích thước cửa sổ sau khi đã hiện.
 // Chạy: npm run test:dashboard-fit   (tuỳ chọn: node tests/test-dashboard-fit.mjs <đường dẫn index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { genPhieuCan, genDNTT, genHDNCC, genHosokeo, toCSV } from './fixtures.mjs';
@@ -19,7 +19,7 @@ let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x !== undefined ? '  [' + x + ']' : '')); };
 const overflowing = (page) => page.$$eval('#dashCards .card .val', (els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1 || e.getBoundingClientRect().right > e.closest('.card').getBoundingClientRect().right).map((e) => e.textContent));
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 for (const [w, h] of [[1700, 900], [1366, 768], [1100, 800], [760, 900]]) {
   const page = await browser.newPage({ viewport: { width: w, height: h } });
   await page.route('https://docs.google.com/**', (r) => { const k = Object.keys(ID).find((x) => r.request().url().includes(ID[x])); return r.fulfill({ status: 200, contentType: 'text/csv', body: CSV[k] || '' }); });

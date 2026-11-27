@@ -8,12 +8,14 @@
  * gì để "khôi phục").
  * @module services/backup-restore
  */
+import { eventBus } from '../utils/event-bus.js';
+import { loadPrecisionSettings } from '../utils/hak-format.js';
 import { $, downloadBlob } from '../utils/dom-utils.js';
 import { loadDM } from '../store/state.js';
 import { storageService } from './storage-service.js';
 import { logger } from './logger.js';
 import { pushUndoSnapshot } from '../store/app-state.js';
-import { RESULTS, runReport } from '../store/report-runtime.js';
+import { refreshReport } from '../store/report-runtime.js';
 import { renderDMTables } from '../components/dm-tables.js';
 import { exportLoans, restoreLoans } from './loan-store.js';
 import { reloadOpening } from '../components/tienvay-summary.js';
@@ -89,9 +91,11 @@ export async function restoreData(file) {
 
     // Nạp lại STATE từ dữ liệu vừa khôi phục + vẽ lại UI liên quan — đúng những gì boot() làm
     // lúc khởi động, chỉ khác là chạy lại giữa chừng thay vì lúc tải trang.
+    loadPrecisionSettings();
+    eventBus.emit('precision:change');
     loadDM();
     renderDMTables();
-    if (RESULTS) runReport();
+    refreshReport();
 
     if (status) status.textContent = 'Đã khôi phục ' + result.restoredKeys.length + ' mục dữ liệu từ "' + file.name + '".' + loanNote + ' (Danh mục có thể bấm "Hoàn tác" nếu khôi phục nhầm.)';
     logger.info('[backup-restore] Đã khôi phục', result.restoredKeys.join(', '), 'từ', file.name);

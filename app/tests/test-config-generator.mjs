@@ -1,7 +1,7 @@
 // Kiểm tra config.html: điền form, bấm "Tạo file báo cáo", xác nhận file HTML tải về đã thay
 // đúng tên công ty + 4 link Google Sheet, KHÔNG đổi gì khác (chạy được bình thường, vẫn gọi
 // đúng link MỚI khi tải dữ liệu).
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -24,7 +24,7 @@ const DIST_HTML = path.resolve(__dirname, '../dist/index.html');
 let pass = 0, fail = 0;
 function check(name, cond) { if (cond) { pass++; console.log('OK  ', name); } else { fail++; console.log('FAIL', name); } }
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -101,7 +101,6 @@ await page2.waitForTimeout(400);
 check('File mới khi chạy gọi ĐÚNG link Phiếu cân mới (không gọi lại link cũ)', calledPhieuCan);
 check('File mới khi chạy gọi ĐÚNG link DNTT mới (không gọi lại link cũ)', calledDntt);
 check('File mới chạy không lỗi JS', errors2.length === 0);
-const companyNameOnPage = await page2.evaluate(() => document.querySelector('.brand h1, .companyName, [class*=company]')?.textContent || document.body.textContent.includes('HOÀNG ANH KHÔI QUẢNG NAM'));
 const bodyHasNewName = await page2.evaluate((name) => document.body.innerText.includes(name), NEW.ten);
 check('Giao diện hiển thị đúng tên công ty mới (sidebar/hướng dẫn sử dụng)', bodyHasNewName);
 // Guide text in "Hướng dẫn sử dụng" card must not reference config.html incorrectly, sanity check section exists

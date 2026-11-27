@@ -16,7 +16,7 @@
  * mỗi bước tách — nếu baseline lệch mà không chủ động đổi hành vi, đó là dấu hiệu đã làm sai
  * khác so với bản gốc, PHẢI dừng lại và kiểm tra trước khi tiếp tục.
  */
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -56,7 +56,7 @@ const CSV_BY_URL_SUBSTR = [
   ['2PACX-1vT0mcMT2TsD7lOLSNrTqZPVjJJ395kI54SxSri5-n_VxrfAcC74IKkgCnesT30d1bhx59gJC4esmF7s', toCSV(hosokeo)], // HOSOKEO
 ];
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage();
 
 const pageErrors = [];

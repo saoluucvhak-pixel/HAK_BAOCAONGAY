@@ -11,7 +11,7 @@ import { makeVNNumberInput, parseVNNumber } from './number-input.js';
 import { pushUndoSnapshot } from '../store/app-state.js';
 import { STATE, saveDM } from '../store/state.js';
 import { $ } from '../utils/dom-utils.js';
-import { RESULTS, runReport } from '../store/report-runtime.js';
+import { refreshReport } from '../store/report-runtime.js';
 
 /**
  * [SỬA 2026-10-05] Người dùng báo: "thay đổi đơn giá (Danh mục) nhưng báo cáo không tính lại tiền".
@@ -21,7 +21,7 @@ import { RESULTS, runReport } from '../store/report-runtime.js';
  */
 export function onDMChanged(){
   saveDM();
-  if (RESULTS) runReport();
+  refreshReport();
 }
 export function renderDMTables(){
   var dlBody = $('#dmDLTable tbody'); dlBody.innerHTML = '';

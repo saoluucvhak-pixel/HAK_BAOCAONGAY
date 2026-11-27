@@ -7,12 +7,13 @@
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module components/tau-modal
  */
+import { notify } from '../utils/event-bus.js';
 import { assignTau, listKnownTau, loadTauAssignments, unassignTau } from '../services/tau-assignment.js';
 import { TABLES } from '../store/state.js';
 import { fmtDate } from '../utils/date-utils.js';
 import { $, $$, esc } from '../utils/dom-utils.js';
 import { fmtKL } from '../utils/number-utils.js';
-import { RESULTS, runReport } from '../store/report-runtime.js';
+import { getPendingReport, refreshReport } from '../store/report-runtime.js';
 
 /* ============================================================
    [MỚI 2026-09-22] Modal chọn BKLS để gán/xuất theo Tàu — xem services/tau-assignment.js cho
@@ -68,8 +69,12 @@ function fillTauExistingSelect(){
   $('#tauSelectExisting').innerHTML = '<option value="">— gõ tên tàu mới ở trên —</option>' + known.map(function(t){ return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('');
 }
 export function openTauModal(){
+  if (getPendingReport()) {
+    notify('info', 'Đang lập báo cáo. Vui lòng chờ kết quả.');
+    return;
+  }
   if (!TABLES['bklsct'] || !(TABLES['bklsct'].rows||[]).length){
-    alert('Chưa có dữ liệu BKLS xuất khẩu. Hãy vào "Tổng hợp lâm sản", chọn khoảng ngày rồi bấm LẬP BÁO CÁO trước.');
+    notify('warning', 'Chưa có dữ liệu BKLS xuất khẩu. Hãy vào "Tổng hợp lâm sản", chọn khoảng ngày rồi bấm LẬP BÁO CÁO trước.');
     return;
   }
   $('#tauTenTau').value = ''; $('#tauKhachHang').value = ''; $('#tauCheckAll').checked = false;
@@ -82,20 +87,20 @@ function getCheckedSoBKLS(){ return $$('.tauRowChk:checked', $('#tauRowList')).m
 export function confirmTauAssignClick(){
   var tau = $('#tauTenTau').value.trim();
   var khachHang = $('#tauKhachHang').value.trim();
-  if (!tau){ alert('Vui lòng nhập hoặc chọn Tên tàu.'); return; }
+  if (!tau){ notify('warning', 'Vui lòng nhập hoặc chọn Tên tàu.'); return; }
   var list = getCheckedSoBKLS();
-  if (!list.length){ alert('Chưa chọn dòng nào.'); return; }
+  if (!list.length){ notify('warning', 'Chưa chọn dòng nào.'); return; }
   var result = assignTau(list, tau, khachHang);
-  if (result.skipped.length) alert('Đã gán ' + result.assigned.length + ' dòng cho tàu "' + tau + '". Bỏ qua ' + result.skipped.length + ' dòng vì đã bị khoá bởi tàu khác.');
-  else alert('Đã gán ' + result.assigned.length + ' dòng cho tàu "' + tau + '".');
+  if (result.skipped.length) notify('warning', 'Đã gán ' + result.assigned.length + ' dòng cho tàu "' + tau + '". Bỏ qua ' + result.skipped.length + ' dòng vì đã bị khoá bởi tàu khác.');
+  else notify('success', 'Đã gán ' + result.assigned.length + ' dòng cho tàu "' + tau + '".');
   closeTauModal();
-  if (RESULTS) runReport();
+  refreshReport();
 }
 export function confirmTauUnassignClick(){
   var list = getCheckedSoBKLS();
-  if (!list.length){ alert('Chưa chọn dòng nào để gỡ gán.'); return; }
+  if (!list.length){ notify('warning', 'Chưa chọn dòng nào để gỡ gán.'); return; }
   if (!confirm('Gỡ gán Tàu cho ' + list.length + ' dòng đã chọn? (Có thể gán lại cho tàu khác sau khi gỡ.)')) return;
   unassignTau(list);
   closeTauModal();
-  if (RESULTS) runReport();
+  refreshReport();
 }

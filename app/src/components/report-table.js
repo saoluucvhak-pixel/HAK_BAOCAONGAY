@@ -14,6 +14,7 @@ import { exportPDF } from '../services/export/pdf-export.js';
 import { printSection } from '../services/export/print-sheet.js';
 import { openBankInfoModal } from '../services/export/bank-forms.js';
 import { runExport } from '../services/export-runner.js';
+import { alignOf } from '../utils/hak-format.js';
 import { alignClass, fmtCell, cellDisplay } from '../utils/cell-format.js';
 
 // Giữ đường import cũ (loan-editor.js…) hoạt động.
@@ -90,7 +91,7 @@ export function applySortSearch(key) {
     var col = st.cols[st.sortCol], dir = st.sortDir;
     view.sort(function (a, b) {
       var va = a[col[0]], vb = b[col[0]];
-      if (col[2] === 'money' || col[2] === 'kl' || col[2] === 'int' || col[2] === 'datekey') { va = va || 0; vb = vb || 0; return (va - vb) * dir; }
+      if (alignOf(col[2]) === 'right' || col[2] === 'datekey') { va = va || 0; vb = vb || 0; return (va - vb) * dir; }
       if (col[2] === 'date') { va = dateKey(va) || 0; vb = dateKey(vb) || 0; return (va - vb) * dir; }
       return VI_COLLATOR.compare(String(va || ''), String(vb || '')) * dir;
     });
@@ -120,7 +121,7 @@ function tfootHTML(st) {
   return '<tfoot><tr class="total">' + st.cols.map(function (c, i) {
     var numCls = alignClass(c[2]);
     if (i === 0) return '<td class="' + numCls + '">Tổng cộng</td>';
-    if (st.totals.hasOwnProperty(c[0])) return '<td class="' + numCls + '">' + fmtCell(st.totals[c[0]], c[2]) + '</td>';
+    if (Object.hasOwn(st.totals, c[0])) return '<td class="' + numCls + '">' + fmtCell(st.totals[c[0]], c[2]) + '</td>';
     return '<td></td>';
   }).join('') + '</tr></tfoot>';
 }

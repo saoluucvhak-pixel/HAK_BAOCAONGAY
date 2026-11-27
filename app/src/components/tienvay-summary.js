@@ -93,7 +93,7 @@ export function initOpeningBalance(changed) {
 const LUYKE_KEY = 'baocaongay_tienvay_luyke';
 /** Đọc lựa chọn đã lưu: 'ky' (mặc định — trong khoảng thời gian báo cáo) | 'dauSo'. */
 export function loadLuyKeMode() {
-  try { return localStorage.getItem(LUYKE_KEY) === 'dauSo' ? 'dauSo' : 'ky'; } catch (e) { return 'ky'; }
+  try { return localStorage.getItem(LUYKE_KEY) === 'dauSo' ? 'dauSo' : 'ky'; } catch { return 'ky'; }
 }
 /**
  * [2026-10-29] Ô chọn "Lũy kế tiền vay chi: Trong kỳ báo cáo | Từ đầu sổ". Đổi ⇒ lưu trên máy, lập lại sổ.
@@ -105,7 +105,7 @@ export function initLuyKeMode(changed) {
   sel.value = STATE.tienVayLuyKe;
   sel.addEventListener('change', () => {
     STATE.tienVayLuyKe = sel.value === 'dauSo' ? 'dauSo' : 'ky';
-    try { localStorage.setItem(LUYKE_KEY, STATE.tienVayLuyKe); } catch (e) { /* không lưu được thì vẫn dùng cho phiên này */ }
+    try { localStorage.setItem(LUYKE_KEY, STATE.tienVayLuyKe); } catch { /* không lưu được thì vẫn dùng cho phiên này */ }
     if (typeof changed === 'function') changed();
   });
 }

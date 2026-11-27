@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -10,7 +10,7 @@ const DIST_HTML = path.resolve(__dirname, '../dist/index.html');
 const DOWNLOAD_DIR = path.resolve(__dirname, '../.tmp-pdf-test');
 fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage({ acceptDownloads: true });
 const errors = []; page.on('pageerror', (e) => errors.push(e.message));
 
@@ -72,7 +72,7 @@ console.log('Tổng số "word" trong PDF:', words.length);
 
 let orphanDCount = 0;
 const orphanExamples = [];
-words.forEach((w, i) => {
+words.forEach((w) => {
   if (w.text !== 'đ') return;
   // Tìm từ ngay phía trên (yMax của nó nhỏ hơn yMin của "đ" 1 dòng, x gần trùng) có phải là số không.
   const above = words.find((o) => o !== w && Math.abs(o.xMin - w.xMin) < 3 && o.yMax <= w.yMin + 0.5 && o.yMax > w.yMin - 6 && /[\d.,]/.test(o.text));

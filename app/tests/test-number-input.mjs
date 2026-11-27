@@ -2,7 +2,7 @@
 // khối lượng có ngăn cách đơn vị và thập phân 2 số"). Kiểm tra: hàm thuần + GÕ PHÍM THẬT trên trình
 // duyệt (định dạng khi gõ, phím "." thành dấu thập phân, chặn chữ số lẻ thứ 3, giá trị lưu đúng, báo
 // cáo dùng đúng giá trị). Chạy: npm run test:number-input
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { formatVNNumber as F, parseVNNumber as P, reformatTyping as R } from '../src/components/number-input.js';
@@ -28,7 +28,7 @@ check('Hiển thị → đọc lại giữ nguyên giá trị (40.000 số ngẫ
 // ---- 2) Gõ phím thật
 const pc = genPhieuCan(60), dn = genDNTT(pc, 30);
 const CSV = { tytjQLj: toCSV(pc), zPk2i: toCSV(dn), wW_a10: toCSV(genHDNCC(dn)), esmF7s: toCSV(genHosokeo(5)) };
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 1366, height: 800 } });
 const errs = []; page.on('pageerror', (e) => errs.push(e.message));
 await page.route('https://docs.google.com/**', (r) => { const k = Object.keys(CSV).find((x) => r.request().url().includes(x)); return r.fulfill({ status: 200, contentType: 'text/csv', body: k ? CSV[k] : '' }); });

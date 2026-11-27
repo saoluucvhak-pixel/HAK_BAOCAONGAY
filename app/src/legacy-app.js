@@ -19,7 +19,9 @@ import { CONFIG } from './config/config.js';
 import { NHAPKEO_COLS, XECHO_COLS, THANHTOAN_COLS, CONGNO_COLS, HOTRO_COLS, TROGIA_COLS, TONGHOPTRO_COLS, HOAHONG_COLS, BKLSCT_COLS, BKLSTH_COLS, TAUTONGHOP_COLS, BANKVAY_COLS, BANKTHTT_COLS, BANKTNDN_COLS, BANKPNK_COLS } from './constants/columns.js';
 import { pad2, toKeyFromInput, dateKeyToday } from './utils/date-utils.js';
 
-import { computeNhapKeo, computeXeCho1h, computeThanhToan, computeCongNo, computeHoTroOrTroGia, computeTongHopHoTro, computeHoaHongDL, computeTongHopNgay, computeXuatHang01, computeXuatHang02, computeTauTongHop, computeSoTienVay, computeTongHopThanhToan, computeBankTNDN, computePhieuNhapKho, sumCols } from './services/report-service.js';
+import { sumCols } from './services/report-service.js';
+import { computeReports } from './services/report-batch.js';
+import ReportWorker from './services/report-worker.js?worker&inline';
 import { storageService } from './services/storage-service.js';
 import { logger } from './services/logger.js';
 
@@ -27,9 +29,13 @@ import { $, $$ } from './utils/dom-utils.js';
 import { STATE, loadDM, applyFilters } from './store/state.js';
 import { setStatus, loadAllData } from './services/data-service.js';
 import { renderReportTable } from './components/report-table.js';
-import { renderDashboard } from './components/dashboard.js';
-import { initLoanEditor, getLoanView } from './components/loan-editor.js';
+import { initDashboardTheme, renderDashboard } from './components/dashboard.js';
+import { initLoanEditor, getLoanView, refreshLoanFormatting } from './components/loan-editor.js';
 import { initThemePicker } from './components/theme-picker.js';
+import { initPrecisionSettings } from './components/precision-settings.js';
+import { initToast } from './components/toast.js';
+import { eventBus, notify } from './utils/event-bus.js';
+import { loadPrecisionSettings } from './utils/hak-format.js';
 import { initOpeningBalance, initLuyKeMode, renderTienVayKpi, renderThttKpi } from './components/tienvay-summary.js';
 import { pushUndoSnapshot, undo, redo } from './store/app-state.js';
 import { backupData, restoreData } from './services/backup-restore.js';
@@ -41,7 +47,7 @@ import { closeTauModal, confirmTauAssignClick, confirmTauUnassignClick, openTauM
 import { BANK_INFO_MODAL_MODE, closeBankInfoModal, downloadTienVayTemplate, exportKhoanVayExcel, exportPNKPdf, exportTNDNExcel, exportTNDNPDF, openBankInfoModal } from './services/export/bank-forms.js';
 import { exportAllExcel, exportBankExcel, exportLamSanExcel, exportNgayExcel } from './services/export/excel-export.js';
 import { showReportTab } from './services/export/print-sheet.js';
-import { RESULTS, registerRunReport, setResults } from './store/report-runtime.js';
+import { getPendingReport, refreshReport, registerRunReport, setPendingReport, setResults } from './store/report-runtime.js';
 import { closeWOModal, exportWOExcel, exportWOPDF, openWOModal } from './services/export/wo-form.js';
 
 /* ============================================================
@@ -63,34 +69,90 @@ import { closeWOModal, exportWOExcel, exportWOPDF, openWOModal } from './service
    lọc/khoảng ngày hiện tại, gọi các hàm compute*() ở trên rồi giao cho UI_SERVICE
    render (RESULTS = model dùng chung cho bảng, dashboard, export, đối chiếu).
    ============================================================ */
-export function runReport(){
-  var ctx = applyFilters();
-  STATE.filtered = ctx;
-  var fromKey = toKeyFromInput($('#fFrom').value);
-  var toKey = toKeyFromInput($('#fTo').value);
-  var reportKey = toKey != null ? toKey : (fromKey != null ? fromKey : dateKeyToday());
+const WORKER_ROW_THRESHOLD = 10_000;
+let stopReportWorker;
+let renderedReport;
 
-  var nhap = computeNhapKeo(ctx.phieucan, fromKey, toKey);
-  var xecho = computeXeCho1h(nhap.rows);
-  var tt = computeThanhToan(ctx.dntt, ctx.phieucanBySoCT, fromKey, toKey);
-  var congno = computeCongNo(ctx.phieucan, ctx.dnttBySoCT, reportKey);
-  var hotro = computeHoTroOrTroGia(ctx.phieucan, STATE.dmht, fromKey, toKey, 'Cuối tháng', 'Tiền hỗ trợ');
-  var trogia = computeHoTroOrTroGia(ctx.phieucan, STATE.dmht, fromKey, toKey, 'Khi thanh toán', 'Tiền trợ giá');
-  var tonghoptro = computeTongHopHoTro(hotro.rows);
-  var hoahong = computeHoaHongDL(ctx.dntt, ctx.phieucanBySoCT, STATE.dmdl, fromKey, toKey);
-  var tonghop = computeTongHopNgay(ctx.phieucan, ctx.dntt, ctx.phieucanBySoCT, fromKey, toKey); // {rows, cols, totals} — cols/totals tự sinh động theo ĐL/NG thật có trong dữ liệu, xem report-service.js
-  var tauAssignments = loadTauAssignments();
-  var bklsct = computeXuatHang01(STATE.hosokeo, STATE.hdmbByKey, fromKey, toKey, tauAssignments);
-  var bklsth = computeXuatHang02(bklsct.rows);
-  // [MỚI] "Tổng hợp nguyên liệu xuất theo tàu" — tính trên TOÀN BỘ HOSOKEO (fromKey=toKey=null,
-  // không giới hạn theo khoảng ngày đang lọc), vì 1 tàu có thể nhận hàng dồn từ nhiều kỳ báo cáo
-  // khác nhau, không chỉ kỳ đang xem — xem JSDoc computeTauTongHop() trong report-service.js.
-  var bklsAllRows = computeXuatHang01(STATE.hosokeo, STATE.hdmbByKey, null, null, tauAssignments).rows;
-  var tautonghop = computeTauTongHop(bklsAllRows, tauAssignments);
-  var tienvay = computeSoTienVay(STATE.vayRecords, STATE.dntt, fromKey, toKey, STATE.soDuDauSo, STATE.tienVayLuyKe); // vay: khoản vay TH_VAY (tab 1); chi: TOÀN BỘ DNTT_CT như Power Query
-  var thtt = computeTongHopThanhToan(STATE.dntt, fromKey, toKey); // THTT_NH: toàn bộ DNTT_CT như Power Query
-  var tndn = computeBankTNDN(ctx.dntt, ctx.phieucanBySoCT, STATE.hdnccBySoHopDong, fromKey, toKey);
-  var pnk = computePhieuNhapKho(ctx.phieucan, fromKey, toKey);
+export function runReport() {
+  stopReportWorker?.();
+  stopReportWorker = undefined;
+  setPendingReport(null);
+  const ctx = applyFilters();
+  const fromKey = toKeyFromInput($('#fFrom').value);
+  const toKey = toKeyFromInput($('#fTo').value);
+  const reportKey = toKey ?? fromKey ?? dateKeyToday();
+  const input = { ctx, fromKey, toKey, reportKey, tauAssignments: loadTauAssignments(),
+    dmht: STATE.dmht, dmdl: STATE.dmdl, hosokeo: STATE.hosokeo, hdmbByKey: STATE.hdmbByKey,
+    vayRecords: STATE.vayRecords, dntt: STATE.dntt, soDuDauSo: STATE.soDuDauSo,
+    tienVayLuyKe: STATE.tienVayLuyKe, hdnccBySoHopDong: STATE.hdnccBySoHopDong,
+    plantCode: CONFIG.NHA_MAY, hsCode: CONFIG.MA_HS };
+  const show = (result) => {
+    STATE.filtered = ctx;
+    renderedReport = { input, result };
+    renderReports(input, result);
+  };
+  if (STATE.phieucan.length <= WORKER_ROW_THRESHOLD || typeof Worker === 'undefined') {
+    show(computeReports(input));
+    return;
+  }
+
+  const button = $('#btnLapBC');
+  const label = button.textContent;
+  button.textContent = 'ĐANG LẬP BÁO CÁO…';
+  button.setAttribute('aria-busy', 'true');
+  const request = startReportWorker(input);
+  stopReportWorker = () => {
+    request.cancel();
+    resetButton();
+  };
+  function resetButton() {
+    button.textContent = label;
+    button.removeAttribute('aria-busy');
+  }
+  const task = request.result.catch((error) => {
+    if (getPendingReport() !== task) return null;
+    logger.warn('[Lập báo cáo] Worker không khả dụng:', error.message);
+    return computeReports(input);
+  }).then((result) => {
+    if (result && getPendingReport() === task) show(result);
+  }).finally(() => {
+    if (getPendingReport() === task) {
+      setPendingReport(null);
+      stopReportWorker = undefined;
+      resetButton();
+    }
+  });
+  setPendingReport(task);
+  return task;
+}
+
+function startReportWorker(input) {
+  let worker;
+  let timer;
+  let cancel;
+  const result = new Promise((resolve, reject) => {
+    cancel = () => resolve(null);
+    worker = new ReportWorker();
+    worker.onmessage = ({ data }) => {
+      if (data.error) reject(new Error(data.error));
+      else resolve(data.result);
+    };
+    worker.onerror = (event) => {
+      event.preventDefault();
+      reject(new Error(event.message || 'Không chạy được Worker'));
+    };
+    worker.onmessageerror = () => reject(new Error('Không đọc được dữ liệu từ Worker'));
+    timer = setTimeout(() => reject(new Error('Worker không phản hồi')), 30_000);
+    worker.postMessage(input);
+  }).finally(() => {
+    clearTimeout(timer);
+    worker?.terminate();
+  });
+  return { result, cancel };
+}
+
+function renderReports({ ctx, fromKey, toKey }, result) {
+  const { nhap, xecho, tt, congno, hotro, trogia, tonghoptro, hoahong, tonghop, bklsct, bklsth, tautonghop, tienvay, thtt, tndn, pnk } = result;
 
   // tonghop.rows (không phải cả object {rows,cols,totals}) — dashboard.js (biểu đồ) đọc
   // RESULTS.tonghop như 1 mảng (`.map(...)`), phải giữ đúng shape cũ để không vỡ biểu đồ.
@@ -115,7 +177,7 @@ export function runReport(){
   renderReportTable('tndn', tndn.rows, BANKTNDN_COLS, { 'Số lượng/trọng lượng': tndn.totalSL, 'Tổng giá thanh toán': tndn.totalTT });
   renderReportTable('pnk', pnk.rows, BANKPNK_COLS, { 'Khối lượng': pnk.totalKL, 'Thành tiền': pnk.totalTT });
 
-  renderDashboard(ctx, reportKey);
+  renderDashboard(ctx, fromKey, toKey);
 }
 
 registerRunReport(runReport);
@@ -165,6 +227,25 @@ function on(selector, event, handler){
   if (!el){ logger.warn('[initEvents] Không tìm thấy phần tử "'+selector+'" — bỏ qua gắn sự kiện "'+event+'".'); return; }
   el.addEventListener(event, handler);
 }
+function applyHistoryChange(action, success, empty) {
+  if (!action()) {
+    notify('info', empty);
+    return false;
+  }
+  renderDMTables();
+  refreshReport();
+  notify('success', success);
+  return true;
+}
+
+function undoDM() {
+  return applyHistoryChange(undo, 'Đã hoàn tác thay đổi danh mục.', 'Không còn thay đổi để hoàn tác.');
+}
+
+function redoDM() {
+  return applyHistoryChange(redo, 'Đã làm lại thay đổi danh mục.', 'Không còn thay đổi để làm lại.');
+}
+
 function initEvents(){
   $$('.item', $('#navList')).forEach(function(it){ it.addEventListener('click', function(){ showSection(it.dataset.target); }); });
   $$('.rtab').forEach(function(b){ b.addEventListener('click', function(){ showReportTab(b.dataset.rtab); }); });
@@ -211,8 +292,8 @@ function initEvents(){
   on('#btnTauUnassign', 'click', confirmTauUnassignClick);
   on('#btnAddDL', 'click', function(){ pushUndoSnapshot(); STATE.dmdl.push({ 'Đại lý':'', 'Tên Đại lý':'', 'Sản lượng Min':0, 'Sản lượng max':0, 'Hoa hồng':0, 'Ngày bắt đầu':'', 'Ngày kết thúc':'' }); onDMChanged(); renderDMTables(); });
   on('#btnAddHT', 'click', function(){ pushUndoSnapshot(); STATE.dmht.push({ 'Nguồn gốc':'', 'Hỗ trợ':0, 'Hình thức':'Cuối tháng', 'Ngày bắt đầu':'', 'Ngày kết thúc':'' }); onDMChanged(); renderDMTables(); });
-  on('#btnUndoDM', 'click', function(){ if (undo()) { renderDMTables(); if (RESULTS) runReport(); } });
-  on('#btnRedoDM', 'click', function(){ if (redo()) { renderDMTables(); if (RESULTS) runReport(); } });
+  on('#btnUndoDM', 'click', undoDM);
+  on('#btnRedoDM', 'click', redoDM);
   on('#btnBackupData', 'click', backupData);
   on('#btnRestoreDataInput', 'change', function(e){
     var f = e.target.files && e.target.files[0];
@@ -226,8 +307,8 @@ function initEvents(){
     var tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
     if (!(e.ctrlKey || e.metaKey)) return;
-    if (e.key === 'z' && !e.shiftKey) { if (undo()) { e.preventDefault(); renderDMTables(); if (RESULTS) runReport(); } }
-    else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { if (redo()) { e.preventDefault(); renderDMTables(); if (RESULTS) runReport(); } }
+    if (e.key === 'z' && !e.shiftKey) { if (undoDM()) e.preventDefault(); }
+    else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { if (redoDM()) e.preventDefault(); }
   });
   on('#btnWOModal', 'click', openWOModal);
   on('#btnWOCancel', 'click', closeWOModal);
@@ -264,14 +345,22 @@ function boot(){
     if (woKhoInput) woKhoInput.placeholder = 'VD: Nhà máy dăm gỗ ' + CONFIG.TEN_CONG_TY;
   }
   installGlobalErrorHandlers();
+  initToast();
   initThemePicker();
+  initDashboardTheme();
+  loadPrecisionSettings();
+  initPrecisionSettings();
+  eventBus.on('precision:change', () => {
+    refreshLoanFormatting();
+    if (renderedReport) renderReports(renderedReport.input, renderedReport.result);
+  });
   initDefaultDates();
   loadDM();
   renderDMTables();
   initEvents();
-  initLoanEditor(function(){ if (RESULTS) runReport(); });
-  initLuyKeMode(function(){ if (RESULTS) runReport(); }); // lũy kế trong kỳ báo cáo (mặc định) / từ đầu sổ
-  initOpeningBalance(function(){ if (RESULTS) runReport(); }); // số dư đầu kỳ nhập tay của Sổ chi tiết tiền vay
+  initLoanEditor(refreshReport);
+  initLuyKeMode(refreshReport); // lũy kế trong kỳ báo cáo (mặc định) / từ đầu sổ
+  initOpeningBalance(refreshReport); // số dư đầu kỳ nhập tay của Sổ chi tiết tiền vay
   loadAllData();
   preloadExportLibsWhenIdle();
 }
@@ -303,7 +392,7 @@ function installGlobalErrorHandlers(){
   function show(msg){
     msg = String(msg || 'Lỗi không xác định').replace(/^Uncaught\s+/, '');
     logger.error('[Lỗi chưa xử lý] ' + msg);
-    try { setStatus('Có lỗi — thao tác vừa rồi chưa hoàn tất: ' + msg, 'err'); } catch (e) { /* thanh trạng thái chưa sẵn sàng */ }
+    try { setStatus('Có lỗi — thao tác vừa rồi chưa hoàn tất: ' + msg, 'err'); } catch { /* thanh trạng thái chưa sẵn sàng */ }
   }
   // Bỏ qua 2 "lỗi" vô hại mà trình duyệt vẫn bắn ra window.onerror: cảnh báo vòng lặp
   // ResizeObserver (Chart.js tự co giãn biểu đồ) và "Script error." (lỗi từ nguồn ngoài, không có

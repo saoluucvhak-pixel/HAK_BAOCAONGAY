@@ -42,7 +42,8 @@ export const CONFIG = Object.freeze({
     BANK_INFO: 'baocaongay_bank_info',
     WO_INFO: 'baocaongay_wo_info',
     TAU_ASSIGN: 'baocaongay_tau_assign',
+    PRECISION_SETTINGS: 'baocaongay_precision_settings',
     APP_STATE_BACKUP: 'baocaongay_app_state_backup'
   },
-  APP_VERSION: '2.0.0'
+  APP_VERSION: '2.1.0'
 });

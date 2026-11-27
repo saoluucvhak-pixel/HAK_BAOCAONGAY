@@ -7,6 +7,8 @@
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module services/export/print-sheet
  */
+import { getPendingReport } from '../../store/report-runtime.js';
+import { notify } from '../../utils/event-bus.js';
 import { alignClass, cellDisplay, fmtCell } from '../../utils/cell-format.js';
 import { REPORT_KEYS } from '../../constants/columns.js';
 import { TABLES } from '../../store/state.js';
@@ -42,12 +44,12 @@ function buildPrintSheet(key){
     totalRow = '<tr class="psTotalRow">' + cols.map(function(c,i){
       var numCls = alignClass(c[2]) ? ' class="'+alignClass(c[2]).trim()+'"' : '';
       if (i===0) return '<td'+numCls+'>Tổng cộng</td>';
-      if (st.totals.hasOwnProperty(c[0])) return '<td'+numCls+'>'+fmtCell(st.totals[c[0]], c[2])+'</td>';
+      if (Object.hasOwn(st.totals, c[0])) return '<td'+numCls+'>'+fmtCell(st.totals[c[0]], c[2])+'</td>';
       return '<td></td>';
     }).join('') + '</tr>';
   }
   return (
-    '<div class="psHead">'+esc(companyNameFor(key))+'</div>' +
+    '<div class="psHead">'+esc(companyNameFor())+'</div>' +
     '<div class="psTitle">'+esc(reportTitle(key))+'</div>' +
     '<div class="psDate">'+esc(reportDateLabel() + unitNote(cols, reportDateLabel()))+'</div>' +
     '<table class="psTable"><thead>'+thead+'</thead><tbody>'+(tbody||'')+totalRow+'</tbody></table>'
@@ -60,6 +62,10 @@ export function showReportTab(key){
   $$('.reportPanel', scope).forEach(function(p){ p.classList.toggle('active', p.dataset.rpanel===key); });
 }
 export function printSection(key){
+  if (getPendingReport()) {
+    notify('info', 'Đang lập báo cáo. Vui lòng chờ kết quả.');
+    return;
+  }
   if (REPORT_KEYS.indexOf(key) >= 0 && TABLES[key]){
     // In theo mẫu Excel: Tên công ty / Tiêu đề báo cáo / Ngày / toàn bộ dữ liệu (không theo trang) + Tổng cộng
     $('#printSheet').innerHTML = buildPrintSheet(key);

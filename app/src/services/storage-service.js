@@ -45,7 +45,7 @@ class StorageService {
     }
   }
 
-  remove(key) { try { localStorage.removeItem(key); } catch (e) { /* bỏ qua */ } }
+  remove(key) { try { localStorage.removeItem(key); } catch { /* bỏ qua */ } }
 
   /** Chụp nguyên trạng từng khoá, kể cả khoá chưa tồn tại (null), để hoàn nguyên sau sự cố. */
   snapshotRaw() {
@@ -61,7 +61,7 @@ class StorageService {
     if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
     let ok = true;
     for (const [name, key] of Object.entries(CONFIG.STORAGE_KEYS)) {
-      if (!Object.prototype.hasOwnProperty.call(snapshot, name)) { ok = false; continue; }
+      if (!Object.hasOwn(snapshot, name)) { ok = false; continue; }
       try {
         if (snapshot[name] === null) localStorage.removeItem(key);
         else if (typeof snapshot[name] === 'string') localStorage.setItem(key, snapshot[name]);
@@ -94,7 +94,7 @@ class StorageService {
       return { ok: false, restoredKeys: [] };
     }
     const entries = Object.entries(CONFIG.STORAGE_KEYS)
-      .filter(([name]) => Object.prototype.hasOwnProperty.call(backup.data, name) && backup.data[name] != null);
+      .filter(([name]) => Object.hasOwn(backup.data, name) && backup.data[name] != null);
     const previous = new Map();
     const restoredKeys = [];
     try {

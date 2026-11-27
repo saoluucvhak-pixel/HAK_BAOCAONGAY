@@ -2,7 +2,7 @@
 // Yêu cầu: mất mạng vẫn mở được báo cáo với SỐ LIỆU GIỐNG HỆT lần online gần nhất, báo rõ đang xem
 // dữ liệu offline + giờ lưu; có mạng lại thì tự dùng bản mới; mọi lỗi IndexedDB KHÔNG làm hỏng app.
 // Chạy: npm run test:offline   (tuỳ chọn: node tests/test-offline-cache.mjs <index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { genPhieuCan, genDNTT, genHDNCC, genHosokeo, toCSV } from './fixtures.mjs';
@@ -20,7 +20,7 @@ const REPORTS = ['nhapkeo', 'xecho', 'thanhtoan', 'congno', 'hotro', 'trogia', '
 let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x ? '  [' + x + ']' : '')); };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 
 /** net: 'online' | 'offline' | 'hk-down' ; data: bộ dữ liệu trả về khi online */
 async function newApp({ init } = {}) {
@@ -42,7 +42,7 @@ async function snapshot(p) {
   await p.evaluate(() => { document.querySelector('#fFrom').value = '2024-01-01'; document.querySelector('#fTo').value = '2025-12-31'; document.querySelector('#btnLapBC').click(); });
   return p.evaluate((keys) => keys.map((k) => k + ':' + (document.querySelector('[data-count="' + k + '"]')?.textContent || '') + ':' + (document.querySelector('#tbl-' + k + ' tfoot')?.textContent || '')).join('\n'), REPORTS);
 }
-const idbCount = (p) => p.evaluate(() => new Promise((res) => { const r = indexedDB.open('baocaongay-offline'); r.onsuccess = () => { try { const q = r.result.transaction('sheets').objectStore('sheets').count(); q.onsuccess = () => { res(q.result); r.result.close(); }; } catch (e) { res(-1); } }; r.onerror = () => res(-1); }));
+const idbCount = (p) => p.evaluate(() => new Promise((res) => { const r = indexedDB.open('baocaongay-offline'); r.onsuccess = () => { try { const q = r.result.transaction('sheets').objectStore('sheets').count(); q.onsuccess = () => { res(q.result); r.result.close(); }; } catch { res(-1); } }; r.onerror = () => res(-1); }));
 
 // ---- A→D: cùng 1 "máy" (context giữ IndexedDB qua các lần mở lại)
 {
@@ -93,7 +93,7 @@ const idbCount = (p) => p.evaluate(() => new Promise((res) => { const r = indexe
 }
 // ---- G: trình duyệt không có IndexedDB → online vẫn chạy y như cũ
 {
-  const { context, page, state } = await newApp({ init: () => { try { Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: true }); } catch (e) { /* */ } } });
+  const { context, page, state } = await newApp({ init: () => { try { Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: true }); } catch { /* */ } } });
   await page.goto('file://' + DIST); await waitLoaded(page);
   const s = await status(page);
   check('Không có IndexedDB: online vẫn tải bình thường, không lỗi', s.dot === 'dot ok' && s.text === 'Đã tải 40 phiếu cân, 15 đề nghị thanh toán' && !state.pageErrors, s.text);

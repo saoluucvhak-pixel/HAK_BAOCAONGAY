@@ -8,6 +8,7 @@
  * nhỏ trong <head> đọc cùng khoá để áp màu trước khi vẽ trang (không chớp màu).
  * @module components/theme-picker
  */
+import { eventBus } from '../utils/event-bus.js';
 import { $ } from '../utils/dom-utils.js';
 
 export const THEME_STORAGE_KEY = 'baocaongay_ui_theme';
@@ -19,7 +20,7 @@ export function loadTheme() {
   try {
     const t = JSON.parse(localStorage.getItem(THEME_STORAGE_KEY) || '{}');
     return { skin: SKINS.includes(t.skin) ? t.skin : 'luxe', mode: MODES.includes(t.mode) ? t.mode : 'auto' };
-  } catch (e) { return { skin: 'luxe', mode: 'auto' }; }
+  } catch { return { skin: 'luxe', mode: 'auto' }; }
 }
 
 /** Áp lên <html>: luxe = không gắn data-skin (màu mặc định); auto = không gắn data-theme (theo máy). */
@@ -27,10 +28,11 @@ export function applyTheme(t) {
   const h = document.documentElement;
   if (t.skin && t.skin !== 'luxe') h.setAttribute('data-skin', t.skin); else h.removeAttribute('data-skin');
   if (t.mode === 'light' || t.mode === 'dark') h.setAttribute('data-theme', t.mode); else h.removeAttribute('data-theme');
+  eventBus.emit('theme:change', t);
 }
 
 function saveTheme(t) {
-  try { localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(t)); } catch (e) { /* không lưu được: vẫn áp cho phiên này */ }
+  try { localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(t)); } catch { /* không lưu được: vẫn áp cho phiên này */ }
 }
 
 /** Gắn 2 ô chọn trong menu trái. Gọi 1 lần lúc khởi động. */

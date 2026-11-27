@@ -4,7 +4,7 @@
 // dung thật) xuống trang 2, để lại trang 1 trắng. Đã sửa bằng `.app{min-height:0}` trong
 // @media print (xem index.html). Không thuộc bộ ui-baseline.mjs — chạy riêng bằng
 // `node tests/test-print-blankpage.mjs`.
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -17,7 +17,7 @@ const DIST_HTML = path.resolve(__dirname, '../dist/index.html');
 let pass = 0, fail = 0;
 function check(name, cond) { if (cond) { pass++; console.log('OK  ', name); } else { fail++; console.log('FAIL', name); } }
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage();
 const phieucan = genPhieuCan(60);
 const dntt = genDNTT(phieucan, 25);

@@ -218,7 +218,7 @@ export function computeHoaHongDL(dntt, phieucanBySoCT, dmdl, fromKey, toKey) {
 /** Số thiếu/không đọc được → null (ô trống trên bảng/Excel), không để NaN lọt vào dòng báo cáo. */
 function numOrNull(v) { const n = parseNum(v); return typeof n === 'number' && isFinite(n) ? n : null; }
 
-export function computeXuatHang01(hosokeo, hdmbByKey, fromKey, toKey, tauAssignments) {
+export function computeXuatHang01(hosokeo, hdmbByKey, fromKey, toKey, tauAssignments, plantCode = CONFIG.NHA_MAY) {
   const tau = tauAssignments || {};
   let rows = hosokeo.filter((r) => r['Mã hợp đồng'] && inDateRange(r['Ngày nhập'], fromKey, toKey));
   rows = sortByNumKey(rows, (r) => dateKey(r['Ngày nhập']));
@@ -229,7 +229,7 @@ export function computeXuatHang01(hosokeo, hdmbByKey, fromKey, toKey, tauAssignm
     return {
       STT: i + 1, 'Số BKLS': r['Số BKLS'], 'Ngày BKLS': r['Ngày nhập'], 'Họ và tên người bán': r['Họ và tên chủ rừng'],
       'Số CCCD': r['Mã khách hàng'], 'Tên nguyên liệu': 'Dăm gỗ keo', 'Địa điểm khai thác': r['ĐỊA CHỈ RỪNG'],
-      'Khối lượng (Tấn)': numOrNull(r['Khối lượng (Tấn)']), 'Mã hợp đồng': r['Mã hợp đồng'], 'Nhà máy': CONFIG.NHA_MAY,
+      'Khối lượng (Tấn)': numOrNull(r['Khối lượng (Tấn)']), 'Mã hợp đồng': r['Mã hợp đồng'], 'Nhà máy': plantCode,
       'Đơn giá': numOrNull(r['Đơn giá']), 'Thanh toán': numOrNull(r['Thanh toán']), 'Địa chỉ thường trú': hd['Địa chỉ thường trú'] || '',
       'Tàu': ga ? ga.tau : '', 'Khách hàng xuất': ga ? ga.khachHang : ''
     };
@@ -246,13 +246,13 @@ export function computeXuatHang01(hosokeo, hdmbByKey, fromKey, toKey, tauAssignm
  * đi 2 chuyến tàu khác nhau, tổng hợp phải tách thành 2 dòng riêng theo từng tàu (không gộp
  * chung), đúng bản chất mỗi tờ khai/mẫu WO lập riêng cho từng chuyến xuất.
  */
-export function computeXuatHang02(rows01) {
+export function computeXuatHang02(rows01, hsCode = CONFIG.MA_HS) {
   const map = {};
   rows01.forEach((r) => {
-    const k = [r['Họ và tên người bán'], r['Địa chỉ thường trú'], r['Số CCCD'], r['Tên nguyên liệu'], CONFIG.MA_HS, r['Địa điểm khai thác'], r['Tàu'] || '', r['Khách hàng xuất'] || ''].join('||');
+    const k = [r['Họ và tên người bán'], r['Địa chỉ thường trú'], r['Số CCCD'], r['Tên nguyên liệu'], hsCode, r['Địa điểm khai thác'], r['Tàu'] || '', r['Khách hàng xuất'] || ''].join('||');
     if (!map[k]) map[k] = {
       'Họ và tên người bán': r['Họ và tên người bán'], 'Địa chỉ thường trú': r['Địa chỉ thường trú'],
-      'Số CCCD': r['Số CCCD'], 'Tên nguyên liệu': r['Tên nguyên liệu'], 'Mã HS': CONFIG.MA_HS,
+      'Số CCCD': r['Số CCCD'], 'Tên nguyên liệu': r['Tên nguyên liệu'], 'Mã HS': hsCode,
       'Địa điểm khai thác': r['Địa điểm khai thác'], 'Tàu': r['Tàu'] || '', 'Khách hàng xuất': r['Khách hàng xuất'] || '',
       ngayMaxKey: null, ngayMax: null, klSum: 0, dgSum: 0, dgCnt: 0, ttSum: 0
     };

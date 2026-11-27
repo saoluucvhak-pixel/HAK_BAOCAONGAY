@@ -11,7 +11,7 @@ import { BRAND } from '../src/constants/brand.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const tokensCss = fs.readFileSync(require.resolve('@hak/enterprise-design-system/tokens/luxe.css'), 'utf8');
-const html = fs.readFileSync(path.resolve(__dirname, '../index.html'), 'utf8');
+const appCss = fs.readFileSync(path.resolve(__dirname, '../src/styles/main.css'), 'utf8');
 
 let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x !== undefined ? '  [' + x + ']' : '')); };
@@ -25,8 +25,8 @@ function block(css, sel) {
 const luxeLight = Object.assign({}, block(tokensCss, ':root'), block(tokensCss, ':root{--mut-aa:#6b655a'.slice(0, 5)), block(tokensCss, '[data-skin="luxe"]'));
 luxeLight['mut-aa'] = (tokensCss.match(/--mut-aa:(#[0-9a-f]{6})/i) || [])[1];
 const luxeDark = block(tokensCss, '[data-skin="luxe"][data-theme="dark"]');
-const appLight = block(html, ':root');
-const appDark = block(html, ':root[data-theme="dark"]');
+const appLight = block(appCss, ':root');
+const appDark = block(appCss, ':root[data-theme="dark"]');
 
 // Biến của app ← token luxe (sáng / tối)
 const MAP_LIGHT = { bg: 'bg', panel: 'card', ink: 'ink', muted: 'mut-aa', line: 'line', accent: 'brand', 'accent-2': 'brand2', head: 'th', hover: 'hover', champ: 'champ', champL: 'champL' };
@@ -45,8 +45,8 @@ for (const [theme, v] of [['Sáng', appLight], ['Tối', Object.assign({}, appLi
 const PAIRS_ALL = PAIRS.concat([['accent', 'panel'], ['side-active', 'side']]);
 const blockAt = (css, sel) => { const i = css.indexOf(sel + '{'); return i < 0 ? {} : block(css.slice(i), sel); };
 for (const skin of ['classic', 'navy', 'ngoc', 'neutral']) {
-  const L = blockAt(html, ':root[data-skin="' + skin + '"]'), Dk = blockAt(html, ':root[data-skin="' + skin + '"][data-theme="dark"]');
-  const Dm = blockAt(html, '  :root[data-skin="' + skin + '"]:not([data-theme="light"])'.trim());
+  const L = blockAt(appCss, ':root[data-skin="' + skin + '"]'), Dk = blockAt(appCss, ':root[data-skin="' + skin + '"][data-theme="dark"]');
+  const Dm = blockAt(appCss, '  :root[data-skin="' + skin + '"]:not([data-theme="light"])'.trim());
   check(skin + ': có đủ khối sáng / tối / tối-theo-máy', Object.keys(L).length >= 25 && Object.keys(Dk).length >= 25 && Object.keys(Dm).length >= 25);
   check(skin + ': tối theo máy = tối chọn tay (cùng bảng màu)', JSON.stringify(Dm) === JSON.stringify(Dk));
   for (const [theme, v] of [['sáng', L], ['tối', Dk]]) {
@@ -58,7 +58,7 @@ for (const skin of ['classic', 'navy', 'ngoc', 'neutral']) {
 // Classic = token gốc (teal) của chính Design System (:root và [data-theme="dark"] trong luxe.css)
 {
   const base = block(tokensCss, ':root'), baseDark = block(tokensCss, '[data-theme="dark"]');
-  const L = blockAt(html, ':root[data-skin="classic"]'), Dk = blockAt(html, ':root[data-skin="classic"][data-theme="dark"]');
+  const L = blockAt(appCss, ':root[data-skin="classic"]'), Dk = blockAt(appCss, ':root[data-skin="classic"][data-theme="dark"]');
   const MAP = { bg: 'bg', panel: 'card', ink: 'ink', line: 'line', accent: 'brand', head: 'th', hover: 'hover' };
   const full = (h) => (h || '').toLowerCase().replace(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/, '#$1$1$2$2$3$3');
   const eq = (a, b) => full(a) === full(b);

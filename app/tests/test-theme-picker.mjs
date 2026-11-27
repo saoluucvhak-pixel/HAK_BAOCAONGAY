@@ -1,7 +1,7 @@
 // [2026-10-29] Chọn giao diện (menu trái): 5 chủ đề × Sáng / Tối / Theo máy. Kiểm tra trên bản build:
 // đổi màu đúng, lưu lại khi tải trang (áp ngay trong <head>, không chớp màu), không đụng dữ liệu/sao lưu.
 // Chạy: npm run test:theme-picker   (tuỳ chọn: node tests/test-theme-picker.mjs <đường dẫn index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -9,10 +9,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, '../dist/index.html');
 let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x !== undefined ? '  [' + x + ']' : '')); };
-const EXPECT = { // --accent mong đợi (sáng / tối) — khớp bảng màu trong index.html
+const EXPECT = { // --accent mong đợi (sáng / tối) — khớp bảng màu trong main.css
   luxe: ['#1d3a63', '#d4b06a'], classic: ['#0e7c86', '#21b5c0'], navy: ['#1e3a8a', '#7aa2ff'], ngoc: ['#047857', '#34d399'], neutral: ['#334155', '#cbd5e1'],
 };
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const ctx = await browser.newContext({ colorScheme: 'light' });
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', (e) => errors.push(e.message));

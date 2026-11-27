@@ -13,7 +13,7 @@
 //
 // Chạy: npm run test:perf-equivalence
 import crypto from 'crypto';
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import { genPhieuCan, genDNTT, genHDNCC, genHosokeo, toCSV } from './fixtures.mjs';
 import * as RS from '../src/services/report-service.js';
 import { parseCSV, csvToObjects } from '../src/utils/csv-utils.js';
@@ -162,11 +162,11 @@ for (const t of times.slice(0, 500)) {
   if (toMinutes('5/6/2024', t) !== Date.UTC(2024, 4, 6, tp.h, tp.mi, tp.s) / 60000) tmBad++;
 }
 check('toMinutes/fmtTime khớp khi đi qua cache giờ', tmBad === 0, tmBad ? tmBad + ' chỗ lệch' : '');
-let frozenOk = false; try { parseTimeParts('10:20').h = 99; } catch (e) { frozenOk = true; }
+let frozenOk = false; try { parseTimeParts('10:20').h = 99; } catch { frozenOk = true; }
 check('Object giờ trong cache bị khoá (không nơi nào sửa được làm hỏng cache)', frozenOk && parseTimeParts('10:20').h === 10);
 
 // ---- 3) Trên Chromium thật ----
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const page = await browser.newPage();
 const br = await page.evaluate((sample) => {
   const nf0 = new Intl.NumberFormat('vi-VN'), nf2 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });

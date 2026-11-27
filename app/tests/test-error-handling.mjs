@@ -2,7 +2,7 @@
 // app KHÔNG được treo, dữ liệu cũ KHÔNG được mất. Mỗi tình huống dưới đây đã được tái hiện là lỗi
 // thật trên bản trước (treo vĩnh viễn / báo xanh nhưng báo cáo trống / bấm nút không thấy gì).
 // Chạy: npm run test:error-handling   (tuỳ chọn: node tests/test-error-handling.mjs <đường dẫn index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { genPhieuCan, genDNTT, genHDNCC, genHosokeo, toCSV } from './fixtures.mjs';
@@ -18,7 +18,7 @@ const fulfill = (route, body, status = 200) => route.fulfill({ status, contentTy
 let pass = 0, fail = 0;
 const check = (name, ok, extra) => { if (ok) pass++; else fail++; console.log((ok ? 'OK   ' : 'FAIL ') + name + (extra ? '  [' + extra + ']' : '')); };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 async function open(handler, { init, waitMs = 3500 } = {}) {
   const page = await browser.newPage();
   if (init) await page.addInitScript(init);

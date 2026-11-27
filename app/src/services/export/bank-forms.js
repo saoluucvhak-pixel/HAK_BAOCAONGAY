@@ -7,6 +7,9 @@
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module services/export/bank-forms
  */
+import { savePdf, updateExportProgress, writeWorkbook } from '../export-runner.js';
+import { notify } from '../../utils/event-bus.js';
+import { excelNumberFormat } from '../../utils/hak-format.js';
 import { CONFIG } from '../../config/config.js';
 import { BRAND, OUTER_BORDER_STYLE, THIN_BORDER } from '../../constants/brand.js';
 import { LOAN_FIELDS } from '../loan-model.js';
@@ -16,7 +19,7 @@ import { TABLES } from '../../store/state.js';
 import { dateKey, fmtDate, pad2, toExcelDate } from '../../utils/date-utils.js';
 import { $, $$, downloadBlob, esc } from '../../utils/dom-utils.js';
 import { fmtKL, fmtMoney } from '../../utils/number-utils.js';
-import { RESULTS } from '../../store/report-runtime.js';
+import { getPendingReport, RESULTS } from '../../store/report-runtime.js';
 import { ensurePdfFont, forcePdfMoneyColumnWidths } from './pdf-export.js';
 
 /* Thông tin báo cáo ngân hàng — nhập 1 lần qua modal, dùng cho mẫu 02/TNDN chính thức
@@ -64,10 +67,14 @@ function readBankInfoForm(){
 }
 export var BANK_INFO_MODAL_MODE = 'tndn'; // 'tndn' hoặc 'pnk' — quyết định modal đang mở để xuất mẫu nào
 export function openBankInfoModal(mode){
+  if (getPendingReport()) {
+    notify('info', 'Đang lập báo cáo. Vui lòng chờ kết quả.');
+    return;
+  }
   BANK_INFO_MODAL_MODE = mode;
   var st = TABLES[mode==='tndn' ? 'tndn' : 'pnk'];
   if (!st || !(st.rows||[]).length){
-    alert('Chưa có dữ liệu báo cáo ' + (mode==='tndn' ? '"Bảng kê 02/TNDN"' : '"Phiếu nhập kho"') + '. Hãy vào "Báo cáo ngân hàng", chọn khoảng ngày rồi bấm LẬP BÁO CÁO trước.');
+    notify('warning', 'Chưa có dữ liệu báo cáo ' + (mode==='tndn' ? '"Bảng kê 02/TNDN"' : '"Phiếu nhập kho"') + '. Hãy vào "Báo cáo ngân hàng", chọn khoảng ngày rồi bấm LẬP BÁO CÁO trước.');
     return;
   }
   $('#bankModalTitle').textContent = mode==='tndn'
@@ -155,16 +162,16 @@ function buildTNDNWorksheet(workbook, rows, info, ngayMax){
       cell.value = v; cell.border = THIN_BORDER; cell.alignment = { vertical:'middle', wrapText:(i===2) };
       if (isZebra) cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:BRAND.zebraFillARGB}, bgColor:{argb:BRAND.zebraFillARGB} };
       if (i===0){ cell.numFmt='dd/mm/yyyy'; cell.alignment.horizontal='center'; } // [CHUẨN HAK] ngày thật, căn giữa
-      if (i===6){ cell.numFmt='#,##0.00'; cell.alignment.horizontal='right'; }
-      if (i===7||i===8){ cell.numFmt='#,##0'; cell.alignment.horizontal='right'; }
+      if (i===6){ cell.numFmt=excelNumberFormat('kl'); cell.alignment.horizontal='right'; }
+      if (i===7||i===8){ cell.numFmt=excelNumberFormat('money'); cell.alignment.horizontal='right'; }
     });
   });
   var totalRow = startRow + rows.length, totSL=0, totTT=0;
   rows.forEach(function(r){ totSL += r['Số lượng/trọng lượng']||0; totTT += r['Tổng giá thanh toán']||0; });
   ws.mergeCells(totalRow,1,totalRow,6);
   ws.getCell(totalRow,1).value = 'TỔNG CỘNG';
-  ws.getCell(totalRow,7).value = totSL; ws.getCell(totalRow,7).numFmt='#,##0.00';
-  ws.getCell(totalRow,9).value = totTT; ws.getCell(totalRow,9).numFmt='#,##0';
+  ws.getCell(totalRow,7).value = totSL; ws.getCell(totalRow,7).numFmt=excelNumberFormat('kl');
+  ws.getCell(totalRow,9).value = totTT; ws.getCell(totalRow,9).numFmt=excelNumberFormat('money');
   for (var ci3=1; ci3<=NCOLS; ci3++){
     var c3 = ws.getCell(totalRow,ci3);
     c3.font = { bold:true };
@@ -213,13 +220,14 @@ export async function downloadTienVayTemplate(){
       c.border = THIN_BORDER;
       var type = LOAN_FIELDS[col - 1] && LOAN_FIELDS[col - 1][2];
       if (type === 'date'){ c.numFmt = 'dd/mm/yyyy'; c.alignment = { horizontal:'center' }; }
-      if (type === 'money') c.numFmt = '#,##0';
+      if (type === 'money') c.numFmt = excelNumberFormat('money');
     });
   });
   [16, 16, 20].forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
-  var buf = await workbook.xlsx.writeBuffer();
+  var buf = await writeWorkbook(workbook);
   var blob = new Blob([buf], { type:'application/octet-stream' });
   downloadBlob(blob, 'Mau_TienVay_TH_VAY.xlsx');
+  return true;
 }
 /**
  * [2026-10-29] "Lưu ra Excel" ở tab Cập nhật khoản vay: các khoản đang hiện (đã lọc) → file 3 cột TH_VAY
@@ -228,7 +236,7 @@ export async function downloadTienVayTemplate(){
  * @param {Object[]} rows khoản vay (loan-model schema 3)
  */
 export async function exportKhoanVayExcel(rows){
-  if (!rows || !rows.length){ alert('Chưa có khoản vay nào để lưu ra Excel.'); return; }
+  if (!rows || !rows.length){ notify('warning', 'Chưa có khoản vay nào để lưu ra Excel.'); return; }
   var workbook = new libs.ExcelJS.Workbook();
   var ws = workbook.addWorksheet('TH_VAY');
   ws.addRow(LOAN_FIELDS.map(function(f){ return f[1]; }));
@@ -242,16 +250,17 @@ export async function exportKhoanVayExcel(rows){
     var row = ws.addRow([toExcelDate(r.ngayHachToan), toExcelDate(r.ngayChungTu) || (r.ngayChungTu || null), r.tongTienVay]);
     row.eachCell({ includeEmpty: true }, function(c, col){
       c.border = THIN_BORDER;
-      if (col <= 2){ c.numFmt = 'dd/mm/yyyy'; c.alignment = { horizontal:'center' }; } else c.numFmt = '#,##0';
+      if (col <= 2){ c.numFmt = 'dd/mm/yyyy'; c.alignment = { horizontal:'center' }; } else c.numFmt = excelNumberFormat('money');
     });
   });
   var tRow = ws.addRow(['Tổng cộng', null, total]);
   tRow.font = { bold:true };
-  tRow.eachCell({ includeEmpty: true }, function(c, col){ c.border = THIN_BORDER; c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:BRAND.totalFillARGB} }; if (col === 3) c.numFmt = '#,##0'; });
+  tRow.eachCell({ includeEmpty: true }, function(c, col){ c.border = THIN_BORDER; c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:BRAND.totalFillARGB} }; if (col === 3) c.numFmt = excelNumberFormat('money'); });
   [16, 16, 20].forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
-  var buf = await workbook.xlsx.writeBuffer();
+  var buf = await writeWorkbook(workbook);
   var d = new Date();
   downloadBlob(new Blob([buf], { type:'application/octet-stream' }), 'KhoanVay_TH_VAY_' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '.xlsx');
+  return true;
 }
 function bankNgayLabel(ngayVal){
   var k = dateKey(ngayVal); if (k==null) return '';
@@ -261,14 +270,15 @@ function bankNgayLabel(ngayVal){
 export async function exportTNDNExcel(){
   var info = readBankInfoForm(); saveBankInfo(info);
   var res = RESULTS && RESULTS.tndn; var rows = res ? res.rows : [];
-  if (!rows.length){ alert('Không có dữ liệu để xuất (kiểm tra lại khoảng ngày / bấm LẬP BÁO CÁO).'); return; }
+  if (!rows.length){ notify('warning', 'Không có dữ liệu để xuất (kiểm tra lại khoảng ngày / bấm LẬP BÁO CÁO).'); return; }
   var workbook = new libs.ExcelJS.Workbook();
   buildTNDNWorksheet(workbook, rows, info, res.ngayMax);
-  var buf = await workbook.xlsx.writeBuffer();
+  var buf = await writeWorkbook(workbook);
   var blob = new Blob([buf], { type:'application/octet-stream' });
   var d = new Date();
   downloadBlob(blob, 'BangKe02TNDN_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.xlsx');
   closeBankInfoModal();
+  return true;
 }
 function buildTNDNPdf(rows, info, ngayMax){
   var doc = new libs.jsPDF({ orientation:'landscape' });
@@ -310,24 +320,34 @@ function buildTNDNPdf(rows, info, ngayMax){
   doc.text('Người lập bảng kê\n(Ký, họ tên)'.split('\n'), pageW-30, fy+6, { align:'center' });
   return doc;
 }
-export function exportTNDNPDF(){
+export async function exportTNDNPDF(){
   var info = readBankInfoForm(); saveBankInfo(info);
   var res = RESULTS && RESULTS.tndn; var rows = res ? res.rows : [];
-  if (!rows.length){ alert('Không có dữ liệu để xuất (kiểm tra lại khoảng ngày / bấm LẬP BÁO CÁO).'); return; }
+  if (!rows.length){ notify('warning', 'Không có dữ liệu để xuất (kiểm tra lại khoảng ngày / bấm LẬP BÁO CÁO).'); return; }
+  await updateExportProgress(42, 'Dàn trang bảng kê 02/TNDN');
   var doc = buildTNDNPdf(rows, info, res.ngayMax);
   var d = new Date();
-  doc.save('BangKe02TNDN_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.pdf');
+  await savePdf(doc, 'BangKe02TNDN_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.pdf');
   closeBankInfoModal();
+  return true;
 }
 /* ---------- Phiếu nhập kho xuất hàng loạt (Mẫu 01-VT/QĐ 48/2006/QĐ-BTC) — mỗi dòng (1 ngày) 1 trang PDF ---------- */
 /* Đọc số tiền (VNĐ nguyên, không có hào/xu) ra chữ tiếng Việt theo đúng cách đọc kế toán
    (vd 105 → "Một trăm lẻ năm", 21000 → "Hai mươi mốt nghìn"). Đã kiểm thử khớp 100% với
    7 giá trị "Số tiền bằng chữ" có sẵn trong file PHIEUNHAPKHO gốc — xem VALIDATION.md §6. */
-function buildPNKPdf(rows, info){
+async function buildPNKPdf(rows, info){
   var doc = new libs.jsPDF({ orientation:'portrait' });
   ensurePdfFont(doc);
   var pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
-  rows.forEach(function(r, idx){
+  const displayRows = rows.map((row) => [
+    fmtKL(row['Khối lượng']), fmtMoney(row['Đơn giá thanh toán']), fmtMoney(row['Thành tiền'])
+  ]);
+  for (const [idx, r] of rows.entries()) {
+    if (idx % 10 === 0) {
+      await updateExportProgress(20 + Math.floor(65 * idx / rows.length),
+        'Đã tạo ' + idx + '/' + rows.length + ' trang phiếu nhập kho');
+    }
+    const [quantity, price, amount] = displayRows[idx];
     if (idx>0) doc.addPage();
     var y = 15;
     doc.setFont('Roboto','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20);
@@ -359,8 +379,8 @@ function buildPNKPdf(rows, info){
       {content:'Số lượng',colSpan:2}, {content:'Đơn giá\n(đồng)',rowSpan:2}, {content:'Thành tiền\n(đồng)',rowSpan:2}
     ], [ 'Theo chứng từ','Thực nhập' ]];
     var body = [
-      [ '01', 'Gỗ tròn keo', '', 'Tấn', fmtKL(r['Khối lượng']), fmtKL(r['Khối lượng']), fmtMoney(r['Đơn giá thanh toán']), fmtMoney(r['Thành tiền']) ],
-      [ '', 'Cộng', '', '', '', '', '', fmtMoney(r['Thành tiền']) ]
+      [ '01', 'Gỗ tròn keo', '', 'Tấn', quantity, quantity, price, amount ],
+      [ '', 'Cộng', '', '', '', '', '', amount ]
     ];
     var columnStyles = { 6:{halign:'right'}, 7:{halign:'right'} };
     forcePdfMoneyColumnWidths(doc, body, null, [6, 7], columnStyles, 8.5); // 6=Đơn giá, 7=Thành tiền (dòng "Cộng" đã nằm trong body)
@@ -383,18 +403,19 @@ function buildPNKPdf(rows, info){
     [info.nguoiLap, info.nguoiGiao, info.thuKho, info.giamDoc].forEach(function(t,i){ doc.text(t||'', cols4[i], y+22, { align:'center' }); });
     doc.setFont('Roboto','normal'); doc.setFontSize(7); doc.setTextColor(140,140,140);
     doc.text('Trang ' + (idx+1) + '/' + rows.length, pageW-12, pageH-8, { align:'right' });
-  });
+  }
   return doc;
 }
-export function exportPNKPdf(){
+export async function exportPNKPdf(){
   var info = readBankInfoForm(); saveBankInfo(info);
   var res = RESULTS && RESULTS.pnk; var allRows = res ? res.rows : [];
-  if (!allRows.length){ alert('Không có dữ liệu để xuất (kiểm tra lại khoảng ngày / bấm LẬP BÁO CÁO).'); return; }
+  if (!allRows.length){ notify('warning', 'Không có dữ liệu để xuất (kiểm tra lại khoảng ngày / bấm LẬP BÁO CÁO).'); return; }
   var rows = selectedPnkRows(allRows);
-  if (!rows.length){ alert('Chưa chọn phiếu nhập kho nào để in.'); return; }
+  if (!rows.length){ notify('warning', 'Chưa chọn phiếu nhập kho nào để in.'); return; }
   if (rows.length > 400 && !confirm('Sẽ xuất ' + rows.length + ' trang phiếu trong 1 file PDF, có thể mất vài giây. Tiếp tục?')) return;
-  var doc = buildPNKPdf(rows, info);
+  var doc = await buildPNKPdf(rows, info);
   var d = new Date();
-  doc.save('PhieuNhapKho_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.pdf');
+  await savePdf(doc, 'PhieuNhapKho_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.pdf');
   closeBankInfoModal();
+  return true;
 }

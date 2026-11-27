@@ -7,7 +7,7 @@
 //  - Sao lưu/khôi phục (kể cả file sao lưu bản sổ phụ cũ); dữ liệu sổ phụ cũ trên máy tự chuyển sang 3 cột,
 //    không mất; file mẫu tải về nhập lại được.
 // Chạy: npm run test:khoanvay   (tuỳ chọn: node tests/test-khoanvay.mjs <đường dẫn index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -56,7 +56,7 @@ function bankFile() {
 }
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 async function newPage() {
   const ctx = await browser.newContext({ timezoneId: 'Asia/Ho_Chi_Minh', locale: 'vi-VN', viewport: { width: 1366, height: 768 }, acceptDownloads: true });
   const pg = await ctx.newPage();

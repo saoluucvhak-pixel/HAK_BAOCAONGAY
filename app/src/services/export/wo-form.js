@@ -7,6 +7,10 @@
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module services/export/wo-form
  */
+import { getPendingReport } from '../../store/report-runtime.js';
+import { savePdf, updateExportProgress, writeWorkbook } from '../export-runner.js';
+import { notify } from '../../utils/event-bus.js';
+import { excelNumberFormat } from '../../utils/hak-format.js';
 import { CONFIG } from '../../config/config.js';
 import { BRAND, OUTER_BORDER_STYLE, THIN_BORDER } from '../../constants/brand.js';
 import { libs } from '../export-libs.js';
@@ -61,8 +65,12 @@ function readWOForm(){
   };
 }
 export function openWOModal(){
+  if (getPendingReport()) {
+    notify('info', 'Đang lập báo cáo. Vui lòng chờ kết quả.');
+    return;
+  }
   if (!TABLES['bklsct'] || !(TABLES['bklsct'].rows||[]).length){
-    alert('Chưa có dữ liệu báo cáo BKLS xuất khẩu. Hãy vào "Tổng hợp lâm sản", chọn khoảng ngày rồi bấm LẬP BÁO CÁO trước.');
+    notify('warning', 'Chưa có dữ liệu báo cáo BKLS xuất khẩu. Hãy vào "Tổng hợp lâm sản", chọn khoảng ngày rồi bấm LẬP BÁO CÁO trước.');
     return;
   }
   fillWOForm(loadWOInfo());
@@ -98,8 +106,8 @@ function writeWOTotalRow(ws, rows, totalRow){
   var totKL=0, totTT=0;
   rows.forEach(function(r){ totKL += r.soLuong||0; totTT += r.tongTriGia||0; });
   ws.getCell(totalRow,2).value = 'TỔNG CỘNG';
-  ws.getCell(totalRow,8).value = totKL; ws.getCell(totalRow,8).numFmt='#,##0.00';
-  ws.getCell(totalRow,10).value = totTT; ws.getCell(totalRow,10).numFmt='#,##0';
+  ws.getCell(totalRow,8).value = totKL; ws.getCell(totalRow,8).numFmt=excelNumberFormat('kl');
+  ws.getCell(totalRow,10).value = totTT; ws.getCell(totalRow,10).numFmt=excelNumberFormat('money');
   for (var ci2=1; ci2<=11; ci2++){
     var c2 = ws.getCell(totalRow,ci2);
     c2.font = { bold:true };
@@ -182,8 +190,8 @@ function buildWOWorksheet(workbook, rows, info){
       cell.alignment = { vertical:'middle', wrapText:(i===2||i===6) };
       if (isZebra) cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:BRAND.zebraFillARGB}, bgColor:{argb:BRAND.zebraFillARGB} };
       if (i===0){ cell.numFmt='dd/mm/yyyy'; cell.alignment.horizontal='center'; } // [CHUẨN HAK] ngày thật, căn giữa
-      if (i===7){ cell.numFmt='#,##0.00'; cell.alignment.horizontal='right'; }
-      if (i===8||i===9){ cell.numFmt='#,##0'; cell.alignment.horizontal='right'; }
+      if (i===7){ cell.numFmt=excelNumberFormat('kl'); cell.alignment.horizontal='right'; }
+      if (i===8||i===9){ cell.numFmt=excelNumberFormat('money'); cell.alignment.horizontal='right'; }
       if (i===10){ cell.alignment.horizontal='center'; }
     });
   });
@@ -205,14 +213,15 @@ function buildWOWorksheet(workbook, rows, info){
 export async function exportWOExcel(){
   var info = readWOForm(); saveWOInfo(info);
   var rows = computeWORows();
-  if (!rows.length){ alert('Không có dữ liệu để xuất (kiểm tra lại bộ lọc / bấm LẬP BÁO CÁO).'); return; }
+  if (!rows.length){ notify('warning', 'Không có dữ liệu để xuất (kiểm tra lại bộ lọc / bấm LẬP BÁO CÁO).'); return; }
   var workbook = new libs.ExcelJS.Workbook();
   buildWOWorksheet(workbook, rows, info);
-  var buf = await workbook.xlsx.writeBuffer();
+  var buf = await writeWorkbook(workbook);
   var blob = new Blob([buf], { type:'application/octet-stream' });
   var d = new Date();
   downloadBlob(blob, 'BangKeWO_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.xlsx');
   closeWOModal();
+  return true;
 }
 function buildWOPdf(rows, info){
   var doc = new libs.jsPDF({ orientation: 'landscape' });
@@ -288,12 +297,14 @@ function buildWOPdf(rows, info){
 
   return doc;
 }
-export function exportWOPDF(){
+export async function exportWOPDF(){
   var info = readWOForm(); saveWOInfo(info);
   var rows = computeWORows();
-  if (!rows.length){ alert('Không có dữ liệu để xuất (kiểm tra lại bộ lọc / bấm LẬP BÁO CÁO).'); return; }
+  if (!rows.length){ notify('warning', 'Không có dữ liệu để xuất (kiểm tra lại bộ lọc / bấm LẬP BÁO CÁO).'); return; }
+  await updateExportProgress(42, 'Dàn trang bảng kê WO');
   var doc = buildWOPdf(rows, info);
   var d = new Date();
-  doc.save('BangKeWO_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.pdf');
+  await savePdf(doc, 'BangKeWO_' + d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) + '.pdf');
   closeWOModal();
+  return true;
 }

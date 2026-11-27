@@ -5,7 +5,7 @@
 //  - "Lưu ra Excel" → file 3 cột nhập lại được, ra đúng số khoản + tổng; chưa có khoản ⇒ báo.
 //  - Thẻ Tổng hợp thanh toán = dòng tổng của bảng; số chủ rừng / số ngày đếm đúng.
 // Chạy: npm run test:bank-kpi   (tuỳ chọn: node tests/test-bank-kpi.mjs <đường dẫn index.html>)
-import { chromium } from 'playwright';
+import { launchChromium } from './browser-launcher.mjs';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -35,11 +35,10 @@ function thvayFile() {
 let pass = 0, fail = 0;
 const check = (n, ok, x) => { ok ? pass++ : fail++; console.log((ok ? 'OK   ' : 'FAIL ') + n + (x !== undefined ? '  [' + String(x).slice(0, 220) + ']' : '')); };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await launchChromium();
 const ctx = await browser.newContext({ timezoneId: 'Asia/Ho_Chi_Minh', locale: 'vi-VN', viewport: { width: 1366, height: 800 }, acceptDownloads: true });
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-const alerts = []; page.on('dialog', (d) => { alerts.push(d.message()); d.accept(); });
 await page.route('https://docs.google.com/**', (r) => { const k = Object.keys(ID).find((x) => r.request().url().includes(ID[x])); return r.fulfill({ status: 200, contentType: 'text/csv', body: CSV[k] || '' }); });
 async function open() {
   await page.goto('file://' + DIST, { waitUntil: 'load' });
@@ -62,7 +61,7 @@ await open();
   check('Khoản vay — chưa có dữ liệu: 4 thẻ, tổng 0, không lỗi', c.length === 4 && c[0].val === '0' && c[1].val === '—' && errors.length === 0, JSON.stringify(c.map((x) => x.val)));
   check('Hiện "Tự động lưu trên máy"', /Tự động lưu trên máy/.test(await page.textContent('#loanSummary')));
   await page.click('#btnLoanExport'); await page.waitForTimeout(700);
-  check('Lưu ra Excel khi chưa có khoản ⇒ báo, không tạo file', alerts.some((m) => /Chưa có khoản vay nào/.test(m)), alerts.join(' | '));
+  check('Lưu ra Excel khi chưa có khoản ⇒ báo, không tạo file', await page.locator('.toast-warning').filter({ hasText: /Chưa có khoản vay nào/ }).count() === 1);
 }
 // 2) Nhập 3 khoản → thẻ
 {
