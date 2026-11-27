@@ -7,6 +7,7 @@
  * trong hàm xử lý sự kiện, không dùng lúc nạp module (xem ARCHITECTURE.md).
  * @module services/export/report-meta
  */
+import { formatIsoDate } from '../../utils/hak-format.js';
 import { CONFIG } from '../../config/config.js';
 import { REPORT_TITLES } from '../../constants/columns.js';
 import { $ } from '../../utils/dom-utils.js';
@@ -14,7 +15,7 @@ import { $ } from '../../utils/dom-utils.js';
 export function companyNameFor(key){ return CONFIG.TEN_CONG_TY; }
 /* Tiêu đề in đúng theo tên báo cáo trong file Excel mẫu (BaoCaoNgay_DH_*.xlsx) */
 export function reportTitle(key){ return REPORT_TITLES[key] || ((document.querySelector('[data-rpanel="'+key+'"] h2')||{}).textContent) || key; }
-export function ddmmyyyy(iso){ if (!iso) return ''; var p = iso.split('-'); return p.length===3 ? (p[2]+'/'+p[1]+'/'+p[0]) : iso; }
+export function ddmmyyyy(iso){ return formatIsoDate(iso) || iso || ''; }
 export function reportDateLabel(){
   var f = $('#fFrom') ? $('#fFrom').value : '', t = $('#fTo') ? $('#fTo').value : '';
   if (f && t && f === t) return 'Ngày ' + ddmmyyyy(f);

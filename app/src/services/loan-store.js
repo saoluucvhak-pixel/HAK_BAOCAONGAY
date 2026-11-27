@@ -242,3 +242,25 @@ export function restoreLoans(backup) {
     return rows.length;
   }, [STORE, SOPHU_STORE, META_STORE]);
 }
+
+/** Khôi phục các khoản vay của một năm trong cùng giao dịch, giữ các khoản hiện có ngoài năm. */
+export function restoreLoansForYear(backup, year) {
+  const rows = backup.rows;
+  if (backup.schema !== LOAN_SCHEMA || rows.some(row => !row || typeof row.id !== 'string' || !row.id ||
+      row.schema !== LOAN_SCHEMA || (typeof row.ngayHachToan !== 'string' || !row.ngayHachToan.startsWith(year + '-')) ||
+      !Number.isFinite(row.tongTienVay))) {
+    return Promise.reject(new Error('Khoản vay trong bản sao lưu năm không hợp lệ.'));
+  }
+  return tx('readwrite', (store, abort) => {
+    const lookup = store.getAll();
+    lookup.onsuccess = () => {
+      const outside = new Set(lookup.result.filter(row => (typeof row.ngayHachToan !== 'string' || !row.ngayHachToan.startsWith(year + '-'))).map(row => row.id));
+      if (rows.some(row => outside.has(row.id))) {
+        abort(new Error('Mã khoản vay trùng với dữ liệu ngoài năm đang khôi phục.'));
+        return;
+      }
+      for (const row of rows) store.put(row);
+    };
+    return rows.length;
+  });
+}

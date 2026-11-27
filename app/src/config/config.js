@@ -12,6 +12,7 @@ export const CONFIG = Object.freeze({
   DNTT_CT: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqRW3Yk2MBgXp1qi29tQZQyn1R-opTUjE5PqBFIH7knAOcr1YvthP_AuXa_10knbaprgtM4i_zPk2i/pub?gid=1612289204&single=true&output=csv',
   HD_NCC: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRmYRMAG3XDhHz74P7L1-NrKyPD8Zozp5lPU9rR-_dirOq5UHfSMNdZ4pq4PF5DpI6nosDBlAwW_a10/pub?gid=1578334272&single=true&output=csv',
   HOSOKEO: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0mcMT2TsD7lOLSNrTqZPVjJJ395kI54SxSri5-n_VxrfAcC74IKkgCnesT30d1bhx59gJC4esmF7s/pub?gid=0&single=true&output=csv',
+  XUATHANG_DN: 'https://docs.google.com/spreadsheets/d/1ZZ2iUwkkKe8wXdztA7mL-v9j6fmgY5c5rlDdI1sNoAk/edit?usp=sharing',
   MA_HS: '4401220090',
   NHA_MAY: 'CNHAK',
   TEN_CONG_TY: 'CÔNG TY TNHH SXTMDV ĐẠI HIỆP',
@@ -37,6 +38,8 @@ export const CONFIG = Object.freeze({
   // Khoá localStorage — tập trung 1 chỗ để StorageService dùng (BƯỚC 9), tránh chuỗi
   // "baocaongay_xxx" rải rác nhiều nơi trong code (magic string).
   STORAGE_KEYS: {
+    forestrySettings: 'baocaongay_forestry_settings',
+    forestryHistory: 'baocaongay_forestry_history',
     DM_DL: 'baocaongay_dmdl',
     DM_HT: 'baocaongay_dmht',
     BANK_INFO: 'baocaongay_bank_info',

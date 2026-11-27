@@ -3,9 +3,7 @@
 Đây là bản tách file/module của `BaoCaoNgay.html` (xem `ARCHITECTURE.md` để hiểu lý do và cấu
 trúc). File **giao cho người dùng cuối vẫn là 1 file HTML duy nhất**: `dist/index.html`.
 
-**Dùng cho đơn vị khác trong HAK Group (tên công ty/link Google Sheet khác)?** Không cần sửa mã
-nguồn — mở `config.html` đi kèm, điền tên công ty + link Google Sheet riêng, bấm 1 nút là ra
-ngay 1 file báo cáo mới đã cấu hình sẵn. Xem mục "Công cụ tạo file cấu hình riêng" bên dưới.
+**Dùng cho đơn vị khác trong HAK Group?** Mở `config.html` để nhập cấu hình công ty và năm nguồn Google Sheet, sau đó tạo file báo cáo cho đơn vị đó.
 
 **So với bản gốc, có thêm 5 tiện ích** (không đổi số liệu/nghiệp vụ nào):
 - **Hoàn tác/Làm lại** (Ctrl+Z/Ctrl+Y, hoặc 2 nút ở tab "Danh mục & cấu hình") khi sửa danh
@@ -69,15 +67,11 @@ riêng); xoá "dữ liệu duyệt web" của trình duyệt sẽ xoá luôn b�
 Dùng khi cần bản báo cáo này cho **1 đơn vị khác** trong HAK Group (tên công ty, Mã HS, mã nhà
 máy, hoặc link Google Sheet khác) — không sửa mã nguồn, không cần build lại:
 
-1. Mở `config.html` (double-click, giống mọi file HTML khác trong bộ này).
-2. Điền tên công ty + (tuỳ chọn) Mã HS/mã nhà máy, dán link Google Sheet "Xuất bản lên web"
-   dạng CSV của đơn vị đó (xem hướng dẫn ngay trong `config.html`).
-3. (Tuỳ chọn) Điền Mã số thuế / Số điện thoại / Địa chỉ (trụ sở) / Địa chỉ nơi tổ chức thu mua —
-   sẽ tự điền sẵn khi mở modal "Thông tin xuất báo cáo ngân hàng"/"Khai báo mẫu WO" lần đầu
-   (vẫn sửa/lưu lại được như thường, không bị khoá cứng).
-4. Bấm "⬇ Tạo file báo cáo" — tải về 1 file HTML hoàn chỉnh, đặt tên theo tên công ty, dùng
-   ngay được như `dist/index.html` (kể cả các tiện ích: undo/redo, tìm không dấu, sao lưu/khôi
-   phục, virtual scroll...).
+1. Mở `config.html` và bấm **Tải mẫu Excel**.
+2. Điền thông tin công ty và cả năm nguồn Google Sheet vào file mẫu, rồi nhập lại file đã điền.
+3. Bấm **Kiểm tra 5 nguồn Google Sheets** để kiểm tra các nguồn và đối chiếu dòng thông tin công ty.
+4. Bấm **Xác nhận lưu** để tạo file HTML theo cấu hình đã kiểm tra.
+   Để đổi cấu hình, cập nhật file Excel và nhập lại.
 
 `config.html` tự chứa toàn bộ app bên trong (không phụ thuộc `dist/index.html` lúc chạy), nên
 chỉ cần giữ lại đúng 1 file `config.html` là tạo được báo cáo cho bao nhiêu đơn vị cũng được.

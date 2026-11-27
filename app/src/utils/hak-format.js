@@ -9,6 +9,7 @@
  * sửa ở đây. Hàm ở đây chỉ để HIỂN THỊ; không làm tròn/sửa dữ liệu gốc dùng để tính toán.
  * @module utils/hak-format
  */
+import { displayDateParts, displayGroupedNumber } from './display-format.js';
 import standard from '@hak/accounting-report-standard';
 import precision from '@hak/accounting-report-standard/src/precision-settings.js';
 import smartFilterCore from '@hak/smart-filter/core';
@@ -33,7 +34,7 @@ export function formatMoney(n) {
   // Làm tròn ĐÚNG như bản cũ (Math.round rồi mới lấy trị tuyệt đối: -1500,5 → -1.500) để số tiền hiển
   // thị không lệch 1 đồng so với trước. Khác duy nhất: số âm làm tròn về 0 hiện "0" thay vì "-0".
   const v = Math.abs(Math.round(n));
-  return (neg && v !== 0 ? '-' : '') + groupNumber(v, MONEY_DIGITS);
+  return (neg && v !== 0 ? '-' : '') + displayGroupedNumber(groupNumber(v, MONEY_DIGITS));
 }
 
 /**
@@ -48,12 +49,15 @@ function groupNumber(v, digits) {
 /** Khối lượng: luôn đúng QUANTITY_DIGITS chữ số lẻ (1.234,50) để cột thẳng hàng. */
 export function formatQuantity(n) {
   if (n == null || typeof n !== 'number' || !isFinite(n)) return '';
-  return groupNumber(n, QUANTITY_DIGITS);
+  return displayGroupedNumber(groupNumber(n, QUANTITY_DIGITS));
 }
 
 /** "YYYY-MM-DD" → "dd/MM/yyyy" (theo chuẩn, có kiểm tra ngày có thật). Sai → ''. */
 export function formatIsoDate(iso) {
-  try { return standard.formatDateISO(iso); } catch (e) { return ''; }
+  try {
+    const day = standard.formatDateISO(iso);
+    return day ? displayDateParts(...day.split('/').reverse()) : '';
+  } catch { return ''; }
 }
 
 /**

@@ -74,3 +74,23 @@ export function genHosokeo(n = 10) {
   }
   return rows;
 }
+
+/** Điền đúng file Excel được tải từ màn hình cấu hình để kiểm tra cả mẫu và importer. */
+export async function companyConfigWorkbook(page, data) {
+  const { default: ExcelJS } = await import('exceljs');
+  const pending = page.waitForEvent('download');
+  await page.locator('#btnTemplate').click();
+  const download = await pending;
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(await download.path());
+  const sheet = workbook.getWorksheet('Cấu hình');
+  for (const row of sheet.getRows(1, 21)) {
+    const key = row.getCell(4).value;
+    if (key) row.getCell(2).value = data[key] ?? '';
+  }
+  return {
+    name: download.suggestedFilename(),
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
+  };
+}

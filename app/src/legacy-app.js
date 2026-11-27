@@ -29,6 +29,9 @@ import { setStatus, loadAllData } from './services/data-service.js';
 import { renderReportTable } from './components/report-table.js';
 import { renderDashboard } from './components/dashboard.js';
 import { initLoanEditor, getLoanView } from './components/loan-editor.js';
+import { initForestrySettings } from './components/forestry-settings.js';
+import { initForestryReports } from './components/forestry-reports.js';
+import { initDisplayFormat } from './utils/display-format.js';
 import { initThemePicker } from './components/theme-picker.js';
 import { initOpeningBalance, initLuyKeMode, renderTienVayKpi, renderThttKpi } from './components/tienvay-summary.js';
 import { pushUndoSnapshot, undo, redo } from './store/app-state.js';
@@ -146,7 +149,7 @@ function showSection(target){
   $$('.item', $('#navList')).forEach(function(it){ it.classList.toggle('active', it.dataset.target===target); });
   $$('.section').forEach(function(s){ s.classList.remove('active'); });
   $('#sec-'+target).classList.add('active');
-  $('#side').classList.remove('open');
+  setNavigationOpen(false);
 }
 function initDefaultDates(){
   var d = new Date();
@@ -165,10 +168,26 @@ function on(selector, event, handler){
   if (!el){ logger.warn('[initEvents] Không tìm thấy phần tử "'+selector+'" — bỏ qua gắn sự kiện "'+event+'".'); return; }
   el.addEventListener(event, handler);
 }
+function setNavigationOpen(open) {
+  $('#side').classList.toggle('open', open);
+  $('#sideToggle').setAttribute('aria-expanded', String(open));
+}
 function initEvents(){
   $$('.item', $('#navList')).forEach(function(it){ it.addEventListener('click', function(){ showSection(it.dataset.target); }); });
   $$('.rtab').forEach(function(b){ b.addEventListener('click', function(){ showReportTab(b.dataset.rtab); }); });
-  on('#sideToggle', 'click', function(){ $('#side').classList.toggle('open'); });
+  on('#sideToggle', 'click', () => {
+    const open = !$('#side').classList.contains('open');
+    setNavigationOpen(open);
+    if (open) $('#sideClose').focus();
+  });
+  const closeNavigation = () => {
+    setNavigationOpen(false);
+    $('#sideToggle').focus();
+  };
+  on('#sideClose', 'click', closeNavigation);
+  on('#side', 'keydown', event => {
+    if (event.key === 'Escape' && $('#side').classList.contains('open')) closeNavigation();
+  });
   on('#btnLapBC', 'click', runReport);
   on('#btnReload', 'click', loadAllData);
   // Chỉ bản Desktop có cầu nối Electron mới mở được trình quản lý nguồn.
@@ -265,10 +284,13 @@ function boot(){
   }
   installGlobalErrorHandlers();
   initThemePicker();
+  initDisplayFormat(() => { if (RESULTS) runReport(); });
   initDefaultDates();
   loadDM();
   renderDMTables();
   initEvents();
+  initForestrySettings();
+  initForestryReports();
   initLoanEditor(function(){ if (RESULTS) runReport(); });
   initLuyKeMode(function(){ if (RESULTS) runReport(); }); // lũy kế trong kỳ báo cáo (mặc định) / từ đầu sổ
   initOpeningBalance(function(){ if (RESULTS) runReport(); }); // số dư đầu kỳ nhập tay của Sổ chi tiết tiền vay

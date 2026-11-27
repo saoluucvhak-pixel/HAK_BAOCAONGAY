@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { genPhieuCan, genDNTT, toCSV } from './fixtures.mjs';
+import { genPhieuCan, genDNTT, genHDNCC, genHosokeo, toCSV, companyConfigWorkbook } from './fixtures.mjs';
 
 function mulberry32(seed) {
   return function () {
@@ -33,7 +33,7 @@ await page.goto('file://' + CONFIG_HTML, { waitUntil: 'load' });
 check('config.html tải lên không lỗi JS', errors.length === 0);
 
 const NEW = {
-  ten: 'CÔNG TY TNHH HOÀNG ANH KHÔI QUẢNG NAM',
+  ten: 'CÔNG TY TNHH "HOÀNG ANH KHÔI" QUẢNG NAM',
   maHS: '9999999999',
   nhaMay: 'HAKQN',
   phieucan: 'https://docs.google.com/spreadsheets/d/e/TEST_PHIEUCAN_ID/pub?output=csv',
@@ -42,19 +42,33 @@ const NEW = {
   diaChiThuMua: 'Thôn 1, xã ABC, huyện XYZ, Quảng Nam',
 };
 
-await page.fill('#fTenCty', NEW.ten);
-await page.fill('#fMaHS', NEW.maHS);
-await page.fill('#fNhaMay', NEW.nhaMay);
-await page.fill('#fPhieuCan', NEW.phieucan);
-await page.fill('#fDNTT', NEW.dntt);
-// Để trống HD_NCC / Hosokeo (không bắt buộc) — kiểm tra file gốc vẫn giữ nguyên 2 link đó.
-await page.fill('#fMST', NEW.mst);
-await page.fill('#fSDT', NEW.sdt);
-await page.fill('#fDiaChi', NEW.diaChi);
-await page.fill('#fDiaChiThuMua', NEW.diaChiThuMua);
-
+const importedConfig = {
+  TenCty: NEW.ten, MaHS: NEW.maHS, NhaMay: NEW.nhaMay,
+  PhieuCan: NEW.phieucan, DNTT: NEW.dntt,
+  HDNCC: 'https://docs.google.com/spreadsheets/d/e/TEST_HDMB/pub?output=csv',
+  Hosokeo: 'https://docs.google.com/spreadsheets/d/e/TEST_HOSOKEO/pub?output=csv',
+  XuatHang: 'https://docs.google.com/spreadsheets/d/TEST_EXPORT/edit',
+  MST: NEW.mst, SDT: NEW.sdt, DiaChi: NEW.diaChi, DiaChiThuMua: NEW.diaChiThuMua,
+};
+const phieucanFixture = genPhieuCan(40);
+const dnttFixture = genDNTT(phieucanFixture, 15);
+const replies = {
+  TEST_PHIEUCAN_ID: toCSV(phieucanFixture), TEST_DNTT_ID: toCSV(dnttFixture),
+  TEST_HDMB: toCSV(genHDNCC(dnttFixture)), TEST_HOSOKEO: toCSV(genHosokeo(10)),
+  NL_PC_XH: 'Ngày xuất,Khối lượng (Tấn),SỐ TKHQ\n',
+  NL_DH_XB: 'Ngày đơn hàng,SỐ TKHQ,KL_BDMT,ĐƠN GIÁ (USD)\n',
+};
+await page.route('https://docs.google.com/**', route => {
+  const key = Object.keys(replies).find(name => route.request().url().includes(name));
+  return route.fulfill({ status: 200, contentType: 'text/csv', body: replies[key] ?? '' });
+});
+await page.locator('#configFile').setInputFiles(await companyConfigWorkbook(page, importedConfig));
+await page.click('#btnCheck');
+await page.waitForFunction(() => /Cả 5 nguồn đạt/.test(document.querySelector('#msg').textContent));
+check('Kiểm tra xong chỉ hiện tên công ty và tình trạng nguồn', (await page.textContent('#companySummary')).includes(NEW.ten) &&
+  !(await page.locator('body').innerText()).includes(importedConfig.XuatHang));
 const downloadPromise = page.waitForEvent('download');
-await page.click('#btnGenerate');
+await page.click('#btnSave');
 const download = await downloadPromise;
 const outPath = path.join(__dirname, '_tmp_generated.html');
 await download.saveAs(outPath);
@@ -64,14 +78,14 @@ const msgText = await page.evaluate(() => document.getElementById('msg').textCon
 check('Thông báo hiển thị thành công', msgText.includes('Đã tạo xong'));
 
 const generated = fs.readFileSync(outPath, 'utf8');
-check('File mới chứa đúng tên công ty mới', generated.includes(NEW.ten));
+check('File mới chứa đúng tên công ty mới', generated.includes(JSON.stringify(NEW.ten)));
 check('File mới KHÔNG còn tên công ty cũ (Đại Hiệp)', !generated.includes('CÔNG TY TNHH SXTMDV ĐẠI HIỆP'));
 check('File mới chứa đúng Mã HS mới', generated.includes(NEW.maHS));
 check('File mới chứa đúng Mã nhà máy mới', generated.includes(NEW.nhaMay));
 check('File mới chứa đúng link Phiếu cân mới', generated.includes(NEW.phieucan));
 check('File mới chứa đúng link DNTT mới', generated.includes(NEW.dntt));
-check('File mới vẫn giữ nguyên link HD_NCC gốc (để trống -> không đổi)', generated.includes('2PACX-1vRmYRMAG3XDhHz74P7L1-NrKyPD8Zozp5lPU9rR-_dirOq5UHfSMNdZ4pq4PF5DpI6nosDBlAwW_a10'));
-check('File mới vẫn giữ nguyên link Hosokeo gốc (để trống -> không đổi)', generated.includes('2PACX-1vT0mcMT2TsD7lOLSNrTqZPVjJJ395kI54SxSri5-n_VxrfAcC74IKkgCnesT30d1bhx59gJC4esmF7s'));
+check('File mới dùng đúng link HDMB đã nhập', generated.includes(importedConfig.HDNCC));
+check('File mới dùng đúng link Hồ sơ keo và Xuất hàng đã nhập', generated.includes(importedConfig.Hosokeo) && generated.includes(importedConfig.XuatHang));
 check('File mới chứa đúng Mã số thuế mới (mặc định biểu mẫu ngân hàng+WO)', generated.includes(NEW.mst));
 check('File mới chứa đúng Địa chỉ nơi tổ chức thu mua mới', generated.includes(NEW.diaChiThuMua));
 
@@ -84,13 +98,12 @@ const page2 = await browser.newPage();
 const errors2 = [];
 page2.on('pageerror', (e) => errors2.push(e.message));
 let calledPhieuCan = false, calledDntt = false;
-const phieucanFixture = genPhieuCan(40);
-const dnttFixture = genDNTT(phieucanFixture, 15);
 await page2.route('https://docs.google.com/**', (route) => {
   const url = route.request().url();
   if (url.includes('TEST_PHIEUCAN_ID')) { calledPhieuCan = true; return route.fulfill({ status: 200, contentType: 'text/csv', body: toCSV(phieucanFixture) }); }
   if (url.includes('TEST_DNTT_ID')) { calledDntt = true; return route.fulfill({ status: 200, contentType: 'text/csv', body: toCSV(dnttFixture) }); }
-  return route.fulfill({ status: 200, contentType: 'text/csv', body: '' });
+  const key = Object.keys(replies).find(name => url.includes(name));
+  return route.fulfill({ status: 200, contentType: 'text/csv', body: replies[key] ?? '' });
 });
 await page2.goto('file://' + outPath, { waitUntil: 'load' });
 await page2.waitForFunction(() => document.querySelector('#statusText')?.textContent?.includes('phiếu cân'), { timeout: 15000 });

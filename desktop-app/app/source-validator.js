@@ -11,6 +11,21 @@
     { key: 'HDNCC', label: 'Hợp đồng NCC', required: false, columns: ['Số hợp đồng', 'Họ tên Chủ rừng', 'Địa chỉ thường trú'] },
     { key: 'Hosokeo', label: 'Hồ sơ keo', required: false, columns: ['Mã hợp đồng', 'Ngày nhập', 'Số BKLS', 'Họ và tên chủ rừng', 'Khối lượng (Tấn)', 'Đơn giá', 'Thanh toán'] }
   ];
+  const SHIPPING_TABS = [
+    { key: 'NL_PC_XH', columns: ['Ngày xuất', 'Khối lượng (Tấn)', 'SỐ TKHQ'] },
+    { key: 'NL_DH_XB', columns: ['Ngày đơn hàng', 'SỐ TKHQ', 'KL_BDMT', 'ĐƠN GIÁ (USD)'] },
+  ];
+
+  function shippingSheetId(value) {
+    let url;
+    try { url = new URL(value); } catch { /* Báo lỗi theo trường cấu hình. */ }
+    const id = url?.pathname.match(/^\/spreadsheets\/d\/([\w-]+)(?:\/|$)/)?.[1];
+    if (url?.origin !== 'https://docs.google.com' || url.username || url.password || !id || id === 'e') {
+      throw new Error('Nhập link của cả file Google Sheet XUATHANG_DN dạng /spreadsheets/d/…/edit.');
+    }
+    return id;
+  }
+
   const HEADER_LIMIT = 65536;
   function validateUrl(value) {
     // URL sẽ được chèn vào JavaScript của báo cáo HTML; ký tự thoát chuỗi phải bị chặn.
@@ -61,6 +76,10 @@
     if (!url) return { key: source.key, ok: !source.required, skipped: true, message: source.required ? 'Thiếu đường dẫn bắt buộc.' : 'Không cấu hình (giữ nguồn mặc định của mẫu).' };
     const bad = validateUrl(url);
     if (bad) return { key: source.key, ok: false, message: bad };
+    return probeCsv(source, url, fetcher, limitMs);
+  }
+
+  async function probeCsv(source, url, fetcher, limitMs) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), limitMs || 12000);
     let reader;
@@ -104,8 +123,29 @@
       if (reader) { try { await reader.cancel(); } catch (e) { /* đã đọc xong */ } }
     }
   }
-  async function checkAll(config, fetcher, limitMs) {
-    return Promise.all(SOURCES.map((source) => probeSource(source, config[source.key], fetcher, limitMs)));
+  async function probeShipping(value, fetcher, limitMs) {
+    const key = 'XuatHang';
+    if (!String(value ?? '').trim()) return { key, ok: true, skipped: true, message: 'Bỏ qua kiểm tra; báo cáo giữ link mặc định.' };
+    let id;
+    try { id = shippingSheetId(value); }
+    catch (error) { return { key, ok: false, message: error.message }; }
+    const checks = await Promise.all(SHIPPING_TABS.map(tab => {
+      const url = new URL('https://docs.google.com/spreadsheets/d/' + id + '/gviz/tq');
+      url.searchParams.set('tqx', 'out:csv');
+      url.searchParams.set('sheet', tab.key);
+      return probeCsv(tab, url.href, fetcher, limitMs);
+    }));
+    const failed = checks.filter(check => !check.ok);
+    return { key, ok: !failed.length, message: failed.length
+      ? failed.map(check => check.key + ': ' + check.message).join(' | ')
+      : 'NL_PC_XH và NL_DH_XB đều đọc được và đủ cột bắt buộc.' };
   }
-  return { SOURCES, validateUrl, csvHeaders, probeSource, checkAll };
+
+  async function checkAll(config, fetcher, limitMs) {
+    return Promise.all([
+      ...SOURCES.map(source => probeSource(source, config[source.key], fetcher, limitMs)),
+      probeShipping(config.XuatHang, fetcher, limitMs),
+    ]);
+  }
+  return { SOURCES, validateUrl, shippingSheetId, csvHeaders, probeSource, checkAll };
 });

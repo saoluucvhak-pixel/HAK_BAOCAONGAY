@@ -41,3 +41,9 @@ assert.equal(storageService.restoreRaw(snap), true);
 assert.equal(localStorage.getItem(wo), null, 'khôi phục phải xoá khoá vốn không tồn tại');
 assert.deepEqual(storageService.get(dm), ['new'], 'khôi phục giá trị cũ byte-for-byte');
 console.log('PASS: restore validates backup, rolls back failed writes, preserves existing data');
+
+const history = CONFIG.STORAGE_KEYS.forestryHistory;
+const old = { source: 'old', from: '2026-01-01', to: '2026-01-31', createdAt: '2026-02-01T00:00:00Z', opening: 0, closing: 12, selected: ['M'] };
+assert.ok(storageService.set(history, [old]));
+assert.equal(storageService.importAll({ data: { forestryHistory: [{ ...old, createdAt: 'invalid' }], DM_DL: ['wrong'] } }).ok, false);
+assert.deepEqual(storageService.get(history), [old]);

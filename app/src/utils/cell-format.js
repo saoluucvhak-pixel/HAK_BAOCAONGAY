@@ -3,6 +3,7 @@
  * module xuất file (Excel/PDF/In) dùng chung mà không import ngược vào component (tránh vòng phụ thuộc).
  * @module utils/cell-format
  */
+import { displayDateParts, displayDecimal } from './display-format.js';
 import { esc } from './dom-utils.js';
 import { fmtDate, fmtTime } from './date-utils.js';
 import { fmtMoney, fmtKL } from './number-utils.js';
@@ -23,10 +24,10 @@ export function fmtCell(val, type) {
   switch (type) {
     case 'money': return fmtMoney(val);
     case 'kl': return fmtKL(val);
-    case 'int': return Math.round(val).toLocaleString('vi-VN');
+    case 'int': return displayDecimal(Math.round(val));
     case 'date': return fmtDate(val);
     case 'time': return fmtTime(val);
-    case 'datekey': { var s = String(val); if (s.length !== 8) return ''; return s.slice(6, 8) + '/' + s.slice(4, 6) + '/' + s.slice(0, 4); }
+    case 'datekey': { var s = String(val); if (s.length !== 8) return ''; return displayDateParts(s.slice(0, 4), s.slice(4, 6), s.slice(6, 8)); }
     default: return esc(val);
   }
 }
