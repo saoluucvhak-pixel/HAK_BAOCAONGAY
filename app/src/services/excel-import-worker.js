@@ -16,7 +16,7 @@
  * để tải XLSX ngay TRONG Worker — nếu mạng/máy chặn CDN thì Worker lỗi ngay khi khởi động
  * (đúng như dòng thông báo lỗi cũ từng cảnh báo trước: "có thể do mạng chặn tải thư viện XLSX
  * từ CDN trong Worker" — đây là lỗi THẬT một người dùng gặp phải, xem BUG_FIXED.md). Đã sửa:
- * nhúng thẳng nội dung `node_modules/xlsx/dist/xlsx.full.min.js` vào `WORKER_SRC` bằng Vite
+ * nhúng thẳng nội dung `vendor/sheetjs/xlsx.full.min.cjs` vào `WORKER_SRC` bằng Vite
  * `?raw` import — file này tự gán biến toàn cục `XLSX` ở đúng scope của Worker khi được ghép
  * vào đầu chuỗi nguồn (file KHÔNG bọc trong IIFE, `var XLSX=...` ở top-level), hành vi giống hệt
  * `importScripts()` cũ, chỉ khác nguồn nạp — không phụ thuộc mạng nữa.
@@ -26,12 +26,13 @@
  * chuẩn để nhúng Worker vào bundle 1-file-duy-nhất).
  * @module services/excel-import-worker
  */
-import xlsxLibSrc from 'xlsx/dist/xlsx.full.min.js?raw';
+import xlsxLibSrc from '../../vendor/sheetjs/xlsx.full.min.cjs?raw';
+import xlsxLicense from '../../vendor/sheetjs/LICENSE?raw';
 
 // Chuỗi mã nguồn chạy BÊN TRONG Worker — biệt lập hoàn toàn với module này (Worker không có
 // quyền truy cập biến/hàm của luồng chính). Logic parse GIỮ NGUYÊN 100% so với bản gốc
 // `handleTienVayFile()`, chỉ cắt bỏ phần đụng DOM (đưa ra ngoài, xem components/loan-editor.js).
-const WORKER_SRC = xlsxLibSrc + `
+const WORKER_SRC = '/*\n' + xlsxLicense + '\n*/\n' + xlsxLibSrc + `
 
 function excelSerialToStr(v) {
   if (v instanceof Date) {

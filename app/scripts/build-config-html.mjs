@@ -26,5 +26,36 @@ if (!marker.test(cfg)) {
   process.exit(1);
 }
 cfg = cfg.replace(marker, 'const APP_TEMPLATE_B64 = "' + b64 + '";');
+const importBlock = /<!-- HAK_COMPANY_IMPORT_START -->[\s\S]*?<!-- HAK_COMPANY_IMPORT_END -->/;
+if (!importBlock.test(cfg)) throw new Error('Thiếu khối nhúng công cụ nhập cấu hình.');
+const desktopUi = path.join(ROOT, '..', 'desktop-app', 'app');
+const setup = fs.readFileSync(path.join(desktopUi, 'setup.html'), 'utf8');
+const setupBody = /<!-- HAK_SETUP_BODY_START -->[\s\S]*?<!-- HAK_SETUP_BODY_END -->/;
+const setupStyle = /<!-- HAK_SETUP_STYLE_START -->[\s\S]*?<!-- HAK_SETUP_STYLE_END -->/;
+const markup = setup.match(setupBody)?.[0];
+if (!markup || !setupBody.test(cfg) || !setupStyle.test(cfg)) throw new Error('Thiếu khối giao diện cấu hình.');
+const appSource = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const themeTokens = appSource.slice(appSource.indexOf(':root{'), appSource.indexOf('@media screen{'));
+const forest = fs.readFileSync(path.join(ROOT, 'src/assets/forest-mist.webp')).toString('base64');
+const glass = fs.readFileSync(path.join(ROOT, 'src/styles/glass-themes.css'), 'utf8')
+  .replace('../assets/forest-mist.webp', 'data:image/webp;base64,' + forest);
+const sharedTokens = themeTokens + glass;
+fs.writeFileSync(path.join(desktopUi, 'company-setup-tokens.css'), sharedTokens);
+const setupCss = fs.readFileSync(path.join(desktopUi, 'company-setup.css'), 'utf8');
+const setupTheme = fs.readFileSync(path.join(desktopUi, 'company-setup-theme.js'), 'utf8');
+cfg = cfg.replace(setupBody, () => markup).replace(setupStyle, () =>
+  '<!-- HAK_SETUP_STYLE_START -->\n<style>\n' + sharedTokens + setupCss +
+  '</style>\n<script>\n' + setupTheme + '</script>\n<!-- HAK_SETUP_STYLE_END -->');
+const excelPath = path.join(ROOT, 'node_modules', 'exceljs', 'dist', 'exceljs.min.js');
+fs.copyFileSync(excelPath, path.join(desktopUi, 'exceljs.min.js'));
+fs.copyFileSync(path.join(ROOT, 'node_modules', 'exceljs', 'LICENSE'), path.join(desktopUi, 'exceljs.LICENSE'));
+const importScripts = ['source-validator.js', 'exceljs.min.js', 'company-import.js'].map(filename => {
+  const source = fs.readFileSync(path.join(desktopUi, filename), 'utf8');
+  if (/<\/script/i.test(source)) throw new Error('Không thể nhúng script: ' + filename);
+  return '<script>\n' + source + '</script>';
+});
+cfg = cfg.replace(importBlock, () => [
+  '<!-- HAK_COMPANY_IMPORT_START -->', ...importScripts, '<!-- HAK_COMPANY_IMPORT_END -->',
+].join('\n'));
 fs.writeFileSync(CONFIG_HTML, cfg);
 console.log('Đã nhúng dist/index.html (' + html.length + ' ký tự) vào config.html — kích thước config.html mới: ' + fs.statSync(CONFIG_HTML).size + ' bytes.');

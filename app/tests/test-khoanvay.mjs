@@ -12,7 +12,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { fileURLToPath } from 'url';
-import XLSX from 'xlsx';
+import XLSX from '../vendor/sheetjs/xlsx.full.min.cjs';
 import { genPhieuCan, genHDNCC, genHosokeo, toCSV } from './fixtures.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

@@ -3,213 +3,52 @@
 <head>
 <meta charset="UTF-8">
 <title>Cấu hình công ty — Báo cáo ngày</title>
-<style>
-  :root{--ink:#1a2233;--sub:#5b6577;--line:#e2e6ee;--accent:#1f6feb;--err:#c0392b;--ok:#1a8a4a;--panel:#fff;--bg:#f4f6fb}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-  .wrap{max-width:640px;margin:0 auto;padding:32px 24px 60px}
-  h1{font-size:20px;margin:0 0 6px}
-  .sub{color:var(--sub);font-size:13.5px;line-height:1.5;margin:0 0 24px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(20,30,60,.06)}
-  .card h2{font-size:14px;margin:0 0 14px}
-  label{display:block;font-size:13px;font-weight:600;margin:14px 0 4px}
-  label:first-of-type{margin-top:0}
-  .hint{display:block;font-weight:400;color:var(--sub);font-size:12px;margin-top:2px}
-  input[type=text],input[type=url]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;background:#fff;color:var(--ink)}
-  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,111,235,.15)}
-  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  .req{color:var(--err)}
-  button{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:14.5px;font-weight:700;cursor:pointer;width:100%}
-  button:hover{filter:brightness(1.08)}
-  button:disabled{opacity:.6;cursor:default}
-  #msg{margin-top:14px;font-size:13.5px;min-height:18px}
-  #msg.err{color:var(--err)}
-  #msg.ok{color:var(--ok)}
-  .source-status{font-size:12px;line-height:1.45;margin:5px 0 12px;white-space:pre-wrap;color:var(--sub)}
-  .source-status.ok{color:var(--ok)}
-  .source-status.err{color:var(--err)}
-  #btnCheck{background:#e9f1ff;border:1px solid #b8d2ff;color:#185bb7;margin-bottom:10px}
-  .safetyNote{font-size:12px;line-height:1.55;color:#64522a;background:#fff8e5;border:1px solid #f0e0ab;border-radius:8px;padding:10px 12px;margin-top:12px}
-  .editNote{background:#eef4ff;border:1px solid #cfe0ff;border-radius:10px;padding:10px 14px;font-size:12.8px;color:#1a3a72;margin-bottom:16px;display:none}
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="./company-setup-tokens.css">
+<link rel="stylesheet" href="./company-setup.css">
+<script src="./company-setup-theme.js"></script>
 </head>
 <body>
-<div class="wrap">
-  <h1>Cấu hình cho công ty của bạn</h1>
-  <p class="sub">Điền 1 lần khi mở app lần đầu — những lần mở sau sẽ vào thẳng báo cáo, không hiện
-    lại màn hình này nữa (có thể đổi lại bất kỳ lúc nào qua menu "Báo cáo ngày → Đổi cấu hình
-    công ty..."). Dữ liệu chỉ lưu trên máy này, không gửi đi đâu cả.</p>
-  <div class="editNote" id="editNote">Đang sửa cấu hình hiện tại — các ô bên dưới đã điền sẵn giá trị đã lưu trước đó.</div>
-
+<!-- HAK_SETUP_BODY_START -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <strong>Hệ thống báo cáo</strong>
+    <button class="btn" type="button" id="btnBack" hidden>← Quay lại báo cáo</button>
+  </div>
+</header>
+<main class="wrap">
+  <h1>Cấu hình công ty</h1>
+  <p class="sub">Nhập tệp Excel chứa thông tin công ty và địa chỉ 5 nguồn Google Sheets.</p>
+  <p id="currentCompany" class="company-line" aria-label="Công ty đang dùng"></p>
   <div class="card">
-    <h2>1. Thông tin công ty</h2>
-    <label>Tên công ty (in trên báo cáo/Excel/PDF) <span class="req">*</span>
-      <span class="hint">Ví dụ: CÔNG TY TNHH HOÀNG ANH KHÔI QUẢNG NAM</span>
-    </label>
-    <input type="text" id="fTenCty" placeholder="CÔNG TY TNHH SXTMDV ĐẠI HIỆP">
-    <div class="row2">
-      <div>
-        <label>Mã HS hàng hóa
-          <span class="hint">In trên báo cáo Xuất hàng/BKLS xuất khẩu</span>
-        </label>
-        <input type="text" id="fMaHS" placeholder="4401220090">
+    <div class="file-box">
+      <div class="file-info">
+        <strong>Tệp cấu hình Excel</strong>
+        <span id="fileName" aria-live="polite">Chưa chọn tệp .xlsx</span>
       </div>
-      <div>
-        <label>Mã nhà máy
-          <span class="hint">In trên báo cáo BKLS xuất khẩu</span>
-        </label>
-        <input type="text" id="fNhaMay" placeholder="CNHAK">
+      <div class="actions">
+        <button class="btn" type="button" id="btnTemplate">Tải mẫu Excel</button>
+        <button class="btn" type="button" id="btnChooseFile" aria-describedby="fileName">Chọn tệp Excel</button>
+        <input id="configFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
       </div>
     </div>
-  </div>
-
-  <div class="card">
-    <h2>2. Link Google Sheet (đã "Xuất bản lên web" dạng CSV)</h2>
-    <label>Phiếu cân <span class="req">*</span>
-      <span class="hint">Bắt buộc — nguồn dữ liệu chính, mọi báo cáo đều dựa vào đây</span>
-    </label>
-    <input type="url" id="fPhieuCan" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv">
-    <div class="source-status" id="statusPhieuCan" role="status" aria-live="polite">Chưa kiểm tra kết nối</div>
-
-    <label>Đề nghị thanh toán (DNTT_CT) <span class="req">*</span>
-      <span class="hint">Bắt buộc — dùng cho báo cáo Thanh toán/Công nợ</span>
-    </label>
-    <input type="url" id="fDNTT" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
-    <div class="source-status" id="statusDNTT" role="status" aria-live="polite">Chưa kiểm tra kết nối</div>
-
-    <label>HD_NCC (HDMB — Hợp đồng mua bán)
-      <span class="hint">Không bắt buộc — chỉ dùng cho báo cáo BKLS xuất khẩu, để trống nếu chưa có</span>
-    </label>
-    <input type="url" id="fHDNCC" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
-    <div class="source-status" id="statusHDNCC" role="status" aria-live="polite">Chưa kiểm tra kết nối</div>
-
-    <label>Hồ sơ keo (Hosokeo)
-      <span class="hint">Không bắt buộc — chỉ dùng cho báo cáo BKLS xuất khẩu, để trống nếu chưa có</span>
-    </label>
-    <input type="url" id="fHosokeo" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?gid=...&single=true&output=csv">
-    <div class="source-status" id="statusHosokeo" role="status" aria-live="polite">Chưa kiểm tra kết nối</div>
-    <button id="btnCheck" type="button">Kiểm tra 4 nguồn Google Sheets</button>
-    <p class="safetyNote">Chỉ đọc tiêu đề CSV để kiểm tra, không tải dữ liệu vào bộ nhớ ứng dụng. Nguồn xuất bản lên web có thể được người biết đường dẫn truy cập; tránh xuất bản công khai CCCD, STK và dữ liệu nhạy cảm. Nếu dùng link có phân quyền, công cụ có thể không đọc được và sẽ báo lỗi.</p>
-  </div>
-
-  <div class="card">
-    <h2>3. Thông tin dùng cho các biểu mẫu xuất báo cáo (không bắt buộc)</h2>
-    <div class="row2">
-      <div>
-        <label>Mã số thuế</label>
-        <input type="text" id="fMST" placeholder="0400...">
-      </div>
-      <div>
-        <label>Số điện thoại</label>
-        <input type="text" id="fSDT" placeholder="09...">
-      </div>
+    <ul id="sourceResults" aria-label="Kết quả kiểm tra nguồn"></ul>
+    <p id="companySummary" class="company-line" aria-label="Công ty đã kiểm tra"></p>
+    <div class="actions confirm-actions">
+      <button class="btn" type="button" id="btnCheck" disabled>Kiểm tra 5 nguồn</button>
+      <button class="btn primary" type="button" id="btnSave" disabled>Xác nhận lưu</button>
     </div>
-    <label>Địa chỉ (trụ sở)</label>
-    <input type="text" id="fDiaChi" placeholder="...">
-    <label>Địa chỉ nơi tổ chức thu mua</label>
-    <input type="text" id="fDiaChiThuMua" placeholder="...">
+    <p id="msg" role="status" aria-live="polite"></p>
   </div>
-
-  <button id="btnSave">Lưu &amp; mở báo cáo</button>
-  <div id="msg"></div>
-</div>
-
+</main>
+<!-- HAK_SETUP_BODY_END -->
 <script src="./source-validator.js"></script>
+<script src="./exceljs.min.js"></script>
+<script src="./company-import.js"></script>
 <script>
-(async function () {
-  var msg = document.getElementById('msg');
-  var btn = document.getElementById('btnSave');
-  var fields = ['fTenCty','fMaHS','fNhaMay','fPhieuCan','fDNTT','fHDNCC','fHosokeo','fMST','fSDT','fDiaChi','fDiaChiThuMua'];
-
-  var sourceKeys = ['PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo'];
-  var checkBtn = document.getElementById('btnCheck');
-  var lastVerified = '';
-  function values() {
-    var result = {};
-    fields.forEach(function (id) { result[id.slice(1)] = document.getElementById(id).value.trim(); });
-    return result;
-  }
-  function signature(data) { return JSON.stringify(sourceKeys.map(function (k) { return data[k]; })); }
-  async function verify(data) {
-    checkBtn.disabled = true;
-    checkBtn.textContent = 'Đang kiểm tra nguồn...';
-    sourceKeys.forEach(function (key) {
-      var status = document.getElementById('status' + key);
-      status.className = 'source-status';
-      status.textContent = 'Đang kiểm tra...';
-    });
-    try {
-      var result = await window.HAKSourceValidator.checkAll(data);
-      result.forEach(function (item) {
-        var el = document.getElementById('status' + item.key);
-        el.className = 'source-status ' + (item.ok ? 'ok' : 'err');
-        el.textContent = (item.ok ? '✓ ' : '✗ ') + item.message;
-      });
-      var ok = result.every(function (item) { return item.ok; });
-      lastVerified = ok ? signature(data) : '';
-      return ok;
-    } finally {
-      checkBtn.disabled = false;
-      checkBtn.textContent = 'Kiểm tra 4 nguồn Google Sheets';
-    }
-  }
-  sourceKeys.forEach(function (key) {
-    document.getElementById('f' + key).addEventListener('input', function () {
-      lastVerified = '';
-      var el = document.getElementById('status' + key);
-      el.className = 'source-status';
-      el.textContent = 'Đã sửa đường dẫn — cần kiểm tra lại';
-    });
-  });
-  checkBtn.addEventListener('click', async function () {
-    var data = values();
-    var ok = await verify(data);
-    msg.className = ok ? 'ok' : 'err';
-    msg.textContent = ok ? 'Cả 4 nguồn đã được kiểm tra. Có thể lưu cấu hình.' : 'Chưa thể lưu: nguồn bắt buộc hoặc cột dữ liệu không hợp lệ.';
-  });
-
-  // Nếu đã có cấu hình lưu trước (đang mở lại để SỬA), điền sẵn lại vào form.
-  var existing = await window.api.getConfig();
-  if (existing) {
-    document.getElementById('editNote').style.display = 'block';
-    fields.forEach(function (id) {
-      var key = id.slice(1); // fTenCty -> TenCty
-      if (existing[key] != null) document.getElementById(id).value = existing[key];
-    });
-  }
-
-  btn.addEventListener('click', async function () {
-    msg.className = ''; msg.textContent = '';
-    var data = values();
-
-    if (!data.TenCty) { msg.className = 'err'; msg.textContent = 'Cần nhập Tên công ty.'; return; }
-    if (!data.PhieuCan) { msg.className = 'err'; msg.textContent = 'Cần nhập link Google Sheet "Phiếu cân" (bắt buộc).'; return; }
-    if (!data.DNTT) { msg.className = 'err'; msg.textContent = 'Cần nhập link Google Sheet "Đề nghị thanh toán" (bắt buộc).'; return; }
-
-    btn.disabled = true; btn.textContent = 'Đang kiểm tra nguồn...';
-    try {
-      if (lastVerified !== signature(data) && !(await verify(data))) {
-        msg.className = 'err';
-        msg.textContent = 'Không thể lưu khi có nguồn lỗi. Cấu hình đang sử dụng chưa bị thay đổi.';
-        return;
-      }
-      btn.textContent = 'Đang lưu...';
-      var result = await window.api.saveConfig(data);
-      if (!result.ok) {
-        msg.className = 'err'; msg.textContent = 'Lỗi: ' + result.error;
-        return;
-      }
-      msg.className = 'ok'; msg.textContent = 'Đã lưu — đang mở báo cáo...';
-    } catch (e) {
-      msg.className = 'err';
-      msg.textContent = 'Lỗi kiểm tra nguồn: ' + (e.message || String(e));
-    } finally {
-      btn.disabled = false; btn.textContent = 'Lưu & mở báo cáo';
-    }
-    // main.js sẽ tự điều hướng cửa sổ sang báo cáo đã cấu hình sau khi lưu xong.
-
-  });
-})();
+window.api.getConfig().then(current => window.HAKCompanyImport.mount({
+  current, confirm: data => window.api.saveConfig(data), back: window.api.backToReport,
+}));
 </script>
 </body>
 </html>

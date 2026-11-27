@@ -17,7 +17,9 @@ fs.copyFileSync(path.join(__dirname, '..', 'app', 'source-validator.js'), path.j
 let loaded = [], readyCb = null, windowOpenHandler = null, navigationHandler = null, externalUrls = [];
 const switches = {};
 const handlers = {};
+let selectedFolder;
 const electronMock = {
+  dialog: { showOpenDialog: async () => selectedFolder ? { filePaths: [selectedFolder] } : { canceled: true } },
   app: { getPath: () => userData, whenReady: () => ({ then: (cb) => { readyCb = cb; } }), on: () => {}, quit: () => {}, commandLine: { appendSwitch: (k, v) => { switches[k] = v; } } },
   BrowserWindow: Object.assign(function () { this.loadFile = (f) => loaded.push(f); this.webContents = { setWindowOpenHandler(fn) { windowOpenHandler = fn; }, on(name, fn) { if (name === 'will-navigate') navigationHandler = fn; }, session: { on() {} } }; this.on = () => {}; }, { getAllWindows: () => [] }),
   Menu: { setApplicationMenu() {}, buildFromTemplate: () => ({}) },
@@ -121,7 +123,59 @@ check('Chặn điều hướng cửa sổ chính ra website và file lạ', prev
 navigationHandler({ preventDefault() { prevented++; } }, require('url').pathToFileURL(reportPath).toString());
 check('Vẫn cho phép điều hướng tới báo cáo do app quản lý', prevented === 2);
 
-Module._load = origLoad;
-fs.rmSync(tmp, { recursive: true, force: true });
-console.log('\n=== RESULT: ' + pass + ' passed, ' + fail + ' failed ===');
-process.exit(fail ? 1 : 0);
+const defaultShipping = 'https://docs.google.com/spreadsheets/d/1ZZ2iUwkkKe8wXdztA7mL-v9j6fmgY5c5rlDdI1sNoAk/edit?usp=sharing';
+const shippingTemplate = realTemplate.includes(defaultShipping) ? realTemplate :
+  realTemplate.replace('</body>', '<script>window.shippingProbe=' + JSON.stringify(defaultShipping) + '</script></body>');
+fs.writeFileSync(path.join(appDir, 'app', 'index.html'), shippingTemplate);
+const readCompanyConfig = () => JSON.parse(fs.readFileSync(path.join(userData, 'company-config.json'), 'utf8'));
+const company = readCompanyConfig();
+check('Màn hình nhập không nhận lại các link đã lưu', !Object.hasOwn(handlers['get-config'](trustedSetupEvent), 'PhieuCan'));
+const shipping = 'https://docs.google.com/spreadsheets/d/TEST_EXPORT/edit';
+const savedShipping = handlers['save-config'](trustedSetupEvent, { ...company, XuatHang: shipping + '?gid=0' });
+check('Lưu nguồn xuất hàng cùng cấu hình công ty', savedShipping.ok && readCompanyConfig().XuatHang === shipping + '?gid=0');
+check('Mẫu báo cáo lấy đúng file xuất hàng đã cấu hình', fs.readFileSync(reportPath, 'utf8').includes(shipping) && startApp() === reportPath);
+const rejectedShipping = handlers['save-config'](trustedSetupEvent, { ...company, XuatHang: 'https://example.com/spreadsheets/d/TEST_EXPORT/edit' });
+check('Link xuất hàng sai không ghi đè cấu hình đã lưu', !rejectedShipping.ok && readCompanyConfig().XuatHang === shipping + '?gid=0');
+
+const quotedCompany = 'CÔNG TY "HAK" <ĐẠI HIỆP>';
+const savedQuoted = handlers['save-config'](trustedSetupEvent, { ...company, TenCty: quotedCompany, XuatHang: shipping });
+const quotedReport = fs.readFileSync(reportPath, 'utf8');
+check('Tên công ty có dấu nháy và ký tự HTML được mã hóa đúng', savedQuoted.ok &&
+  quotedReport.includes(JSON.stringify(quotedCompany).replace(/</g, '\\u003c')));
+async function testForestryExport() {
+  const reportEvent = { senderFrame: { url: require('url').pathToFileURL(reportPath).toString() } };
+  check('Từ chối quay lại từ trang ngoài', !handlers['back-to-report'](untrustedEvent).ok);
+  const beforeBack = fs.readFileSync(path.join(userData, 'company-config.json'));
+  check('Quay lại báo cáo từ màn hình thiết lập', handlers['back-to-report'](trustedSetupEvent).ok && loaded.at(-1) === reportPath);
+  check('Quay lại giữ cấu hình công ty đang dùng',
+    fs.readFileSync(path.join(userData, 'company-config.json')).equals(beforeBack));
+  const choose = handlers['choose-forestry-export-folder'];
+  const save = handlers['save-forestry-export'];
+  const payload = { from: '2026-11-01', to: '2026-11-27', format: 'xlsx', bytes: Uint8Array.of(80, 75, 3, 4) };
+  check('Hủy chọn thư mục không lưu thiết lập', (await choose(reportEvent)).canceled === true);
+  check('Từ chối lưu khi chưa chọn thư mục', !(await save(reportEvent, payload)).ok);
+  selectedFolder = path.join(tmp, 'reports');
+  fs.mkdirSync(selectedFolder);
+  check('Chọn được thư mục báo cáo', (await choose(reportEvent)).folder === selectedFolder);
+  startApp();
+  check('Nhớ thư mục sau khi mở lại app', handlers['forestry-export-folder'](reportEvent) === selectedFolder);
+  check('Từ chối lưu từ màn hình cấu hình', !(await save(trustedSetupEvent, payload)).ok);
+  check('Từ chối ngày sai', !(await save(reportEvent, { ...payload, to: '2026-11-31' })).ok);
+  const files = await Promise.all([save(reportEvent, payload), save(reportEvent, payload),
+    save(reportEvent, { ...payload, from: '2026-10-01', to: '2026-10-31', format: 'docx' })]);
+  check('Lưu Word và Excel vào đúng thư mục kỳ, xuất lại không ghi đè',
+    files.every(file => file.ok && fs.readFileSync(file.destination).equals(Buffer.from(payload.bytes))) &&
+    new Set(files.map(file => file.destination)).size === 3 &&
+    files.slice(0, 2).every(file => path.basename(path.dirname(file.destination)) === '2026-11-01_2026-11-27') &&
+    path.basename(path.dirname(files[2].destination)) === '2026-10-01_2026-10-31');
+}
+
+testForestryExport().catch(error => {
+  console.error(error);
+  fail++;
+}).finally(() => {
+  Module._load = origLoad;
+  fs.rmSync(tmp, { recursive: true, force: true });
+  console.log('\n=== RESULT: ' + pass + ' passed, ' + fail + ' failed ===');
+  process.exitCode = fail ? 1 : 0;
+});

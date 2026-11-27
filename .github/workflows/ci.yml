@@ -83,6 +83,7 @@ jobs:
         run: |
           npm ci
           npm run build
+          npm run build:config
       - name: Package Windows installer
         working-directory: desktop-app
         env:

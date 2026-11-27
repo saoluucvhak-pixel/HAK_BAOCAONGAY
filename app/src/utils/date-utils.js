@@ -10,6 +10,8 @@
  * Object trả về chỉ bị ĐỌC ở mọi nơi gọi, không bị sửa, nên cache an toàn tuyệt đối.
  * @type {Map<string, {y:number, mo:number, d:number}|null>}
  */
+import { displayDateParts } from './display-format.js';
+
 const _dateCache = new Map();
 
 /**
@@ -128,7 +130,7 @@ export function toExcelDate(v) {
 /** @param {string} str @returns {string} */
 export function fmtDate(str) {
   const p = parseDateParts(str);
-  return p ? pad2(p.d) + '/' + pad2(p.mo) + '/' + p.y : '';
+  return p ? displayDateParts(p.y, p.mo, p.d) : '';
 }
 
 /** @param {string} str @returns {string} */

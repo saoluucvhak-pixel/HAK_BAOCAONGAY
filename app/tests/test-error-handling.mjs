@@ -65,12 +65,24 @@ const count = (p, k) => p.evaluate((key) => document.querySelector('[data-count=
   check('Lỗi mạng thoáng qua: tự thử lại và tải thành công', /Đã tải 40 phiếu cân/.test(s.text) && s.dot === 'dot ok', s.text + ' | số lần gọi PHIEUCAN=' + n);
   await p.close();
 }
-// 5) Sheet bị đổi tên cột → cảnh báo thiếu cột nào
+// 5) Giữ bản lưu hợp lệ khi nguồn mới đổi tên cột.
 {
   const bad = OK.PC.replace('Ngày cân 1', 'Ngay can 1');
-  const p = await open((r, k) => fulfill(r, k === 'PC' ? bad : OK[k]));
+  let mode = 'valid';
+  const p = await open((r, k) => mode === 'offline' ? r.abort('internetdisconnected') :
+    fulfill(r, mode === 'bad' && k === 'PC' ? bad : OK[k]));
+  mode = 'bad';
+  await p.click('#btnReload');
+  await p.waitForFunction(() => !document.querySelector('#btnReload').disabled);
   const s = await status(p);
-  check('Đổi tên cột: cảnh báo đúng Sheet + đúng tên cột bị thiếu', s.dot.includes('warn') && /PHIEUCAN thiếu cột: Ngày cân 1/.test(s.text), s.text);
+  check('Đổi tên cột: từ chối bản mới và dùng bản hợp lệ', s.dot.includes('warn') &&
+    /Đã tải 40 phiếu cân/.test(s.text) && /thiếu cột: Ngày cân 1/.test(s.text), s.text);
+  mode = 'offline';
+  await p.reload();
+  await p.waitForFunction(() => /DỮ LIỆU OFFLINE/.test(document.querySelector('#statusText').textContent));
+  const offline = await status(p);
+  check('Bản cache sau lỗi cấu trúc vẫn đủ dữ liệu', /Đã tải 40 phiếu cân/.test(offline.text) &&
+    !/thiếu cột/.test(offline.text), offline.text);
   await p.close();
 }
 // 6) Dữ liệu chuẩn → KHÔNG có cảnh báo giả

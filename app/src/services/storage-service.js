@@ -8,6 +8,7 @@
  */
 import { CONFIG } from '../config/config.js';
 import { logger } from './logger.js';
+import { isForestryHistoryEntry } from './forestry-history.js';
 
 const DATA_VERSION = 1;
 
@@ -92,6 +93,10 @@ class StorageService {
     // đếm một mục là "đã khôi phục" nếu localStorage.setItem thất bại.
     if (!backup || !backup.data || typeof backup.data !== 'object' || Array.isArray(backup.data)) {
       return { ok: false, restoredKeys: [] };
+    }
+    const history = backup.data.forestryHistory;
+    if (history != null && (!Array.isArray(history) || !history.every(isForestryHistoryEntry))) {
+      return { ok: false, restoredKeys: [], error: 'Lịch sử lâm sản trong bản sao lưu không hợp lệ. Dữ liệu cũ được giữ lại.' };
     }
     const entries = Object.entries(CONFIG.STORAGE_KEYS)
       .filter(([name]) => Object.prototype.hasOwnProperty.call(backup.data, name) && backup.data[name] != null);
