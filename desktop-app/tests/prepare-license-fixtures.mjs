@@ -10,7 +10,7 @@ if (process.env.GITHUB_ACTIONS !== 'true' || process.platform !== 'win32' || !di
   throw new Error('Chỉ dùng để thử trên runner Windows.');
 const helper = path.join(root, 'build', 'license-bin', 'HAK-License.exe');
 const req = path.join(dir, 'device.hakreq');
-execFileSync(helper, ['request', req], { stdio: 'inherit' });
+execFileSync(helper, ['prepare-install-qa', req], { stdio: 'inherit' });
 const privatePath = path.join(dir, 'private.pem');
 const agreed = path.join(dir, 'approved.haklic');
 const future = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);

@@ -114,7 +114,7 @@ try {
   const nextDate = (parsedKit.expiresAt + 3600) * 1000;
   await page.clock.setFixedTime(new Date(nextDate));
   await page.reload();
-  await page.getByText('Cấp lại sau khi cài Windows', { exact: true }).click();
+  await page.getByText('Dùng lại cấu hình khi cài lại', { exact: true }).click();
   await page.locator('#privateFile').setInputFiles({
     name: privateKey.filename, mimeType: 'application/json', buffer: privateKey.buffer
   });

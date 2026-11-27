@@ -176,17 +176,32 @@ try {
 
 const licenses = process.env.HAK_QA_LICENSE_DIR;
 assert(licenses, 'Thiếu bộ fixture cấp phép.');
-const besideInstaller = path.join(path.dirname(candidate), 'HAK-GiayPhep.haklic');
-console.log('Từ chối cài khi thiếu giấy phép hoặc giấy phép lỗi.');
+const besideKit = path.join(path.dirname(candidate), 'HAK-CaiDat.haksetup');
+const prepare = fileURLToPath(new URL('../../desktop-app/tests/prepare-license-fixtures.mjs', import.meta.url));
+const requestFile = path.join(licenses, 'device.hakreq');
+function stageApproval() {
+  const result = spawnSync(process.execPath, [prepare], { stdio: 'inherit', timeout: 60_000 });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, 'Tạo yêu cầu ngẫu nhiên cho lần cài thử.');
+}
+
+console.log('Từ chối cài khi thiếu phản hồi hoặc phản hồi lỗi.');
 install(candidate, 31);
 for (const kind of ['wrong-device', 'tampered', 'expired']) {
-  await copyFile(path.join(licenses, kind + '.haklic'), besideInstaller);
+  stageApproval();
+  await copyFile(path.join(licenses, kind + '.haklic'), besideKit);
   install(candidate, 31);
 }
 
 console.log('Cài đè cùng thư mục và mở 2.2.0 ở chế độ offline.');
-await copyFile(path.join(licenses, 'approved.haklic'), besideInstaller);
+stageApproval();
+const previousRequest = JSON.parse(await readFile(requestFile, 'utf8')).device;
+await copyFile(path.join(licenses, 'approved.haklic'), besideKit);
 install(candidate);
+install(candidate, 31);
+stageApproval();
+assert.notEqual(JSON.parse(await readFile(requestFile, 'utf8')).device, previousRequest);
+install(candidate, 31); // The previous approval fails for the new request on the same machine.
 const registeredExe = await installedExecutable();
 verifyRun(registeredExe, 0);
 const upgraded = await openInstalled(true);
@@ -235,13 +250,15 @@ const licensePath = path.join(process.env.LOCALAPPDATA, 'HAK', 'BaoCaoNgay', 'li
 verifyRun(registeredExe, 0);
 await unlink(licensePath);
 verifyRun(registeredExe, 31);
-const besideKit = path.join(path.dirname(candidate), 'HAK-CaiDat.haksetup');
-await unlink(besideInstaller);
+stageApproval();
 await copyFile(path.join(licenses, 'tampered.haksetup'), besideKit);
 install(candidate, 31);
+stageApproval();
 await copyFile(path.join(licenses, 'approved.haksetup'), besideKit);
 install(candidate);
 verifyRun(await installedExecutable(), 0);
+stageApproval();
+install(candidate, 31); // A previously accepted company file also fails for the next installation.
 const configured = await openInstalled(false, path.join(dir, 'company-file-profile'));
 try {
   const config = JSON.parse(await readFile(path.join(configured.appInfo.userData, 'company-config.json'), 'utf8'));
@@ -254,4 +271,4 @@ try {
 } finally {
   await configured.electron.close();
 }
-console.log('PASS: NSIS từ chối file lỗi, nạp cấu hình đã ký, nâng cấp và khôi phục dữ liệu.');
+console.log('PASS: NSIS từ chối phản hồi cũ cùng máy, nạp cấu hình đã ký, nâng cấp và khôi phục dữ liệu.');
