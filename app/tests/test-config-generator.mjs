@@ -65,7 +65,8 @@ check('Thông báo hiển thị thành công', msgText.includes('Đã tạo xong
 
 const generated = fs.readFileSync(outPath, 'utf8');
 check('File mới chứa đúng tên công ty mới', generated.includes(NEW.ten));
-check('File mới KHÔNG còn tên công ty cũ (Đại Hiệp)', !generated.includes('CÔNG TY TNHH SXTMDV ĐẠI HIỆP'));
+const companyConfig = JSON.parse(generated.match(/<script id="hak-company-config" type="application\/json">([^<]+)<\/script>/)[1]);
+check('Khối cấu hình chứa tên công ty mới', companyConfig.TenCty === NEW.ten);
 check('File mới chứa đúng Mã HS mới', generated.includes(NEW.maHS));
 check('File mới chứa đúng Mã nhà máy mới', generated.includes(NEW.nhaMay));
 check('File mới chứa đúng link Phiếu cân mới', generated.includes(NEW.phieucan));
@@ -124,7 +125,7 @@ await page2.click('#btnBankCancel');
 // modal ngân hàng ở trên (cùng 1 hàm merge logic trong legacy-app.js) — mở modal WO thật cần
 // dựng thêm fixture cho báo cáo BKLS xuất khẩu (Hosokeo/HD_NCC), không cần thiết vì đã kiểm tra
 // đủ ở mức nội dung file (dưới đây) + đã xác nhận cơ chế hoạt động đúng qua modal 02/TNDN.
-check('File mới chứa đúng khối JSON mặc định biểu mẫu WO (maSoThue + diaChiThuMua mới)', generated.includes('{maSoThue:' + JSON.stringify(NEW.mst) + ',diaChiThuMua:' + JSON.stringify(NEW.diaChiThuMua) + '}'));
+check('Thông tin mặc định biểu mẫu WO có mã số thuế và địa chỉ thu mua đã nhập', companyConfig.MST === NEW.mst && companyConfig.DiaChiThuMua === NEW.diaChiThuMua);
 
 fs.unlinkSync(outPath);
 console.log('\npageerrors (config.html):', JSON.stringify(errors));

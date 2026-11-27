@@ -58,44 +58,14 @@ const SETUP_HTML = path.join(__dirname, 'app', 'setup.html');
 const CONFIG_JSON = path.join(app.getPath('userData'), 'company-config.json');
 const REPORT_HTML = path.join(app.getPath('userData'), 'report.html');
 
-// Cùng 1 bộ giá trị mặc định (Đại Hiệp) với `config.html` — PHẢI khớp byte-for-byte với những gì
-// thực sự nằm trong `app/index.html`, nếu không sẽ báo lỗi "không tìm thấy vị trí..." khi lưu.
-const DEFAULTS = {
-  TenCty: 'CÔNG TY TNHH SXTMDV ĐẠI HIỆP',
-  MaHS: '4401220090',
-  NhaMay: 'CNHAK',
-  PhieuCan: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTj7PHtJtv1iBaF9tCKJ9zgnTyc4j6Hbt9CEYX36sVIDXwJDQUvMGd-O_bc8E-N6iEh5JqH9tytjQLj/pub?output=csv',
-  DNTT: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqRW3Yk2MBgXp1qi29tQZQyn1R-opTUjE5PqBFIH7knAOcr1YvthP_AuXa_10knbaprgtM4i_zPk2i/pub?gid=1612289204&single=true&output=csv',
-  HDNCC: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRmYRMAG3XDhHz74P7L1-NrKyPD8Zozp5lPU9rR-_dirOq5UHfSMNdZ4pq4PF5DpI6nosDBlAwW_a10/pub?gid=1578334272&single=true&output=csv',
-  Hosokeo: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0mcMT2TsD7lOLSNrTqZPVjJJ395kI54SxSri5-n_VxrfAcC74IKkgCnesT30d1bhx59gJC4esmF7s/pub?gid=0&single=true&output=csv',
-  BANK_INFO_LITERAL: '{maSoThue:"",diaChi:"",soDienThoai:"",diaChiThuMua:""}',
-  WO_INFO_LITERAL: '{maSoThue:"",diaChiThuMua:""}'
-};
+// Khối JSON giữ nguyên qua các phiên bản bundler; không sửa trực tiếp mã JavaScript đã minify.
+const COMPANY_TEMPLATE = '<script id="hak-company-config" type="application/json">{}</script>';
 
-function replaceOnce(text, oldVal, newVal, label) {
-  const idx = text.indexOf(oldVal);
-  if (idx === -1) throw new Error('Không tìm thấy vị trí "' + label + '" trong file mẫu — file cài đặt có thể bị lỗi, cài đặt lại ứng dụng.');
-  return text.slice(0, idx) + newVal + text.slice(idx + oldVal.length);
-}
-
-/** Sinh lại report.html từ ĐÚNG file mẫu gốc (app/index.html) + dữ liệu cấu hình đã lưu — không
- *  bao giờ thay-thế-chồng-lên-report.html-cũ, tránh lỗi thay 2 lần/tìm không thấy do đã bị đổi. */
 function buildReportHtml(cfg, dest = REPORT_HTML) {
-  let html = fs.readFileSync(TEMPLATE_HTML, 'utf8');
-  html = replaceOnce(html, DEFAULTS.TenCty, cfg.TenCty, 'Tên công ty');
-  if (cfg.MaHS) html = replaceOnce(html, DEFAULTS.MaHS, cfg.MaHS, 'Mã HS');
-  if (cfg.NhaMay) html = replaceOnce(html, DEFAULTS.NhaMay, cfg.NhaMay, 'Mã nhà máy');
-  html = replaceOnce(html, DEFAULTS.PhieuCan, cfg.PhieuCan, 'Link Phiếu cân');
-  html = replaceOnce(html, DEFAULTS.DNTT, cfg.DNTT, 'Link Đề nghị thanh toán');
-  if (cfg.HDNCC) html = replaceOnce(html, DEFAULTS.HDNCC, cfg.HDNCC, 'Link HD_NCC');
-  if (cfg.Hosokeo) html = replaceOnce(html, DEFAULTS.Hosokeo, cfg.Hosokeo, 'Link Hồ sơ keo');
-  if (cfg.MST || cfg.SDT || cfg.DiaChi || cfg.DiaChiThuMua) {
-    const bankInfoNew = '{maSoThue:' + JSON.stringify(cfg.MST || '') + ',diaChi:' + JSON.stringify(cfg.DiaChi || '') + ',soDienThoai:' + JSON.stringify(cfg.SDT || '') + ',diaChiThuMua:' + JSON.stringify(cfg.DiaChiThuMua || '') + '}';
-    const woInfoNew = '{maSoThue:' + JSON.stringify(cfg.MST || '') + ',diaChiThuMua:' + JSON.stringify(cfg.DiaChiThuMua || '') + '}';
-    html = replaceOnce(html, DEFAULTS.BANK_INFO_LITERAL, bankInfoNew, 'Thông tin mặc định biểu mẫu ngân hàng');
-    html = replaceOnce(html, DEFAULTS.WO_INFO_LITERAL, woInfoNew, 'Thông tin mặc định biểu mẫu WO');
-  }
-  fs.writeFileSync(dest, html, 'utf8');
+  const html = fs.readFileSync(TEMPLATE_HTML, 'utf8');
+  if (!html.includes(COMPANY_TEMPLATE)) throw new Error('Không tìm thấy khối cấu hình công ty trong file mẫu.');
+  const json = JSON.stringify(cfg).replace(/</g, '\\u003c');
+  fs.writeFileSync(dest, html.replace(COMPANY_TEMPLATE, () => COMPANY_TEMPLATE.replace('{}', () => json)), 'utf8');
 }
 
 /**

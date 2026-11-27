@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write   # tạo GitHub Release
+  id-token: write
+  attestations: write
 
 jobs:
   installer:
@@ -29,11 +31,26 @@ jobs:
           npm run build
           npm run build:config
 
-      - name: Build installer
+      - name: Build Authenticode-signed installer
         working-directory: desktop-app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          WIN_CSC_LINK: ${{ secrets.HAK_WINDOWS_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.HAK_WINDOWS_CSC_PASSWORD }}
+          HAK_REQUIRE_SIGNING: "1"
         run: |
+          if (-not $env:WIN_CSC_LINK) { throw 'Configure HAK_WINDOWS_CSC_LINK before publishing a signed installer.' }
           npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm run release
+
+      - name: Verify signature and record SHA-256
+        run: ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature
+
+      - name: Record GitHub build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: desktop-app/release/*.exe
 
       - uses: actions/upload-artifact@v4
         with:
@@ -43,6 +60,8 @@ jobs:
             desktop-app/release/*.part
             desktop-app/release/GHEP_FILE.bat
             desktop-app/release/HUONG_DAN_GHEP_FILE.txt
+            desktop-app/release/SHA256SUMS.txt
+            desktop-app/release/INSTALLER_SECURITY.json
           if-no-files-found: error
           retention-days: 30
 
@@ -57,5 +76,6 @@ jobs:
           gh release create "$TAG" \
             desktop-app/release/*.exe desktop-app/release/*.part \
             desktop-app/release/GHEP_FILE.bat desktop-app/release/HUONG_DAN_GHEP_FILE.txt \
+            desktop-app/release/SHA256SUMS.txt desktop-app/release/INSTALLER_SECURITY.json \
             --title "Bộ cài Báo cáo ngày ${VERSION} (lần ${{ github.run_number }})" \
-            --notes "Bộ cài desktop Báo cáo ngày ${VERSION}, đóng từ commit ${{ github.sha }}. Tải các file .part cùng GHEP_FILE.bat vào một thư mục, nhấp đúp GHEP_FILE.bat; hoặc tải thẳng file Setup .exe."
+            --notes "Bộ cài desktop Báo cáo ngày ${VERSION}, đóng từ commit ${{ github.sha }}, đã xác minh chữ ký Authenticode. Tải các file .part cùng GHEP_FILE.bat vào một thư mục, nhấp đúp GHEP_FILE.bat; hoặc tải thẳng file Setup .exe."

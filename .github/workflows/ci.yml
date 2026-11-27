@@ -20,16 +20,19 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      # Các test trỏ cố định tới /opt/pw-browsers/chromium (môi trường phát triển) → trỏ về Chromium của Playwright.
-      - run: sudo mkdir -p /opt/pw-browsers && sudo ln -sf "$(node -e "console.log(require('playwright').chromium.executablePath())")" /opt/pw-browsers/chromium
       - run: npm run build
       # config.html lưu bản base64 của dist: phải đồng bộ sau build để tránh phát hành mẫu cũ.
       - run: npm run build:config
-      - run: npm run lint
+      - run: node scripts/verify-build.mjs
+      - name: Check committed artifacts match the build
+        run: git diff --exit-code -- config.html dist/index.html ../desktop-app/app/index.html
+      - run: npm run lint -- --max-warnings 0
       - run: npm test
-      # Cảnh báo lỗ hổng thư viện (xlsx chưa có bản vá; jsPDF/autotable cần nâng major) — chưa chặn CI.
-      - run: npm audit --omit=dev
-        continue-on-error: true
+      - run: npm run test:ui
+      - run: npm audit --audit-level=high
+      - name: Audit Electron and packaging dependencies
+        working-directory: desktop-app
+        run: npm audit --audit-level=high
 
   desktop-security-tests:
     runs-on: ubuntu-latest
@@ -63,11 +66,54 @@ jobs:
             throw 'Security manifest smoke test failed'
           }
 
+  desktop-upgrade-tests:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            app/package-lock.json
+            desktop-app/package-lock.json
+      - name: Build web template
+        working-directory: app
+        run: |
+          npm ci
+          npm run build
+          npm run build:config
+          Copy-Item dist/index.html ../desktop-app/app/index.html -Force
+          node scripts/verify-build.mjs
+      - name: Package installer for Windows QA
+        working-directory: desktop-app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npm ci
+          npm run dist -- --publish never
+      - name: Sign the QA installer and test upgrade and restore
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $oldDir = Join-Path $env:RUNNER_TEMP 'hak-original'
+          gh release download installer-v1.0.0-2 --pattern '*.exe' --dir $oldDir
+          if ($LASTEXITCODE) { throw 'Legacy installer download failed.' }
+          $old = @(Get-ChildItem $oldDir -Filter '*.exe')
+          $new = @(Get-ChildItem desktop-app/release -Filter '*.exe')
+          if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Expected exactly one old and one new installer.' }
+          Write-Host "Published installer signature: $((Get-AuthenticodeSignature $old[0].FullName).Status)"
+          & ./desktop-app/tests/sign-for-test.ps1 -Installer $new[0].FullName
+          node app/tests/windows-installer-upgrade.mjs $old[0].FullName $new[0].FullName
+
   desktop-installer:
     # Chỉ build bộ cài từ main sau khi build/test và Windows mock đều đạt;
     # không công bố một EXE lấy từ PR chưa được nghiệm thu.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [build-test, desktop-windows-tests]
+    needs: [build-test, desktop-windows-tests, desktop-upgrade-tests]
     runs-on: windows-latest
     permissions:
       contents: read
