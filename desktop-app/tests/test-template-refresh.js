@@ -123,7 +123,7 @@ check('Vẫn cho phép điều hướng tới báo cáo do app quản lý', prev
 
 const defaultShipping = 'https://docs.google.com/spreadsheets/d/1ZZ2iUwkkKe8wXdztA7mL-v9j6fmgY5c5rlDdI1sNoAk/edit?usp=sharing';
 const shippingTemplate = realTemplate.includes(defaultShipping) ? realTemplate :
-  realTemplate.replace('</body>', '<!--' + defaultShipping + '--></body>');
+  realTemplate.replace('</body>', '<script>window.shippingProbe=' + JSON.stringify(defaultShipping) + '</script></body>');
 fs.writeFileSync(path.join(appDir, 'app', 'index.html'), shippingTemplate);
 const company = handlers['get-config'](trustedSetupEvent);
 const shipping = 'https://docs.google.com/spreadsheets/d/TEST_EXPORT/edit';
@@ -133,6 +133,11 @@ check('Mẫu báo cáo lấy đúng file xuất hàng đã cấu hình', fs.read
 const rejectedShipping = handlers['save-config'](trustedSetupEvent, { ...company, XuatHang: 'https://example.com/spreadsheets/d/TEST_EXPORT/edit' });
 check('Link xuất hàng sai không ghi đè cấu hình đã lưu', !rejectedShipping.ok && handlers['get-config'](trustedSetupEvent).XuatHang === shipping + '?gid=0');
 
+const quotedCompany = 'CÔNG TY "HAK" <ĐẠI HIỆP>';
+const savedQuoted = handlers['save-config'](trustedSetupEvent, { ...company, TenCty: quotedCompany, XuatHang: shipping });
+const quotedReport = fs.readFileSync(reportPath, 'utf8');
+check('Tên công ty có dấu nháy và ký tự HTML được mã hóa đúng', savedQuoted.ok &&
+  quotedReport.includes(JSON.stringify(quotedCompany).replace(/</g, '\\u003c')));
 Module._load = origLoad;
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log('\n=== RESULT: ' + pass + ' passed, ' + fail + ' failed ===');

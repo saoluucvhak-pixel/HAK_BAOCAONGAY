@@ -69,9 +69,9 @@ export async function restoreData(file) {
     var beforeRestore = storageService.snapshotRaw();
     pushUndoSnapshot();
     var result = storageService.importAll(backup);
-    if (!result.ok) throw new Error(result.rollbackFailed
+    if (!result.ok) throw new Error(result.error || (result.rollbackFailed
       ? 'Không thể ghi và hoàn nguyên dữ liệu. Cần kiểm tra bộ nhớ trình duyệt và bản sao lưu trước khi tiếp tục.'
-      : 'Không thể ghi dữ liệu khôi phục vào bộ nhớ (đầy dung lượng hoặc bị chặn). Dữ liệu cũ đã được giữ lại.');
+      : 'Không thể ghi dữ liệu khôi phục vào bộ nhớ (đầy dung lượng hoặc bị chặn). Dữ liệu cũ đã được giữ lại.'));
     // File sao lưu cũ (trước 29/10/2026) không có "khoanVay" ⇒ GIỮ NGUYÊN khoản vay đang có, không xoá.
     var loanNote = '';
     if (backup.khoanVay) {

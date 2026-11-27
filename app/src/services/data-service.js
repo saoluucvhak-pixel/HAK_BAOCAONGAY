@@ -35,7 +35,7 @@ var FETCH_RETRY_DELAY_MS = 1500;
  * Các cột mà báo cáo THỰC SỰ đọc ở từng Sheet (đúng tên cột code đang dùng). Nếu Google Sheet bị
  * đổi tên/xoá cột, trước đây app vẫn báo "Đã tải ... ✓" rồi các báo cáo trống trơn/0 dòng mà
  * không có lời giải thích nào (đã tái hiện: đổi "Ngày cân 1" → báo cáo nhập keo 0 dòng, trạng
- * thái vẫn xanh). Nay sẽ cảnh báo rõ thiếu cột nào ở Sheet nào. Chỉ CẢNH BÁO, không chặn.
+ * thái vẫn xanh). Chỉ cập nhật trạng thái và bản lưu khi Sheet có đủ cột bắt buộc.
  */
 export var REQUIRED_COLUMNS = {
   PHIEUCAN: ['So_CT', 'Khách hàng', 'Ngày cân 1', 'Giờ cân 1', 'Ngày cân 2', 'Giờ cân 2', 'Biển số 1', 'KL hàng (KG)', 'Đơn giá_TC', 'Thành tiền', 'ĐL', 'NG'],
@@ -99,35 +99,34 @@ function fmtStamp(d) {
   return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ' ' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear();
 }
 
-/**
- * [Phase 4.1 — Offline] Tải 1 Sheet: thành công → lưu bản mới vào IndexedDB (không chờ, không làm
- * chậm) rồi dùng luôn; thất bại → dùng bản lưu gần nhất nếu có (ghi nhận vào `offlineUsed` để báo
- * rõ cho người dùng), không có bản lưu → ném lỗi gốc như trước đây.
- * @param {string} name @param {string} url @param {Array} offlineUsed
- */
-function loadSheet(name, url, offlineUsed) {
-  return fetchCSVText(url).then(function (text) {
-    if (url) saveSheetText(url, name, text);
-    return csvToObjects(parseCSV(text));
-  }, function (err) {
-    return loadSheetText(url).then(function (cached) {
-      if (!cached) throw err;
-      offlineUsed.push({ name: name, savedAt: cached.savedAt, reason: err.message });
-      logger.warn('[Offline] ' + name + ': không tải được (' + err.message + ') — dùng bản lưu lúc ' + fmtStamp(cached.savedAt));
-      return csvToObjects(parseCSV(cached.text));
-    });
-  });
+function validatedSheetRows(name, text) {
+  const rows = parseCSV(text);
+  const headers = new Set((rows[0] ?? []).map(value => value.trim()));
+  const missing = REQUIRED_COLUMNS[name].filter(column => !headers.has(column));
+  if (missing.length) throw new Error('thiếu cột: ' + missing.join(', '));
+  return csvToObjects(rows);
 }
 
-/** true nếu lần tải gần nhất phải dùng dữ liệu lưu offline cho ít nhất 1 Sheet. */
+async function loadSheet(name, url, offlineUsed) {
+  if (!url) return [];
+  try {
+    const text = await fetchCSVText(url);
+    const rows = validatedSheetRows(name, text);
+    await saveSheetText(url, name, text);
+    return rows;
+  } catch (error) {
+    const cached = await loadSheetText(url);
+    if (!cached) throw error;
+    let rows;
+    try { rows = validatedSheetRows(name, cached.text); }
+    catch { throw error; }
+    offlineUsed.push({ name, savedAt: cached.savedAt, reason: error.message });
+    logger.warn('[Offline] ' + name + ': ' + error.message + ' — dùng bản lưu lúc ' + fmtStamp(cached.savedAt));
+    return rows;
+  }
+}
+
 var lastLoadOffline = false;
-
-/** Trả về danh sách cột bắt buộc bị thiếu (rỗng nếu đủ, hoặc nếu Sheet không có dòng nào). */
-export function missingColumns(rows, required) {
-  if (!rows || !rows.length) return [];
-  var have = rows[0];
-  return required.filter(function (c) { return !Object.prototype.hasOwnProperty.call(have, c); });
-}
 
 export function setStatus(text, kind, detail) {
   $('#statusText').textContent = text;
@@ -151,10 +150,6 @@ export async function loadAllData() {
       loadSheet('HD_NCC', CONFIG.HD_NCC, offlineUsed).catch(function (e) { warnings.push('không tải được HD_NCC (địa chỉ/CCCD người bán sẽ trống): ' + e.message); return []; }),
       loadSheet('HOSOKEO', CONFIG.HOSOKEO, offlineUsed).catch(function (e) { warnings.push('không tải được HOSOKEO (Bảng kê lâm sản sẽ trống): ' + e.message); return []; })
     ]);
-    [['PHIEUCAN', results[0]], ['DNTT_CT', results[1]], ['HD_NCC', results[2]], ['HOSOKEO', results[3]]].forEach(function (p) {
-      var miss = missingColumns(p[1], REQUIRED_COLUMNS[p[0]]);
-      if (miss.length) warnings.push('Sheet ' + p[0] + ' thiếu cột: ' + miss.join(', ') + ' (có thể đã bị đổi tên — báo cáo liên quan sẽ trống/sai)');
-    });
     STATE.phieucan = results[0];
     STATE.dntt = results[1];
     STATE.hdncc = results[2];
@@ -197,7 +192,7 @@ export async function loadAllData() {
     updateLastUpdatedText();
     var okText = 'Đã tải ' + STATE.phieucan.length.toLocaleString('vi-VN') + ' phiếu cân, ' + STATE.dntt.length.toLocaleString('vi-VN') + ' đề nghị thanh toán';
     if (lastLoadOffline) {
-      var offlineText = 'ĐANG XEM DỮ LIỆU OFFLINE (không kết nối được Google Sheet): ' + offlineUsed.map(function (o) { return o.name + ' lưu lúc ' + fmtStamp(o.savedAt); }).join(', ');
+      var offlineText = 'ĐANG XEM DỮ LIỆU OFFLINE (không kết nối được Google Sheet): ' + offlineUsed.map(function (o) { return o.name + ' lưu lúc ' + fmtStamp(o.savedAt) + ' (' + o.reason + ')'; }).join(', ');
       setStatus(okText + ' — ⚠ ' + [offlineText].concat(warnings).join(' | '), 'warn',
         okText + '\n' + offlineText + '\nLý do: ' + offlineUsed[0].reason + (warnings.length ? '\n' + warnings.join('\n') : '') + '\nBấm "CẬP NHẬT DỮ LIỆU" khi có mạng để tải bản mới.');
     } else if (warnings.length) {

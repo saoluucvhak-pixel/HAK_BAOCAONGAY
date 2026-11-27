@@ -1,6 +1,6 @@
 import { forestryPrintPages } from '../services/export/forestry-layout.js';
 import { forestryWord, forestryWorkbook } from '../services/export/forestry-documents.js';
-import { closingStock, latestForestryClosing } from '../services/forestry-history.js';
+import { closingStock, isForestryHistoryEntry, latestForestryClosing } from '../services/forestry-history.js';
 import { storageService } from '../services/storage-service.js';
 import { dispatchSheetId, readForestrySettings } from './forestry-settings.js';
 import { CONFIG } from '../config/config.js';
@@ -37,6 +37,10 @@ function appendRow(parent, values, tag) {
   }
 }
 
+const previewQuantity = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 });
+const previewCurrency = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
+const dailyNumericColumns = new Set([0, 6, 7, 11, 12, 14, 15]);
+
 function showResults(container, reports) {
   for (const report of reports) {
     const panel = document.createElement('section');
@@ -50,9 +54,43 @@ function showResults(container, reports) {
     table.setAttribute('aria-label', report.name);
     appendRow(table.createTHead(), report.headers, 'th');
     const body = table.createTBody();
-    for (const values of report.rows) appendRow(body, values, 'td');
+    const pageSize = 200;
+    const pageCount = Math.max(1, Math.ceil(report.rows.length / pageSize));
+    const pager = document.createElement('div');
+    pager.className = 'tools';
+    const previous = document.createElement('button');
+    const next = document.createElement('button');
+    for (const [button, label] of [[previous, 'Trang trước'], [next, 'Trang sau']]) {
+      button.type = 'button';
+      button.className = 'btn small';
+      button.textContent = label;
+    }
+    const pageLabel = document.createElement('span');
+    pageLabel.setAttribute('aria-live', 'polite');
+    let page = 0;
+    function renderPage() {
+      body.replaceChildren();
+      for (const values of report.rows.slice(page * pageSize, (page + 1) * pageSize)) {
+        appendRow(body, values.map((value, index) => {
+          if (typeof value !== 'number') return value;
+          if (report.name === 'RP_MAU04') return dailyNumericColumns.has(index) ? previewQuantity.format(value) : value;
+          if (report.name === 'RP_MAU14') return [6, 7, 9, 10].includes(index) ? previewCurrency.format(value) : value;
+          return index >= 4 && index <= 8 ? previewQuantity.format(value) : value;
+        }), 'td');
+      }
+      pageLabel.textContent = (page + 1) + ' / ' + pageCount;
+      previous.disabled = page === 0;
+      next.disabled = page + 1 === pageCount;
+    }
+    previous.addEventListener('click', () => { page--; renderPage(); });
+    next.addEventListener('click', () => { page++; renderPage(); });
+    renderPage();
     scroll.append(table);
     panel.append(title, scroll);
+    if (pageCount > 1) {
+      pager.append(previous, pageLabel, next);
+      panel.append(pager);
+    }
     container.append(panel);
   }
 }
@@ -82,7 +120,7 @@ const reportLabels = { M04_14: '04, 14', M: '29 tháng', '6T': '29 sáu tháng',
 
 function readHistory() {
   const entries = storageService.get(historyKey, []);
-  return Array.isArray(entries) ? entries : [];
+  return Array.isArray(entries) ? entries.filter(isForestryHistoryEntry) : [];
 }
 
 export function initForestryReports() {
@@ -112,15 +150,21 @@ export function initForestryReports() {
       carriedOpening = false;
     }
     openingSourceId = source;
-    prior = latestForestryClosing(readHistory(), form.elements.from.value, source);
+    prior = latestForestryClosing(readHistory(), form.elements.from.value, { source, company: CONFIG.TEN_CONG_TY, intake: CONFIG.HOSOKEO });
     priorButton.disabled = !prior;
     openingSource.textContent = prior
       ? 'Tồn cuối gần nhất: ' + number.format(prior.closing) + ' tấn, ngày ' + dateLabel(prior.to) + '.'
-      : 'Chưa có tồn cuối kỳ trước cho nguồn và kỳ đang chọn.';
+      : 'Chưa có tồn cuối của ngày liền trước cùng nguồn nhập, xuất và đơn vị. Hãy đối chiếu rồi nhập tồn đầu kỳ.';
   }
   function renderHistory() {
     historyTable.replaceChildren();
     const entries = readHistory();
+    const stored = storageService.get(historyKey, []);
+    if (!Array.isArray(stored) || stored.length !== entries.length) {
+      const notice = historyTable.insertRow().insertCell();
+      notice.colSpan = 5;
+      notice.textContent = 'Có mục lịch sử lâm sản không hợp lệ đang được bỏ qua.';
+    }
     if (!entries.length) {
       const empty = historyTable.insertRow().insertCell();
       empty.colSpan = 5;
@@ -201,7 +245,7 @@ export function initForestryReports() {
       showResults(output, reports);
       result = { reports, from, to };
       updateExportButtons();
-      const entry = { createdAt: new Date().toISOString(), source, from, to, selected, opening, closing: closingStock(reports) };
+      const entry = { createdAt: new Date().toISOString(), source, company: CONFIG.TEN_CONG_TY, intake: CONFIG.HOSOKEO, from, to, selected, opening, closing: closingStock(reports) };
       const savedHistory = storageService.set(historyKey, [entry, ...readHistory()]);
       renderHistory();
       status.textContent = 'Đã lập ' + reports.length + ' bảng từ Google Sheet.' +

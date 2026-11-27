@@ -33,7 +33,7 @@ await page.goto('file://' + CONFIG_HTML, { waitUntil: 'load' });
 check('config.html tải lên không lỗi JS', errors.length === 0);
 
 const NEW = {
-  ten: 'CÔNG TY TNHH HOÀNG ANH KHÔI QUẢNG NAM',
+  ten: 'CÔNG TY TNHH "HOÀNG ANH KHÔI" QUẢNG NAM',
   maHS: '9999999999',
   nhaMay: 'HAKQN',
   phieucan: 'https://docs.google.com/spreadsheets/d/e/TEST_PHIEUCAN_ID/pub?output=csv',
@@ -64,7 +64,7 @@ const msgText = await page.evaluate(() => document.getElementById('msg').textCon
 check('Thông báo hiển thị thành công', msgText.includes('Đã tạo xong'));
 
 const generated = fs.readFileSync(outPath, 'utf8');
-check('File mới chứa đúng tên công ty mới', generated.includes(NEW.ten));
+check('File mới chứa đúng tên công ty mới', generated.includes(JSON.stringify(NEW.ten)));
 check('File mới KHÔNG còn tên công ty cũ (Đại Hiệp)', !generated.includes('CÔNG TY TNHH SXTMDV ĐẠI HIỆP'));
 check('File mới chứa đúng Mã HS mới', generated.includes(NEW.maHS));
 check('File mới chứa đúng Mã nhà máy mới', generated.includes(NEW.nhaMay));

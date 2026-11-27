@@ -79,6 +79,14 @@ function replaceOnce(text, oldVal, newVal, label) {
   return text.slice(0, idx) + newVal + text.slice(idx + oldVal.length);
 }
 
+function jsString(value) {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
+function replaceString(text, oldVal, newVal, label) {
+  return replaceOnce(text, JSON.stringify(oldVal), jsString(newVal), label);
+}
+
 function normalizeShippingLink(value) {
   if (!value || value === DEFAULTS.XuatHang) return DEFAULTS.XuatHang;
   let url;
@@ -96,20 +104,20 @@ function normalizeShippingLink(value) {
  *  bao giờ thay-thế-chồng-lên-report.html-cũ, tránh lỗi thay 2 lần/tìm không thấy do đã bị đổi. */
 function buildReportHtml(cfg, dest = REPORT_HTML) {
   let html = fs.readFileSync(TEMPLATE_HTML, 'utf8');
-  html = replaceOnce(html, DEFAULTS.TenCty, cfg.TenCty, 'Tên công ty');
-  if (cfg.MaHS) html = replaceOnce(html, DEFAULTS.MaHS, cfg.MaHS, 'Mã HS');
-  if (cfg.NhaMay) html = replaceOnce(html, DEFAULTS.NhaMay, cfg.NhaMay, 'Mã nhà máy');
-  html = replaceOnce(html, DEFAULTS.PhieuCan, cfg.PhieuCan, 'Link Phiếu cân');
-  html = replaceOnce(html, DEFAULTS.DNTT, cfg.DNTT, 'Link Đề nghị thanh toán');
-  if (cfg.HDNCC) html = replaceOnce(html, DEFAULTS.HDNCC, cfg.HDNCC, 'Link HD_NCC');
-  if (cfg.Hosokeo) html = replaceOnce(html, DEFAULTS.Hosokeo, cfg.Hosokeo, 'Link Hồ sơ keo');
+  html = replaceString(html, DEFAULTS.TenCty, cfg.TenCty, 'Tên công ty');
+  if (cfg.MaHS) html = replaceString(html, DEFAULTS.MaHS, cfg.MaHS, 'Mã HS');
+  if (cfg.NhaMay) html = replaceString(html, DEFAULTS.NhaMay, cfg.NhaMay, 'Mã nhà máy');
+  html = replaceString(html, DEFAULTS.PhieuCan, cfg.PhieuCan, 'Link Phiếu cân');
+  html = replaceString(html, DEFAULTS.DNTT, cfg.DNTT, 'Link Đề nghị thanh toán');
+  if (cfg.HDNCC) html = replaceString(html, DEFAULTS.HDNCC, cfg.HDNCC, 'Link HD_NCC');
+  if (cfg.Hosokeo) html = replaceString(html, DEFAULTS.Hosokeo, cfg.Hosokeo, 'Link Hồ sơ keo');
   const shippingLink = normalizeShippingLink(cfg.XuatHang);
   if (shippingLink !== DEFAULTS.XuatHang) {
-    html = replaceOnce(html, DEFAULTS.XuatHang, shippingLink, 'Link XUATHANG_DN');
+    html = replaceString(html, DEFAULTS.XuatHang, shippingLink, 'Link XUATHANG_DN');
   }
   if (cfg.MST || cfg.SDT || cfg.DiaChi || cfg.DiaChiThuMua) {
-    const bankInfoNew = '{maSoThue:' + JSON.stringify(cfg.MST || '') + ',diaChi:' + JSON.stringify(cfg.DiaChi || '') + ',soDienThoai:' + JSON.stringify(cfg.SDT || '') + ',diaChiThuMua:' + JSON.stringify(cfg.DiaChiThuMua || '') + '}';
-    const woInfoNew = '{maSoThue:' + JSON.stringify(cfg.MST || '') + ',diaChiThuMua:' + JSON.stringify(cfg.DiaChiThuMua || '') + '}';
+    const bankInfoNew = '{maSoThue:' + jsString(cfg.MST || '') + ',diaChi:' + jsString(cfg.DiaChi || '') + ',soDienThoai:' + jsString(cfg.SDT || '') + ',diaChiThuMua:' + jsString(cfg.DiaChiThuMua || '') + '}';
+    const woInfoNew = '{maSoThue:' + jsString(cfg.MST || '') + ',diaChiThuMua:' + jsString(cfg.DiaChiThuMua || '') + '}';
     html = replaceOnce(html, DEFAULTS.BANK_INFO_LITERAL, bankInfoNew, 'Thông tin mặc định biểu mẫu ngân hàng');
     html = replaceOnce(html, DEFAULTS.WO_INFO_LITERAL, woInfoNew, 'Thông tin mặc định biểu mẫu WO');
   }

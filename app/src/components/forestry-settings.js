@@ -9,6 +9,10 @@ const fields = [
   ['TÊN HH_TKHQ', 'text'],
   ['Đơn vị tính (MT)', 'text'],
   ['Đơn vị tính (BDMT)', 'text'],
+  ['Khối lượng NK', 'number'],
+  ['Trị giá NK (USD)', 'number'],
+  ['Số hiệu, nhãn đánh dấu', 'text'],
+  ['Ghi chú', 'text'],
   ['Loài nguy cấp Quý hiếm', 'text'],
   ['Tiêu hao SX', 'number'],
   ['Tồn đầu ngày', 'number'],
@@ -19,6 +23,7 @@ const fields = [
   ['Diễn giải hồ sơ xuất', 'text'],
   ['ID_Mau07', 'text'],
 ];
+const optionalNumberFields = new Set(['Khối lượng NK', 'Trị giá NK (USD)']);
 
 export function dispatchSheetId(value) {
   let id;
@@ -57,6 +62,7 @@ export function initForestrySettings() {
     const grid = document.createElement('div');
     grid.className = 'modalGrid';
     for (const [field, type, title = field] of fields) {
+      if (optionalNumberFields.has(field) && code !== 'MAU14') continue;
       const label = document.createElement('label');
       label.className = 'f';
       label.textContent = title === 'Tiêu hao SX' ? 'Tiêu hao sản xuất (%)' : title;
@@ -65,7 +71,7 @@ export function initForestrySettings() {
       input.name = code + ':' + field;
       if (type === 'number') {
         input.step = 'any';
-        input.required = true;
+        input.required = !optionalNumberFields.has(field);
       }
       if (field === 'Tiêu hao SX') {
         input.min = '0';
@@ -85,9 +91,11 @@ export function initForestrySettings() {
     }
     for (const row of settings.rows) {
       for (const [field] of fields) {
+        const input = form.elements.namedItem(row['Mẫu'] + ':' + field);
+        if (!input) continue;
         const raw = row[field];
         const value = field === 'Tiêu hao SX' ? Number((raw * 100).toPrecision(12)) : raw;
-        form.elements.namedItem(row['Mẫu'] + ':' + field).value = value ?? '';
+        input.value = value ?? '';
       }
     }
     const date = new Date(settings.updatedAt);
@@ -117,8 +125,10 @@ export function initForestrySettings() {
     const rows = readForestrySettings().rows.map(row => {
       const next = { ...row };
       for (const [field, type] of fields) {
-        const value = values.get(row['Mẫu'] + ':' + field).trim();
-        next[field] = type === 'number' ? Number(value) / (field === 'Tiêu hao SX' ? 100 : 1) : value;
+        const input = values.get(row['Mẫu'] + ':' + field);
+        if (input === null) continue;
+        const value = input.trim();
+        next[field] = type === 'number' && value !== '' ? Number(value) / (field === 'Tiêu hao SX' ? 100 : 1) : value;
       }
       return next;
     });
