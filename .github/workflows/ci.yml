@@ -121,9 +121,9 @@ jobs:
         if: always()
         run: |
           if ($env:HAK_QA_CERT_THUMBPRINT) {
-            foreach ($store in @('Root', 'TrustedPublisher', 'My')) {
-              Remove-Item "Cert:\CurrentUser\$store\$env:HAK_QA_CERT_THUMBPRINT" -ErrorAction SilentlyContinue
-            }
+            Remove-Item "Cert:\LocalMachine\Root\$env:HAK_QA_CERT_THUMBPRINT" -ErrorAction SilentlyContinue
+            Remove-Item "Cert:\CurrentUser\My\$env:HAK_QA_CERT_THUMBPRINT" -ErrorAction SilentlyContinue
+
           }
 
   desktop-installer:
@@ -161,7 +161,7 @@ jobs:
           SIGNING_CERT_PRESENT: ${{ secrets.HAK_WINDOWS_CSC_LINK != '' }}
         run: |
           $requireSigned = $env:SIGNING_CERT_PRESENT -eq 'true'
-          ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature:$requireSigned
+          ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature:$requireSigned -RequireTimestamp:$requireSigned
       - name: Record GitHub build provenance for the EXE
         uses: actions/attest@v4
         with:
