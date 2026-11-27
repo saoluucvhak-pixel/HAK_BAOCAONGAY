@@ -68,7 +68,7 @@ Nếu cố ý thay đổi file xuất: `node tests/test-export-golden.mjs --upda
 
 ## Cấp phép Báo cáo ngày cho từng máy Windows
 
-1. Trên máy quản trị, mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html) bằng Chrome hoặc Edge cập nhật. Dùng khóa HAK đã tạo lúc phát hành bản 2.6.0. Nếu trang chưa hiện khóa đã lưu, mở **Quản lý khóa và hồ sơ công ty**, rồi chọn **Khôi phục khóa** với file `HAK-KhoaChung.hakkey` và mật khẩu đã đặt.
+1. Trên máy quản trị, mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html) bằng Chrome hoặc Edge cập nhật. Dùng khóa HAK đã tạo lúc phát hành bản 2.6.0. Nếu trang chưa hiện khóa đã lưu, mở **Quản lý khóa và hồ sơ công ty**, rồi chọn **Phục hồi cấp phép** với file `HAK-PhucHoiCapPhep.hakkey` (hoặc `HAK-KhoaChung.hakkey` từ bản trước) và mật khẩu đã đặt.
 2. Dùng cùng bộ cài Báo cáo ngày cho các máy cần cài. Bộ cài 2.6.0 đã có khóa công khai HAK. Mỗi máy được cấp phản hồi riêng theo mã yêu cầu của lần cài.
 3. Người cài sao chép mã yêu cầu `HAK4.…`. HTML hiển thị mã ứng dụng và mã máy. Chọn hoặc nhập công ty rồi bấm **Tạo mã và file HAK**. Bấm **Sao chép mã phản hồi** và **Tải file .haksetup**, rồi gửi cả hai cho người cài. Người dùng giữ cửa sổ mở, kiểm tra mã rồi nạp file.
 

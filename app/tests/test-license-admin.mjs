@@ -29,12 +29,12 @@ function makeBackup() {
 }
 const backup = makeBackup();
 
-async function selectBackup(page, pass) {
+async function selectBackup(page, pass, buffer = backup, name = 'HAK-KhoaChung.hakkey') {
   await page.locator('#restoreIssuer').setInputFiles({
-    name: 'HAK-KhoaChung.hakkey', mimeType: 'application/json', buffer: backup
+    name, mimeType: 'application/json', buffer
   });
   await page.locator('#restoreIssuerPassword').fill(pass);
-  await page.getByRole('button', { name: 'Khôi phục khóa' }).click();
+  await page.getByRole('button', { name: 'Phục hồi cấp phép', exact: true }).click();
 }
 
 async function download(page, name, expected) {
@@ -82,9 +82,12 @@ try {
   await page.locator('#issuerDetails > summary').click();
   await selectBackup(page, password);
   await page.waitForFunction(() => document.querySelector('#issuerStatus').textContent.includes('đã mở'));
-  const downloadedBackup = await download(page, 'Tải bản sao khóa đã mã hóa', 'HAK-KhoaChung.hakkey');
+  const recoveryFilename = 'HAK-PhucHoiCapPhep.hakkey';
+  assert.equal(await page.locator('#recoveryFileHelp code').textContent(), recoveryFilename);
+  const downloadedBackup = await download(page, 'Tạo bản sao phục hồi cấp phép', recoveryFilename);
   assert.deepEqual(JSON.parse(downloadedBackup), JSON.parse(backup));
-  const downloadedJwk = JSON.parse(await download(page, 'Tải khóa công khai để đóng bộ cài', 'HAK-PublicKey.jwk'));
+  assert.equal(await page.locator('#verificationFileHelp code').textContent(), 'HAK-PublicKey.jwk');
+  const downloadedJwk = JSON.parse(await download(page, 'Tải khóa xác minh HAK', 'HAK-PublicKey.jwk'));
   assert.deepEqual(downloadedJwk, jwk);
   const recipient = newRequest();
 
@@ -126,7 +129,7 @@ try {
   await recovered.locator('#issuerDetails > summary').click();
   await selectBackup(recovered, 'wrong-password');
   await recovered.waitForFunction(() => document.querySelector('#restoreStatus').textContent.includes('Sai mật khẩu'));
-  await selectBackup(recovered, password);
+  await selectBackup(recovered, password, downloadedBackup, recoveryFilename);
   await recovered.waitForFunction(() => document.querySelector('#issuerStatus').textContent.includes('đã mở'));
   await recovered.locator('summary').filter({ hasText: /^Sao lưu danh sách công ty$/ }).click();
   await recovered.locator('#importCompanies').setInputFiles({

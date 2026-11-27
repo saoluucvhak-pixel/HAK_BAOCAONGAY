@@ -24,6 +24,7 @@
   button { border: 0; border-radius: 5px; background: #005864; color: #fff; font: inherit; font-weight: 650; padding: .55rem .85rem; cursor: pointer; }
   button:disabled { opacity: .55; cursor: wait; }
   button.secondary { background: #e5f0f2; color: #17424a; margin: .8rem .4rem 0 0; }
+  .file-help { margin: .35rem 0 .85rem; }
   .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .85rem; }
   .actions button.secondary { margin: 0; }
   .profiles { margin: 1.15rem 0; }
@@ -84,12 +85,18 @@
     <summary>Quản lý khóa và hồ sơ công ty</summary>
     <p id="restoreStatus" class="status" role="status"></p>
     <form id="restoreIssuerForm">
-      <label>Bản sao khóa HAK <input id="restoreIssuer" type="file" accept=".hakkey" required></label>
+      <label>File phục hồi cấp phép (.hakkey) <input id="restoreIssuer" type="file" accept=".hakkey" required></label>
       <label>Mật khẩu bản sao <input id="restoreIssuerPassword" type="password" autocomplete="off" required></label>
-      <button type="submit">Khôi phục khóa</button>
+      <button type="submit">Phục hồi cấp phép</button>
     </form>
-    <button class="secondary" id="exportIssuer" type="button" hidden>Tải bản sao khóa đã mã hóa</button>
-    <button class="secondary" id="exportVerificationKey" type="button" hidden>Tải khóa công khai để đóng bộ cài</button>
+    <div id="recoveryExport" hidden>
+      <button class="secondary" id="exportIssuer" type="button" aria-describedby="recoveryFileHelp">Tạo bản sao phục hồi cấp phép</button>
+      <p class="file-help" id="recoveryFileHelp">Tải file <code>HAK-PhucHoiCapPhep.hakkey</code> để khôi phục quyền cấp phép khi đổi máy hoặc trình duyệt. File đã mã hóa và cần mật khẩu đã đặt để mở. Lưu tại HAK.</p>
+    </div>
+    <div id="verificationExport" hidden>
+      <button class="secondary" id="exportVerificationKey" type="button" aria-describedby="verificationFileHelp">Tải khóa xác minh HAK</button>
+      <p class="file-help" id="verificationFileHelp">Tải file <code>HAK-PublicKey.jwk</code> cho người tích hợp app. Setup và app dùng khóa công khai này để kiểm tra chữ ký trên phản hồi do HAK cấp. Thuật toán xác minh nằm trong mã nguồn của app.</p>
+    </div>
     <details class="profiles">
       <summary>Sao lưu danh sách công ty</summary>
       <button class="secondary" id="exportCompanies" type="button">Tải danh sách</button>
@@ -102,7 +109,7 @@
   <details class="help" id="issuerGuide">
     <summary>Hướng dẫn cấp phép cho ứng dụng đã tích hợp</summary>
     <h3>Mở khóa trên máy quản trị</h3>
-    <p>Mở file này bằng Chrome hoặc Edge đã cập nhật. Nếu trang báo chưa có khóa, mở <strong>Quản lý khóa và hồ sơ công ty</strong>, chọn bản sao <code>HAK-KhoaChung.hakkey</code> đã tạo khi chuẩn bị bộ cài, nhập mật khẩu của bản sao và bấm <strong>Khôi phục khóa</strong>. Khi trang hiện ô mật khẩu ở màn cấp phép, nhập mật khẩu trước khi bấm tạo phản hồi.</p>
+    <p>Mở file này bằng Chrome hoặc Edge đã cập nhật. Nếu trang báo chưa có khóa, mở <strong>Quản lý khóa và hồ sơ công ty</strong>, chọn file <code>HAK-PhucHoiCapPhep.hakkey</code> (hoặc <code>HAK-KhoaChung.hakkey</code> đã lưu từ bản trước), nhập mật khẩu của bản sao và bấm <strong>Phục hồi cấp phép</strong>. Khi trang hiện ô mật khẩu ở màn cấp phép, nhập mật khẩu trước khi bấm tạo phản hồi.</p>
     <h3>Cấp phép cho từng lần cài</h3>
     <ol>
       <li>Người cài mở bộ cài, sao chép mã bắt đầu bằng <code>HAK4.</code>, gửi cho HAK và giữ nguyên cửa sổ đang mở.</li>
@@ -112,7 +119,7 @@
       <li>Người cài dán mã phản hồi, bấm <strong>Kiểm tra mã</strong>, chọn <strong>Nạp file HAK…</strong>, rồi tiếp tục cài. Nếu đã đóng và mở lại bộ cài hoặc đang cài cho máy khác, bắt đầu từ mã yêu cầu mới.</li>
     </ol>
     <h3>Khi chuyển máy quản trị</h3>
-    <p>Mang theo bản sao <code>HAK-KhoaChung.hakkey</code> và mật khẩu để khôi phục trên máy mới. Nếu cần chuyển hồ sơ công ty, dùng <strong>Sao lưu danh sách công ty</strong> để tải trên máy cũ và nạp trên máy mới. File danh sách chứa thông tin công ty và link Google Sheets dưới dạng văn bản, nên lưu nội bộ.</p>
+    <p>Bấm <strong>Tạo bản sao phục hồi cấp phép</strong> trên máy cũ. Trên máy mới, chọn file <code>HAK-PhucHoiCapPhep.hakkey</code> vừa tải, nhập mật khẩu rồi bấm <strong>Phục hồi cấp phép</strong>. Nếu cần chuyển hồ sơ công ty, dùng <strong>Sao lưu danh sách công ty</strong> để tải trên máy cũ và nạp trên máy mới. File danh sách chứa thông tin công ty và link Google Sheets dưới dạng văn bản, nên lưu nội bộ.</p>
   </details>
 
   <details class="help" id="integrationGuide">
@@ -123,7 +130,7 @@
       <li><strong>Đưa khóa công khai HAK vào bộ cài.</strong> Tải đúng file <code>HAK-PublicKey.jwk</code> và lưu trong repo app mới. Khi đóng gói, nhúng khóa vào cả bộ xác thực của Setup và bộ xác thực khi mở app. Bản sao <code>.hakkey</code> và mật khẩu chỉ dùng trên máy quản trị. Setup và app xác thực offline bằng khóa công khai đã nhúng. Với các bộ cài dùng bộ khóa HAK của Báo cáo ngày 2.6.0, lấy đúng file từ bản đã chốt. <a href="https://raw.githubusercontent.com/saoluucvhak-pixel/HAK_BAOCAONGAY/installer-v2.6.0-16.1/desktop-app/licensing/HAK-PublicKey.jwk">Tải HAK-PublicKey.jwk chính thức</a>.</li>
       <li><strong>Tích hợp tạo yêu cầu và đọc phản hồi.</strong> Setup tạo mã <code>HAK4.</code> bằng mã app, mã máy ổn định, nonce ngẫu nhiên 16 byte và khóa công khai X25519 của lần cài. Giữ trạng thái yêu cầu và khóa X25519 bí mật ở máy cài. Nhận và xác minh mã <code>HAKA4.</code> cùng file <code>.haksetup</code>. Giữ nguyên định dạng, chuỗi được ký và cách giải mã đã dùng trong giao thức v4. Phần đọc file phải xác minh chữ ký Ed25519, đối chiếu đúng yêu cầu đang chờ, mã app, mã máy và thời hạn trước khi cho phép sử dụng. <a href="https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/LicenseProtocol.cs">Xem mã giao thức v4</a>.</li>
       <li><strong>Khóa app chính.</strong> Sau khi duyệt, lưu trạng thái đã xác minh trong vùng lưu trữ được bảo vệ của máy. Mỗi lần mở app, kiểm tra lại chữ ký, hạn dùng, mã app và mã máy thực tế trước khi mở màn hình làm việc. Mỗi lượt cài yêu cầu phê duyệt mới phải tạo nonce và khóa X25519 mới. <a href="https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/Program.cs">Xem cách Báo cáo ngày gọi bộ xác thực ở Setup và app chính</a>.</li>
-      <li><strong>Hiện đúng tên trong HTML và xác định dữ liệu riêng.</strong> Người tích hợp thêm cặp mã ứng dụng và tên lấy từ repo vào mục <code>productNames</code> trong mã nguồn HTML quản trị. HTML vẫn đọc được yêu cầu hợp lệ trước khi thêm tên và sẽ hiện mã app để đối chiếu. App chỉ cần kích hoạt thì đọc dữ liệu cấu hình rỗng <code>{}</code>. Nếu app cần nhận cấu hình riêng, bổ sung đúng trường nhập trong HTML và phần đọc, kiểm tra các trường đó ở app. Hai nguồn CSV của Báo cáo ngày chỉ áp dụng cho Báo cáo ngày. Cập nhật bản HTML quản trị đang dùng khi thêm tên hoặc trường cấu hình, rồi dùng lại file sao lưu khóa HAK cũ nếu trình duyệt chưa có khóa. <a href="https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/tree/main/desktop-app/licensing">Mở thư mục cấp phép trên GitHub</a>.</li>
+      <li><strong>Hiện đúng tên trong HTML và xác định dữ liệu riêng.</strong> Người tích hợp thêm cặp mã ứng dụng và tên lấy từ repo vào mục <code>productNames</code> trong mã nguồn HTML quản trị. HTML vẫn đọc được yêu cầu hợp lệ trước khi thêm tên và sẽ hiện mã app để đối chiếu. App chỉ cần kích hoạt thì đọc dữ liệu cấu hình rỗng <code>{}</code>. Nếu app cần nhận cấu hình riêng, bổ sung đúng trường nhập trong HTML và phần đọc, kiểm tra các trường đó ở app. Hai nguồn CSV của Báo cáo ngày chỉ áp dụng cho Báo cáo ngày. Cập nhật bản HTML quản trị đang dùng khi thêm tên hoặc trường cấu hình. Nếu trình duyệt chưa có khóa HAK, nạp file phục hồi cấp phép đã lưu. <a href="https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/tree/main/desktop-app/licensing">Mở thư mục cấp phép trên GitHub</a>.</li>
       <li><strong>Nghiệm thu trước khi phát hành.</strong> Dùng cùng một HTML để cấp cho Báo cáo ngày và app mới. Xác nhận HTML hiện đúng tên từ repo, mỗi bộ cài nhận phản hồi của mình, app mở lại được sau kích hoạt và phản hồi bị từ chối khi dùng chéo app, chéo máy, sau khi tạo mã yêu cầu mới, khi hết hạn hoặc khi file bị sửa. Thử chạy app chính trên máy chưa được cấp phép và xác nhận màn hình làm việc vẫn bị khóa. Ghi lại URL repo, tên hiển thị, mã định danh và commit đã kiểm thử. Phát hành bộ cài tại GitHub Releases của chính app đó.</li>
     </ol>
   </details>
@@ -188,8 +195,8 @@ function showVault() {
   const vault = readVault();
   const matches = vault?.publicKey.x === expectedIssuer;
   $('restoreIssuerForm').hidden = matches;
-  $('exportIssuer').hidden = !matches;
-  $('exportVerificationKey').hidden = !matches;
+  $('recoveryExport').hidden = !matches;
+  $('verificationExport').hidden = !matches;
   $('unlockIssuerLabel').hidden = !matches || Boolean(issuerKey);
   $('issueButton').disabled = !matches || issuing;
   report($('issuerStatus'), matches
@@ -224,7 +231,7 @@ $('restoreIssuerForm').addEventListener('submit', issuerAction(async (event) => 
     button.disabled = false;
   }
 }));
-$('exportIssuer').addEventListener('click', issuerAction(() => download('HAK-KhoaChung.hakkey', readVault())));
+$('exportIssuer').addEventListener('click', issuerAction(() => download('HAK-PhucHoiCapPhep.hakkey', readVault())));
 $('exportVerificationKey').addEventListener('click', issuerAction(() => download('HAK-PublicKey.jwk', readVault().publicKey)));
 
 async function decryptVault(vault, password) {
