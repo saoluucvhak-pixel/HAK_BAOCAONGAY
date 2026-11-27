@@ -15,6 +15,13 @@
 - Excel cập nhật tiến trình theo sheet và nhóm dòng. PDF hiện tiến trình theo bước, với cập nhật theo nhóm trang khi tạo phiếu nhập kho hàng loạt. Bước dàn trang của jsPDF vẫn chạy đồng bộ.
 - Vite nhúng mã, CSS và Worker vào `app/dist/index.html`. Bản cấu hình và mẫu Electron dùng cùng bản build này.
 
+### Kiểm tra bản phát hành
+
+- CI kiểm tra UI baseline, tính nhất quán của ba bản HTML đã commit và audit riêng cho web và Electron.
+- Nâng Vite lên 8.4, Electron lên 45.5 và electron-builder lên 26.18. Cấu hình công ty dùng một khối JSON trong HTML để thông tin người dùng tiếp tục hoạt động qua các lần nâng công cụ build.
+- Workflow phát hành Windows yêu cầu bộ cài có chữ ký Authenticode hợp lệ. Gói phát hành chứa SHA-256 và bản kê kiểm tra chữ ký. Kịch bản kiểm thử cài đè dùng bản công bố 1.0.0 và chứng thư thử nghiệm trên runner Windows.
+- Kịch bản đo 10.000 đến 100.000 phiếu cân và kết quả tham chiếu có trong README.
+
 ## [Phase 4.12] — 30/10/2026 — Rà soát toàn bộ code app
 
 ### Sửa

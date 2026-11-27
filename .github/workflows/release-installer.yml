@@ -45,7 +45,7 @@ jobs:
           npm run release
 
       - name: Verify signature and record SHA-256
-        run: ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature
+        run: ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature -RequireTimestamp
 
       - name: Record GitHub build provenance
         uses: actions/attest@v4

@@ -2,7 +2,8 @@
 # Không coi bộ cài chưa ký số hoặc chưa quét là "an toàn".
 param(
   [Parameter(Mandatory=$true)][string]$ReleaseDir,
-  [switch]$RequireSignature
+  [switch]$RequireSignature,
+  [switch]$RequireTimestamp
 )
 $ErrorActionPreference = 'Stop'
 $release = (Resolve-Path -LiteralPath $ReleaseDir).Path
@@ -17,6 +18,9 @@ foreach ($file in $files) {
   if ($RequireSignature -and $sigStatus -ne 'Valid') {
     throw "Chứng thư ký số đã được cấu hình nhưng EXE không có chữ ký hợp lệ: $($file.Name) ($sigStatus)"
   }
+  if ($RequireTimestamp -and ($sigStatus -ne 'Valid' -or -not $sig.TimeStamperCertificate)) {
+    throw "Thiếu dấu thời gian Authenticode hợp lệ: $($file.Name)"
+  }
   if ($sigStatus -notin @('Valid','NotSigned')) {
     throw "Chữ ký Windows không hợp lệ: $($file.Name) ($sigStatus)"
   }
@@ -26,6 +30,8 @@ foreach ($file in $files) {
     sha256 = $digest
     authenticode = $sigStatus
     signer = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { $null }
+    signer_thumbprint = if ($sig.SignerCertificate) { $sig.SignerCertificate.Thumbprint } else { $null }
+    timestamped = [bool]$sig.TimeStamperCertificate
   }
 }
 

@@ -95,9 +95,10 @@ jobs:
         run: |
           npm ci
           npm run dist -- --publish never
-      - name: Sign the QA installer and test upgrade and restore
+      - name: Fetch the published legacy installer
         env:
           GH_TOKEN: ${{ github.token }}
+        timeout-minutes: 2
         run: |
           $oldDir = Join-Path $env:RUNNER_TEMP 'hak-original'
           gh release download installer-v1.0.0-2 --pattern '*.exe' --dir $oldDir
@@ -105,9 +106,25 @@ jobs:
           $old = @(Get-ChildItem $oldDir -Filter '*.exe')
           $new = @(Get-ChildItem desktop-app/release -Filter '*.exe')
           if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Expected exactly one old and one new installer.' }
-          Write-Host "Published installer signature: $((Get-AuthenticodeSignature $old[0].FullName).Status)"
-          & ./desktop-app/tests/sign-for-test.ps1 -Installer $new[0].FullName
-          node app/tests/windows-installer-upgrade.mjs $old[0].FullName $new[0].FullName
+          "HAK_QA_OLD=$($old[0].FullName)" >> $env:GITHUB_ENV
+          "HAK_QA_NEW=$($new[0].FullName)" >> $env:GITHUB_ENV
+      - name: Sign and verify the QA installer
+        timeout-minutes: 2
+        run: ./desktop-app/tests/sign-for-test.ps1 -Installer $env:HAK_QA_NEW
+      - name: Install both versions and verify upgrade and restore
+        timeout-minutes: 8
+        run: |
+          Write-Host "Published installer signature: $((Get-AuthenticodeSignature $env:HAK_QA_OLD).Status)"
+          if ((Get-AuthenticodeSignature $env:HAK_QA_NEW).Status -ne 'Valid') { throw 'QA installer signature invalid.' }
+          node app/tests/windows-installer-upgrade.mjs $env:HAK_QA_OLD $env:HAK_QA_NEW
+      - name: Remove the QA signing certificate
+        if: always()
+        run: |
+          if ($env:HAK_QA_CERT_THUMBPRINT) {
+            foreach ($store in @('Root', 'TrustedPublisher', 'My')) {
+              Remove-Item "Cert:\CurrentUser\$store\$env:HAK_QA_CERT_THUMBPRINT" -ErrorAction SilentlyContinue
+            }
+          }
 
   desktop-installer:
     # Chỉ build bộ cài từ main sau khi build/test và Windows mock đều đạt;
