@@ -14,3 +14,4 @@ desktop-app/licensing/obj/
 *.hakreq
 *.haklic
 desktop-app/app/license-verifier.json
+desktop-app/build/HAK-CapPhep.html

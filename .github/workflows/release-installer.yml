@@ -1,21 +1,15 @@
 name: Release installer
 
-# Đóng bộ cài app desktop "Báo cáo ngày" (Windows) — chạy tay: tab Actions → "Release installer" → Run workflow.
-# Kết quả được đăng lên mục Releases của repo (tải từng file trực tiếp) và nằm trong Artifacts của lần chạy: file Setup .exe, các phần .part (≤ 28 MB), GHEP_FILE.bat, HUONG_DAN_GHEP_FILE.txt.
 on:
   workflow_dispatch:
     inputs:
-      issuer_public_key:
-        description: RSA public JWK of the HAK license issuer (optional if repository variable is set)
-        type: string
-        required: false
       publish:
-        description: Post the verified installer to GitHub Releases
+        description: Publish Setup and keep the companion HTML in a separate draft
         type: boolean
         default: false
 
 permissions:
-  contents: write   # tạo GitHub Release
+  contents: write
   id-token: write
   attestations: write
 
@@ -32,7 +26,6 @@ jobs:
             app/package-lock.json
             desktop-app/package-lock.json
 
-      # Bản web mới nhất (desktop-app/scripts/release.mjs chép app/dist/index.html vào app desktop)
       - name: Build web
         working-directory: app
         run: |
@@ -40,26 +33,17 @@ jobs:
           npm run build
           npm run build:config
 
-      - name: Build Authenticode-signed installer
+      - name: Build Windows Setup and matching admin HTML
         working-directory: desktop-app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-          WIN_CSC_LINK: ${{ secrets.HAK_WINDOWS_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.HAK_WINDOWS_CSC_PASSWORD }}
-          HAK_REQUIRE_SIGNING: "1"
-          HAK_LICENSE_PUBLIC_KEY: ${{ inputs.issuer_public_key || vars.HAK_LICENSE_PUBLIC_KEY }}
         run: |
-          if (-not $env:HAK_LICENSE_PUBLIC_KEY) { throw 'Configure HAK_LICENSE_PUBLIC_KEY with the company issuer public key.' }
-          if (-not $env:WIN_CSC_LINK) { throw 'Configure HAK_WINDOWS_CSC_LINK before publishing a signed installer.' }
           npm ci
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm run release
 
-      - name: Verify signature and record SHA-256
-        run: |
-          ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature -RequireTimestamp
-          $registration = Get-AuthenticodeSignature -LiteralPath ./desktop-app/release/registration/HAK-License.exe
-          if ($registration.Status -ne 'Valid' -or -not $registration.TimeStamperCertificate) { throw 'Invalid signature on registration tool.' }
+      - name: Verify the installer and record SHA-256
+        run: ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release
 
       - name: Record GitHub build provenance
         uses: actions/attest@v4
@@ -73,29 +57,27 @@ jobs:
             desktop-app/release/*.exe
             desktop-app/release/*.part
             desktop-app/release/GHEP_FILE.bat
-            desktop-app/release/HAK-CapPhep.html
             desktop-app/release/HUONG_DAN_GHEP_FILE.txt
-            desktop-app/release/registration/Register-HAK.cmd
-            desktop-app/release/registration/HAK-License.exe
             desktop-app/release/SHA256SUMS.txt
             desktop-app/release/INSTALLER_SECURITY.json
           if-no-files-found: error
           retention-days: 30
 
-      # Đăng lên Releases để tải trực tiếp từng file (không cần tải zip Artifacts).
-      - name: Publish GitHub Release
-        if: inputs.publish
+      - name: Publish Setup and save admin HTML as a draft
+        if: inputs.publish && github.ref == 'refs/heads/main'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(node -p "require('./desktop-app/package.json').version")
-          TAG="installer-v${VERSION}-${{ github.run_number }}"
-          gh release create "$TAG" \
+          PAIR="v${VERSION}-${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          gh release create "quan-tri-${PAIR}" desktop-app/release/HAK-CapPhep.html \
+            --draft --target "$GITHUB_SHA" \
+            --title "HAK quản trị nội bộ ${PAIR}" \
+            --notes "HTML quản trị đi kèm bộ cài installer-${PAIR}. Giữ bản nháp này ở chế độ dành cho người có quyền ghi kho."
+          gh release create "installer-${PAIR}" \
             desktop-app/release/*.exe desktop-app/release/*.part \
             desktop-app/release/GHEP_FILE.bat desktop-app/release/HUONG_DAN_GHEP_FILE.txt \
-            desktop-app/release/HAK-CapPhep.html \
             desktop-app/release/SHA256SUMS.txt desktop-app/release/INSTALLER_SECURITY.json \
-            desktop-app/release/registration/HAK-License.exe desktop-app/release/registration/Register-HAK.cmd \
-            --title "Bộ cài Báo cáo ngày ${VERSION} (lần ${{ github.run_number }})" \
-            --notes "Bộ cài desktop Báo cáo ngày ${VERSION}, đóng từ commit ${{ github.sha }}, đã xác minh chữ ký Authenticode. Tải các file .part cùng GHEP_FILE.bat vào một thư mục, nhấp đúp GHEP_FILE.bat; hoặc tải thẳng file Setup .exe. Quản trị viên dùng HAK-CapPhep.html để cấp và cấp lại file .haksetup sau khi cài Windows."
+            --target "$GITHUB_SHA" --title "Bộ cài Báo cáo ngày ${PAIR}" \
+            --notes "Bộ cài Windows x64 từ commit ${GITHUB_SHA}, có SHA-256 và kiểm tra nguồn gốc bản dựng. Bộ cài chưa ký Authenticode. Mỗi lần cài có mã yêu cầu mới. Quản trị viên dùng HTML đúng đợt phát hành để tạo phản hồi."

@@ -88,14 +88,10 @@ jobs:
           npm run build:config
           Copy-Item dist/index.html ../desktop-app/app/index.html -Force
           node scripts/verify-build.mjs
-      - name: Generate temporary issuer for licensing tests
-        env:
-          HAK_LICENSE_QA_KEYGEN: "1"
+      - name: Prepare the temporary test directory
         run: |
           $fixtureDir = Join-Path $env:RUNNER_TEMP 'hak-license-qa'
           New-Item -ItemType Directory $fixtureDir | Out-Null
-          node desktop-app/licensing/admin.mjs keygen "$fixtureDir/private.pem" "$fixtureDir/public.jwk"
-          "HAK_LICENSE_PUBLIC_KEY=$(Get-Content -Raw "$fixtureDir/public.jwk")" >> $env:GITHUB_ENV
           "HAK_LICENSE_QA=1" >> $env:GITHUB_ENV
           "HAK_QA_LICENSE_DIR=$fixtureDir" >> $env:GITHUB_ENV
       - name: Package installer for Windows QA
@@ -135,55 +131,3 @@ jobs:
             Remove-Item "Cert:\CurrentUser\My\$env:HAK_QA_CERT_THUMBPRINT" -ErrorAction SilentlyContinue
 
           }
-
-  desktop-installer:
-    # Chỉ build bộ cài từ main sau khi build/test và Windows mock đều đạt;
-    # không công bố một EXE lấy từ PR chưa được nghiệm thu.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.HAK_LICENSE_PUBLIC_KEY != ''
-    needs: [build-test, desktop-windows-tests, desktop-upgrade-tests]
-    runs-on: windows-latest
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Build latest report for Desktop
-        working-directory: app
-        run: |
-          npm ci
-          npm run build
-      - name: Package Windows installer
-        working-directory: desktop-app
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-          WIN_CSC_LINK: ${{ secrets.HAK_WINDOWS_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.HAK_WINDOWS_CSC_PASSWORD }}
-          HAK_LICENSE_PUBLIC_KEY: ${{ vars.HAK_LICENSE_PUBLIC_KEY }}
-        run: |
-          npm ci
-          npm run dist
-      - name: Audit Authenticode, SHA-256 and optional Defender scan
-        shell: pwsh
-        env:
-          SIGNING_CERT_PRESENT: ${{ secrets.HAK_WINDOWS_CSC_LINK != '' }}
-        run: |
-          $requireSigned = $env:SIGNING_CERT_PRESENT -eq 'true'
-          ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release -RequireSignature:$requireSigned -RequireTimestamp:$requireSigned
-      - name: Record GitHub build provenance for the EXE
-        uses: actions/attest@v4
-        with:
-          subject-path: desktop-app/release/*.exe
-      - name: Upload Windows installer and security manifest
-        uses: actions/upload-artifact@v4
-        with:
-          name: HAK-BAOCAONGAY-Windows-Setup
-          path: |
-            desktop-app/release/*.exe
-            desktop-app/release/SHA256SUMS.txt
-            desktop-app/release/INSTALLER_SECURITY.json
-          if-no-files-found: error
-          retention-days: 30

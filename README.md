@@ -66,51 +66,19 @@ npm run test:dashboard-fit
 Lần đầu cần Chromium cho Playwright: `npx playwright install chromium`.
 Nếu cố ý thay đổi file xuất: `node tests/test-export-golden.mjs --update` (ghi lại mẫu chuẩn) — chỉ làm khi đã kiểm tra bằng mắt.
 
-## Kích hoạt và cấu hình công ty trên Windows
+## Cài đặt Windows bằng mã phản hồi
 
-1. **Máy cần cài** mở bộ cài rồi bấm **Sao chép** để gửi mã yêu cầu `HAK-R1.…` cho HAK. Giữ cửa sổ mở trong khi chờ phản hồi.
-2. **Quản trị viên HAK** mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html), mở khóa bằng file khóa riêng và mật khẩu, rồi dán mã yêu cầu. Mở **Thông tin công ty và nguồn Google Sheets**, điền tên công ty và các thông tin cần dùng. Dán liên kết CSV cho **Phiếu cân** và **Đề nghị thanh toán**. Có thể để trống **Hợp đồng NCC** và **Hồ sơ keo** khi không dùng hai nguồn này. Chọn ngày hết hạn rồi bấm **Tạo file cài đặt HAK**.
-3. **Máy cần cài** bấm **Nạp file HAK…** rồi chọn `HAK-CaiDat.haksetup`. Nếu ứng dụng đang hoạt động, dùng **Nạp file cài đặt HAK…** trong menu ứng dụng. Sau khi xác minh chữ ký, thời hạn và đúng máy được duyệt, ứng dụng tự đưa cấu hình vào báo cáo.
+1. Mở Setup. Sao chép **mã yêu cầu 8 chữ số** gửi HAK và giữ cửa sổ bộ cài mở.
+2. HAK mở **HAK-CapPhep.html đi kèm đúng bản Setup**, dán mã và bấm **Tạo mã trả lời**.
+3. Dán mã trả lời vào Setup và bấm **Kích hoạt**. Mỗi lần cài hoặc cài đè có mã yêu cầu mới.
 
-Mỗi lần mở bộ cài sinh một mã ngẫu nhiên mới. Phản hồi chỉ có hiệu lực cho lần cài, máy và tài khoản Windows tạo yêu cầu. Mở lại ứng dụng đã cài dùng giấy phép đang còn hạn. HAK có thể tạo file và người nhận có thể nạp file khi offline. Ứng dụng cần Internet để lấy dữ liệu mới từ Google Sheets. File có chứa thông tin công ty và liên kết CSV, vì vậy gửi riêng cho đầu mối được duyệt.
+Để tự điền thông tin công ty và các nguồn Google Sheets CSV, HAK mở **Thông tin công ty và nguồn Google Sheets** rồi bấm **Tạo file cài đặt HAK**. Người nhận chọn **Nạp file HAK…** trong bộ cài. Hai nguồn **Phiếu cân** và **Đề nghị thanh toán** là bắt buộc. HAK có thể nạp lại cấu hình từ file phản hồi cũ thuộc cùng bản dựng. Tạo mã, xuất file và cài đặt có thể làm offline. Ứng dụng cần Internet để tải dữ liệu mới.
 
-### Cấp lại khi cài lại ứng dụng hoặc Windows
+### Phát hành bản nâng cấp
 
-Khi cài lại ứng dụng hoặc Windows, dùng mã yêu cầu mới để cấp phản hồi mới.
+Workflow **Release installer** trên nhánh `main` tự tạo một bộ tính mã ngẫu nhiên cho mỗi lần đóng gói. Chọn `publish=true` để đưa Setup lên GitHub Releases. HTML quản trị cùng bộ tính được lưu trong một bản nháp riêng tên **HAK quản trị nội bộ**. Dùng đúng cặp Setup và HTML cùng số phát hành. Giữ HTML trong nhóm quản trị HAK. Cơ chế này ngăn cài tùy tiện vì bộ cài chứa cùng bộ tính mã.
 
-1. Máy mở lại bộ cài, sao chép mã yêu cầu mới `HAK-R1.…` và gửi HAK.
-2. Quản trị viên mở `HAK-CapPhep.html` bằng Chrome hoặc Edge. Chọn khóa riêng đã mã hóa dùng để cấp file cũ và nhập mật khẩu. Trong **Dùng lại cấu hình khi cài lại**, chọn file `.haksetup` cũ và bấm **Nạp cấu hình từ file cũ**. Công cụ xác minh chữ ký và điền lại thông tin công ty cùng các liên kết Google Sheets, kể cả khi giấy phép cũ đã hết hạn.
-3. Kiểm tra thông tin, dán mã yêu cầu mới, chọn ngày hết hạn rồi bấm **Tạo file cài đặt HAK**. Gửi file mới cho người dùng để chọn **Nạp file HAK…**.
-
-Khi không còn file cũ, điền lại cấu hình theo hồ sơ công ty đã duyệt. Giữ một bản file cấp phép ở nơi quản trị viên được phép truy cập để thuận tiện cấp lại.
-
-### Chỉ kích hoạt bằng mã trả lời
-
-1. **Máy cần cài** mở bộ cài và bấm **Sao chép** để gửi mã yêu cầu `HAK-R1.…` cho HAK.
-2. **Quản trị viên HAK** mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html), mở khóa bằng file khóa riêng và mật khẩu, dán mã yêu cầu rồi bấm **Tạo mã trả lời**. Công cụ cấp mã `HAK-A1.…` và mặc định hạn dùng 90 ngày. Có thể thay đổi ngày hết hạn.
-3. **Máy cần cài** dán mã trả lời vào bộ cài và bấm **Kích hoạt**. Electron xác minh lại khi mở app. Đăng ký và cài bằng cùng tài khoản Windows có TPM hoạt động và .NET Framework 4.8.
-
-Mỗi lần mở trang quản trị, chỉ cần mở khóa một lần để xử lý nhiều máy. Đóng trang sẽ khóa lại. Mã dùng cùng một bộ cài đã đóng với khóa công khai của công ty. Khi hết hạn, ứng dụng mở lại cùng hộp thoại để nhập mã mới. Bộ cài vẫn đọc file giấy phép cũ đặt cạnh EXE.
-
-### Đóng bộ cài trên máy quản trị HAK
-
-- Máy đóng gói dùng Windows với Node.js 22.12 trở lên và .NET SDK có bộ tham chiếu .NET Framework 4.8.
-- Mở `desktop-app/Dong-Bo-Cai-HAK.cmd` và đặt mật khẩu quản trị khi được hỏi. Công cụ lưu khóa riêng đã mã hóa tại `%LOCALAPPDATA%\HAK\Issuer\HAK-KhoaRieng.hakkey`, tự đưa phần khóa công khai vào bộ cài và xuất bộ cài cùng `HAK-CapPhep.html` trong `desktop-app/release`.
-- Khi cần đóng lại bộ cài, nhập mật khẩu đã dùng. Khi duyệt máy, mở `HAK-CapPhep.html`, chọn cùng file `.hakkey` và cấp file phản hồi như trên. Sao lưu file khóa đã mã hóa để giữ khả năng cấp phép nếu máy quản trị được cài lại.
-- Bộ cài đóng cục bộ theo cách này dùng xác minh giấy phép HAK theo máy và được kiểm tra SHA-256. Bộ cài có thể hiện cảnh báo nhà phát hành chưa xác định trên Windows.
-
-### Phát hành có chữ ký Authenticode
-
-Workflow **Release installer** trên GitHub dùng chứng thư Code Signing của đơn vị qua Actions secrets `HAK_WINDOWS_CSC_LINK` và `HAK_WINDOWS_CSC_PASSWORD`. Chứng thư phải dùng được với electron-builder trên runner Windows. Workflow ký SHA-256 với dấu thời gian RFC 3161, kiểm tra trạng thái `Valid` rồi công bố EXE, SHA-256 và bản kê kiểm tra. Khóa riêng nằm trong hệ thống quản lý secrets của đơn vị.
-
-Trên Windows, có thể kiểm tra nhà phát hành và dấu thời gian của file đã tải bằng PowerShell.
-
-```powershell
-Get-AuthenticodeSignature -FilePath '.\BaoCaoNgay_Setup.exe' |
-  Format-List Status, SignerCertificate, TimeStamperCertificate
-```
-
-Job `desktop-upgrade-tests` cài bản 1.0.0 đã công bố và đối chiếu dữ liệu khi cài đè bằng bộ cài mới có chữ ký thử nghiệm. Chứng thư kiểm thử được tạo trên runner tạm thời.
+GitHub phát hành bộ cài chưa ký Authenticode, kèm SHA-256 và thông tin nguồn gốc bản dựng. Nếu cần tự đóng trên Windows, chạy `desktop-app/Dong-Bo-Cai-HAK.cmd` với Node.js 22.12+ và .NET SDK. Setup và HTML nằm trong `desktop-app/release`.
 
 ### Đo hiệu năng báo cáo
 
