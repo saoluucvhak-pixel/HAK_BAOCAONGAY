@@ -1,83 +1,41 @@
-name: Release installer
+name: Update admin HTML for 2.3.0
 
 on:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish Setup and keep the companion HTML in a separate draft
-        type: boolean
-        default: false
 
 permissions:
   contents: write
-  id-token: write
-  attestations: write
 
 jobs:
-  installer:
-    runs-on: windows-latest
+  update-admin:
+    if: github.ref == 'refs/heads/codex/hak-update-admin-230'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |
-            app/package-lock.json
-            desktop-app/package-lock.json
-
-      - name: Build web
-        working-directory: app
-        run: |
-          npm ci
-          npm run build
-          npm run build:config
-
-      - name: Build Windows Setup and matching admin HTML
-        working-directory: desktop-app
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: |
-          npm ci
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          npm run release
-
-      - name: Verify the installer and record SHA-256
-        run: ./desktop-app/scripts/audit-installer.ps1 -ReleaseDir ./desktop-app/release
-
-      - name: Record GitHub build provenance
-        uses: actions/attest@v4
-        with:
-          subject-path: desktop-app/release/*.exe
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: BaoCaoNgay-installer
-          path: |
-            desktop-app/release/*.exe
-            desktop-app/release/*.part
-            desktop-app/release/GHEP_FILE.bat
-            desktop-app/release/HUONG_DAN_GHEP_FILE.txt
-            desktop-app/release/SHA256SUMS.txt
-            desktop-app/release/INSTALLER_SECURITY.json
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Publish Setup and save admin HTML as a draft
-        if: inputs.publish && github.ref == 'refs/heads/main'
-        shell: bash
+      - name: Add the compatible HTML to the existing admin draft
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(node -p "require('./desktop-app/package.json').version")
-          PAIR="v${VERSION}-${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
-          gh release create "quan-tri-${PAIR}" desktop-app/release/HAK-CapPhep.html \
-            --draft --target "$GITHUB_SHA" \
-            --title "HAK quản trị nội bộ ${PAIR}" \
-            --notes "HTML quản trị đi kèm bộ cài installer-${PAIR}. Giữ bản nháp này ở chế độ dành cho người có quyền ghi kho."
-          gh release create "installer-${PAIR}" \
-            desktop-app/release/*.exe desktop-app/release/*.part \
-            desktop-app/release/GHEP_FILE.bat desktop-app/release/HUONG_DAN_GHEP_FILE.txt \
-            desktop-app/release/SHA256SUMS.txt desktop-app/release/INSTALLER_SECURITY.json \
-            --target "$GITHUB_SHA" --title "Bộ cài Báo cáo ngày ${PAIR}" \
-            --notes "Bộ cài Windows x64 từ commit ${GITHUB_SHA}, có SHA-256 và kiểm tra nguồn gốc bản dựng. Bộ cài chưa ký Authenticode. Mỗi lần cài có mã yêu cầu mới. Quản trị viên dùng HTML đúng đợt phát hành để tạo phản hồi."
+          release=460717882
+          tag=quan-tri-v2.3.0-11.1
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/$release" --jq '.draft and .tag_name == "quan-tri-v2.3.0-11.1"')" = true
+          umask 077
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          export HAK_ADMIN_PATCH_DIR="$work"
+          gh release download "$tag" --pattern HAK-CapPhep.html --dir "$work"
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const dir = process.env.HAK_ADMIN_PATCH_DIR;
+          const original = readFileSync(dir + '/HAK-CapPhep.html', 'utf8');
+          assert.equal(createHash('sha256').update(original).digest('hex'), '4ae50f05e5fb9170138dd99aad83b9bb1d1260a8df4e131a1181f6d720d24961');
+          const pair = original.match(/^const seed = '([A-Za-z0-9+/]{43}=)';$/m);
+          assert(pair, 'Missing installer pairing.');
+          const template = readFileSync('desktop-app/licensing/HAK-CapPhep.html', 'utf8');
+          assert.equal(template.split('__HAK_BUILD_SEED__').length, 2);
+          writeFileSync(dir + '/HAK-CapPhep-NhieuCongTy.html', template.replace('__HAK_BUILD_SEED__', pair[1]));
+          JS
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/$release" --jq '.draft')" = true
+          gh release upload "$tag" "$work/HAK-CapPhep-NhieuCongTy.html"
