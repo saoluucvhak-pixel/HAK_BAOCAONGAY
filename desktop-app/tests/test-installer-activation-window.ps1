@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$Installer)
+param([Parameter(Mandatory)][string]$Installer, [switch]$ExpectHidden)
 
 $ErrorActionPreference = 'Stop'
 $existingHelpers = @(Get-Process -Name HAK-License -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
@@ -14,6 +14,16 @@ try {
         Start-Sleep -Milliseconds 250
     } while ([DateTime]::UtcNow -lt $deadline)
 
+    if ($ExpectHidden) {
+        $helper = Get-Process -Name HAK-License -ErrorAction SilentlyContinue |
+            Where-Object { $_.Id -notin $existingHelpers } |
+            Select-Object -First 1
+        if ($activation -or !$helper -or $setup.HasExited) {
+            throw 'Old setup did not reproduce the live activation process without a visible dialog.'
+        }
+        Write-Host 'Confirmed: old setup and HAK-License are running without a visible activation dialog.'
+        return
+    }
     if (!$activation) { throw 'The interactive setup did not show the HAK activation window.' }
     if (!$activation.CloseMainWindow()) { throw 'Could not cancel the HAK activation window.' }
     if (!$setup.WaitForExit(15000) -or $setup.ExitCode -ne 31) {

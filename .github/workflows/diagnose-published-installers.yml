@@ -1,0 +1,29 @@
+name: Diagnose published installers
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/diagnose-published-installers.yml']
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify published installer bytes and compare startup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $old = Join-Path $env:RUNNER_TEMP 'hak-old'
+          $new = Join-Path $env:RUNNER_TEMP 'hak-new'
+          gh release download installer-v2.6.1-19.1 --pattern '*.exe' --dir $old
+          if ($LASTEXITCODE) { throw 'Old installer download failed.' }
+          gh release download installer-v2.6.1-20.1 --pattern '*.exe' --dir $new
+          if ($LASTEXITCODE) { throw 'Fixed installer download failed.' }
+          $oldExe = Get-ChildItem $old -Filter '*.exe'
+          $newExe = Get-ChildItem $new -Filter '*.exe'
+          if ((Get-FileHash $oldExe.FullName).Hash -ne '8046a853dfa9b3f3757cb7bf9e8778477316a963ac115f393981451408eb8564') { throw 'Old hash mismatch.' }
+          if ((Get-FileHash $newExe.FullName).Hash -ne '88094e8a921f15d0128b7a3142e3fc18c0a078795e86bf72aaf98e83aa8ceff6') { throw 'Fixed hash mismatch.' }
+          ./desktop-app/tests/test-installer-activation-window.ps1 -Installer $newExe.FullName
+          ./desktop-app/tests/test-installer-activation-window.ps1 -Installer $oldExe.FullName -ExpectHidden
