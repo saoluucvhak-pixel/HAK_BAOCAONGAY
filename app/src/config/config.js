@@ -26,8 +26,7 @@ export const MANAGED_COMPANY = company._hakCompanyProfile
     SDT: company.SDT,
     DiaChiThuMua: company.DiaChiThuMua,
     MaHS: company.MaHS,
-    NhaMay: company.NhaMay,
-    XuatHang: company.XuatHang || company.XUATHANG || ''
+    NhaMay: company.NhaMay
   })
   : null;
 
