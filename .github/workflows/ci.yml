@@ -23,6 +23,7 @@ jobs:
       - run: npm run build
       # config.html lưu bản base64 của dist: phải đồng bộ sau build để tránh phát hành mẫu cũ.
       - run: npm run build:config
+      - run: cp dist/index.html ../desktop-app/app/index.html
       - run: node scripts/verify-build.mjs
       - name: Check committed artifacts match the build
         run: git diff --exit-code -- config.html dist/index.html ../desktop-app/app/index.html
