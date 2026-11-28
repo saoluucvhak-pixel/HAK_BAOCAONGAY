@@ -10,6 +10,6 @@ assert.match(html.toString('utf8'), /<script id="hak-company-config" type="appli
 const config = readFileSync(new URL('config.html', app), 'utf8');
 const template = config.match(/const APP_TEMPLATE_B64 = "([A-Za-z0-9+/=]+)";/);
 assert(template, 'Không tìm thấy HTML nhúng trong config.html.');
-assert.deepEqual(Buffer.from(template[1], 'base64'), html, 'config.html đang chứa bản web cũ.');
-assert.deepEqual(readFileSync(new URL('../desktop-app/app/index.html', app)), html, 'Mẫu Electron đang chứa bản web cũ.');
+assert.equal(Buffer.compare(Buffer.from(template[1], 'base64'), html), 0, 'config.html đang chứa bản web cũ.');
+assert.equal(Buffer.compare(readFileSync(new URL('../desktop-app/app/index.html', app)), html), 0, 'Mẫu Electron đang chứa bản web cũ.');
 console.log('PASS: Một file HTML. Mẫu cấu hình và Electron khớp từng byte.');
