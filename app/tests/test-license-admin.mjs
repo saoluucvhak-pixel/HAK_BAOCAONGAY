@@ -77,12 +77,13 @@ try {
   await guide.locator('summary').click();
   assert(await guide.getByRole('heading', { name: 'Cấp phép cho từng lần cài' }).isVisible());
   await page.locator('#integrationGuide > summary').click();
-  assert((await page.getByRole('link', { name: 'Tải HAK-PublicKey.jwk chính thức' }).getAttribute('href')).includes('installer-v2.6.0-16.1'));
+  const sharedPublicKeyUrl = 'https://raw.githubusercontent.com/saoluucvhak-pixel/HAK_AI_AGENT_CONTROL_CENTER/main/config/licensing/HAK-PublicKey.jwk';
+  assert.equal(await page.getByRole('link', { name: 'Tải HAK-PublicKey.jwk chính thức' }).getAttribute('href'), sharedPublicKeyUrl);
   assert(await page.getByRole('link', { name: 'Xem mã giao thức v4' }).isVisible());
   await page.getByText('Prompt cho agent tích hợp app mới', { exact: true }).click();
   const agentPrompt = await page.getByLabel('Prompt tích hợp cấp phép HAK v4').inputValue();
   assert(agentPrompt.includes('[URL_GITHUB_APP_MUC_TIEU]'));
-  assert(agentPrompt.includes('/installer-v2.6.0-16.1/desktop-app/licensing/HAK-PublicKey.jwk'));
+  assert(agentPrompt.includes(sharedPublicKeyUrl));
   assert(agentPrompt.includes('tự viết bộ tạo yêu cầu'));
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.getByRole('button', { name: 'Sao chép prompt', exact: true }).click();
