@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HAK · Quản trị giấy phép</title>
+<meta name="hak-issuer-key" content="aS9Vy_CfraLPjzI_TEcJWjDoccAnhxdN_E54iPQOE_E">
+<title>HAK · Cấp phép ứng dụng</title>
 <style>
   :root { font: 16px/1.55 system-ui,sans-serif; color: #14252c; background: #f3f6f7; }
   body { margin: 0; padding: 30px 16px; }
@@ -23,6 +24,12 @@
   button { border: 0; border-radius: 5px; background: #005864; color: #fff; font: inherit; font-weight: 650; padding: .55rem .85rem; cursor: pointer; }
   button:disabled { opacity: .55; cursor: wait; }
   button.secondary { background: #e5f0f2; color: #17424a; margin: .8rem .4rem 0 0; }
+  .company-json { overflow: auto; padding: .85rem; background: #f3f6f7; border-radius: 5px; }
+  #agentPrompt { box-sizing: border-box; width: 100%; min-height: 16rem; resize: vertical; padding: .75rem; font: .9rem/1.5 monospace; }
+  .danger { background: #962c3f; }
+  .file-help { margin: .35rem 0 .85rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .85rem; }
+  .actions button.secondary { margin: 0; }
   .profiles { margin: 1.15rem 0; }
   .status { margin: .8rem 0 0; }
   .error { color: #9f1e2c; }
@@ -32,54 +39,19 @@
 <body>
 <main>
   <header>
-    <h1>Quản trị giấy phép HAK</h1>
-    <p>Dùng trên máy quản trị HAK. Công cụ chạy offline.</p>
+    <h1>Cấp phép ứng dụng HAK</h1>
   </header>
-  <details class="help" id="issuerGuide">
-    <summary>Hướng dẫn cấp phép nhiều app</summary>
-    <h3>1. Chuẩn bị một lần tại HAK</h3>
-    <ol>
-      <li>Mở <strong>Tạo hoặc khôi phục khóa</strong>, đặt mật khẩu rồi bấm <strong>Tạo khóa chung</strong>. Giữ bản sao <code>HAK-KhoaChung.hakkey</code> đã mã hóa và mật khẩu tại HAK.</li>
-      <li>Bấm <strong>Tải khóa công khai để đóng bộ cài</strong>. Dùng cùng file <code>HAK-PublicKey.jwk</code> cho các app HAK đã tích hợp cấp phép và cho các lần nâng cấp. File này dùng để kiểm tra phản hồi đã được HAK cấp.</li>
-      <li>Bộ cài Báo cáo ngày dùng khóa công khai đã lưu trong kho mã nguồn. Với app mới, cung cấp cùng khóa công khai cho công cụ đóng gói của app đó. Khi dùng GitHub <strong>Release installer</strong>, có thể chỉ định khóa công khai qua biến <code>HAK_LICENSE_PUBLIC_KEY</code> hoặc ô <code>issuer_public_key</code>.</li>
-    </ol>
-    <h3>2. Cấp phép cho một máy</h3>
-    <ol>
-      <li>Người cài mở Setup, sao chép mã yêu cầu <code>HAK4.…</code>, gửi HAK và giữ cửa sổ đang mở.</li>
-      <li>Dán mã vào trang này. Đối chiếu <strong>Ứng dụng</strong> và <strong>Máy</strong> hiện dưới ô mã rồi chọn ngày hết hạn. Nếu là Báo cáo ngày, chọn thêm công ty và kiểm tra các nguồn Google Sheets.</li>
-      <li>Bấm <strong>Tạo mã và file HAK</strong>. Gửi cả mã phản hồi và file <code>.haksetup</code>. Người cài kiểm tra mã rồi nạp file vào Setup. Khi chuyển sang cấp cho app khác, dán mã yêu cầu của app đó vào cùng trang này.</li>
-    </ol>
-    <h3>3. Chuyển máy quản trị hoặc khôi phục sau sự cố</h3>
-    <p>Mở HTML trên máy mới, nạp <code>HAK-KhoaChung.hakkey</code> và nhập mật khẩu cũ, rồi bấm <strong>Khôi phục khóa</strong>. Dùng <strong>Sao lưu danh sách công ty</strong> nếu cần chuyển cả hồ sơ công ty.</p>
-  </details>
-  <section aria-labelledby="issuerTitle">
-    <h2 id="issuerTitle">Khóa cấp phép chung HAK</h2>
-    <p id="issuerStatus" class="status" role="status"></p>
-    <details id="issuerDetails">
-      <summary>Tạo hoặc khôi phục khóa</summary>
-      <form id="initializeIssuer">
-        <label>Mật khẩu bảo vệ khóa <input id="newIssuerPassword" type="password" autocomplete="new-password" minlength="12" required></label>
-        <label>Nhập lại mật khẩu <input id="repeatIssuerPassword" type="password" autocomplete="new-password" minlength="12" required></label>
-        <button type="submit">Tạo khóa chung</button>
-      </form>
-      <form id="restoreIssuerForm">
-        <label>Nạp bản sao khóa HAK <input id="restoreIssuer" type="file" accept=".hakkey" required></label>
-        <label>Mật khẩu bản sao <input id="restoreIssuerPassword" type="password" autocomplete="off" required></label>
-        <button class="secondary" type="submit">Khôi phục khóa</button>
-      </form>
-      <button class="secondary" id="exportIssuer" type="button" hidden>Tải bản sao khóa đã mã hóa</button>
-      <button class="secondary" id="exportVerificationKey" type="button" hidden>Tải khóa công khai để đóng bộ cài</button>
-    </details>
-    <label id="unlockIssuerLabel" hidden>Mật khẩu mở khóa cấp phép
-      <input id="unlockIssuerPassword" type="password" autocomplete="off">
-    </label>
-  </section>
   <section aria-labelledby="issue-title">
-    <h2 id="issue-title">Tạo phản hồi cho máy cần cài</h2>
+    <h2 id="issue-title">Cấp phép cho một máy</h2>
+    <p id="issuerStatus" class="status" role="status"></p>
+    <button class="secondary" id="lockIssuer" type="button">🔒 Khóa phiên làm việc</button>
     <form id="issueForm">
       <label>Mã yêu cầu từ máy cần cài <input id="requestCode" type="text" spellcheck="false" autocomplete="off" placeholder="HAK4.…" maxlength="1024"></label>
       <p id="requestSummary" class="status" hidden></p>
-      <label>Ngày hết hạn của file phản hồi <input id="expiry" type="date" required></label>
+      <label id="unlockIssuerLabel" hidden>Mật khẩu mở khóa cấp phép
+        <input id="unlockIssuerPassword" type="password" autocomplete="off">
+      </label>
+      <label>Ngày hết hạn sử dụng <input id="expiry" type="date" required></label>
       <div class="profiles" id="companyChooser">
         <label>Công ty đã lưu
           <select id="savedCompany"></select>
@@ -101,21 +73,121 @@
         <label>Link CSV hồ sơ keo (tùy chọn) <input id="Hosokeo" maxlength="2000" inputmode="url"></label>
         <button class="secondary" id="saveCompany" type="button">Lưu công ty</button>
       </details>
-      <button type="submit" value="kit">Tạo mã và file HAK</button>
+      <button id="issueButton" type="submit" disabled>Tạo mã và file HAK</button>
     </form>
-    <details class="profiles">
-      <summary>Sao lưu danh sách công ty</summary>
-      <button class="secondary" id="exportCompanies" type="button">Tải danh sách</button>
-      <label>Nạp danh sách vào HTML mới
-        <input id="importCompanies" type="file" accept=".json,application/json">
-      </label>
-    </details>
     <div id="replyPanel" hidden>
-      <label>Mã trả lời <input id="replyCode" readonly></label>
-      <button class="secondary" id="copyReply" type="button">Sao chép mã trả lời</button>
+      <label>Mã phản hồi <input id="replyCode" readonly></label>
+      <div class="actions">
+        <button class="secondary" id="copyReply" type="button">Sao chép mã phản hồi</button>
+        <button class="secondary" id="downloadSetup" type="button">Tải file .haksetup</button>
+      </div>
     </div>
     <p id="issueStatus" class="status" role="status"></p>
   </section>
+
+  <details class="help" id="issuerDetails">
+    <summary>Quản lý khóa và hồ sơ công ty</summary>
+    <p id="restoreStatus" class="status" role="status"></p>
+    <form id="restoreIssuerForm">
+      <label>File phục hồi cấp phép (.hakkey) <input id="restoreIssuer" type="file" accept=".hakkey" required></label>
+      <label>Mật khẩu bản sao <input id="restoreIssuerPassword" type="password" autocomplete="off" required></label>
+      <button type="submit">Phục hồi cấp phép</button>
+    </form>
+    <div id="recoveryExport" hidden>
+      <button class="secondary" id="exportIssuer" type="button" aria-describedby="recoveryFileHelp">Tạo bản sao phục hồi cấp phép</button>
+      <p class="file-help" id="recoveryFileHelp">Tải file <code>HAK-PhucHoiCapPhep.hakkey</code> để khôi phục quyền cấp phép khi đổi máy hoặc trình duyệt. File đã mã hóa và cần mật khẩu đã đặt để mở. Lưu tại HAK.</p>
+    </div>
+    <div id="verificationExport" hidden>
+      <button class="secondary" id="exportVerificationKey" type="button" aria-describedby="verificationFileHelp">Tải khóa xác minh HAK</button>
+      <p class="file-help" id="verificationFileHelp">Tải file <code>HAK-PublicKey.jwk</code> cho người tích hợp app. Setup và app dùng khóa công khai này để kiểm tra chữ ký trên phản hồi do HAK cấp. Thuật toán xác minh nằm trong mã nguồn của app.</p>
+    </div>
+    <details class="profiles" id="companyBackupDetails">
+      <summary>Sao lưu và nạp danh sách công ty</summary>
+      <p class="file-help">Để chuyển danh sách sang máy khác, tải <code>HAK-DanhSachCongTy.json</code> ở máy cũ rồi chọn file đó ở máy mới. Để nhập danh sách mới, tải <code>HAK-MauDanhSachCongTy.json</code>, điền thông tin rồi chọn file đã lưu.</p>
+      <div class="actions">
+        <button class="secondary" id="exportCompanies" type="button">Tải bản sao danh sách</button>
+        <button class="secondary" id="exportCompanyTemplate" type="button">Tải mẫu JSON để điền</button>
+      </div>
+      <details>
+        <summary>Xem cấu trúc JSON và cách điền</summary>
+        <p class="file-help">Mở file mẫu bằng trình soạn thảo văn bản. Lưu dưới dạng <code>.json</code> với mã hóa UTF-8. Giữ nguyên <code>format</code> và tên các trường. Điền giá trị trong dấu ngoặc kép. Mỗi khối trong <code>companies</code> là một công ty. Để thêm công ty, sao chép khối đó và đặt dấu phẩy giữa các khối.</p>
+        <p><strong>Bắt buộc</strong> · <code>TenCty</code> là tên công ty, <code>PhieuCan</code> là link CSV phiếu cân, <code>DNTT</code> là link CSV đề nghị thanh toán. Dùng link xuất CSV có <code>output=csv</code> hoặc <code>format=csv</code>.</p>
+        <p><strong>Có thể để trống</strong> · <code>DiaChi</code> là địa chỉ công ty, <code>MST</code> là mã số thuế, <code>SDT</code> là số điện thoại, <code>DiaChiThuMua</code> là địa chỉ thu mua, <code>MaHS</code> là mã HS, <code>NhaMay</code> là nhà máy, <code>HDNCC</code> là link CSV hợp đồng nhà cung cấp và <code>Hosokeo</code> là link CSV hồ sơ keo.</p>
+        <pre class="company-json"><code id="companyTemplatePreview"></code></pre>
+      </details>
+      <label>Chọn file danh sách công ty (.json)
+        <input id="importCompanies" type="file" accept=".json,application/json" aria-describedby="companyImportHelp">
+      </label>
+      <p class="file-help" id="companyImportHelp">HTML thêm hồ sơ mới và giữ dữ liệu của công ty đã lưu trùng tên. File chứa thông tin công ty và link Google Sheets dưới dạng văn bản.</p>
+      <p class="status" id="companyBackupStatus" role="status"></p>
+    </details>
+    <h3>Dữ liệu trên máy đang dùng</h3>
+    <p id="wipeHelp">Nút dưới đây xóa ngay khóa cấp phép đã lưu và toàn bộ hồ sơ công ty khỏi trình duyệt này. Để dùng tiếp, nạp lại file phục hồi và danh sách công ty. Các file đã tải xuống cần được xử lý riêng.</p>
+    <button class="danger" id="wipeIssuerData" type="button" aria-describedby="wipeHelp">Xóa sạch dữ liệu trên máy này</button>
+  </details>
+
+  <details class="help" id="issuerGuide">
+    <summary>Hướng dẫn cấp phép cho ứng dụng đã tích hợp</summary>
+    <h3>Mở khóa trên máy quản trị</h3>
+    <p>Mở file này bằng Chrome hoặc Edge đã cập nhật. Nếu trang báo chưa có khóa, mở <strong>Quản lý khóa và hồ sơ công ty</strong>, chọn file <code>HAK-PhucHoiCapPhep.hakkey</code> (hoặc <code>HAK-KhoaChung.hakkey</code> đã lưu từ bản trước), nhập mật khẩu của bản sao và bấm <strong>Phục hồi cấp phép</strong>. Khi trang hiện ô mật khẩu ở màn cấp phép, nhập mật khẩu trước khi bấm tạo phản hồi.</p>
+    <h3>Cấp phép cho từng lần cài</h3>
+    <ol>
+      <li>Người cài mở bộ cài, sao chép mã bắt đầu bằng <code>HAK4.</code>, gửi cho HAK và giữ nguyên cửa sổ đang mở.</li>
+      <li>Dán mã vào ô <strong>Mã yêu cầu từ máy cần cài</strong>. Đối chiếu tên ứng dụng, mã ứng dụng và mã máy. Nếu HTML báo chưa có tên, đối chiếu mã ứng dụng với repo của app theo hướng dẫn tích hợp bên dưới.</li>
+      <li>Chọn <strong>Ngày hết hạn sử dụng</strong>. Giấy phép còn hiệu lực đến cuối ngày đã chọn theo giờ Việt Nam. Với Báo cáo ngày, chọn <strong>Công ty đã lưu</strong>. Để thêm hồ sơ, bấm <strong>Thêm công ty</strong>, điền tên và hai link CSV bắt buộc cho Phiếu cân và Đề nghị thanh toán, rồi bấm <strong>Lưu công ty</strong>. Các link nằm trong file phản hồi được mã hóa cho lần cài đó và được ẩn trên giao diện app Báo cáo ngày.</li>
+      <li>Bấm <strong>Tạo mã và file HAK</strong>. Bấm <strong>Sao chép mã phản hồi</strong> và <strong>Tải file .haksetup</strong>. Gửi cả hai cho người đã gửi mã yêu cầu.</li>
+      <li>Người cài dán mã phản hồi, bấm <strong>Kiểm tra mã</strong>, chọn <strong>Nạp file HAK…</strong>, rồi tiếp tục cài. Nếu đã đóng và mở lại bộ cài hoặc đang cài cho máy khác, bắt đầu từ mã yêu cầu mới.</li>
+    </ol>
+    <h3>Khi rời máy hoặc dùng máy khác</h3>
+    <p>Bấm <strong>Khóa phiên làm việc</strong> sau khi cấp xong. HTML tự khóa sau 15 phút không dùng chuột hoặc bàn phím. Muốn cấp tiếp, nhập lại mật khẩu. Trên máy mượn, bấm <strong>Xóa sạch dữ liệu trên máy này</strong> trong mục quản lý khóa để xóa dữ liệu HAK lưu trong trình duyệt.</p>
+    <h3>Khi nâng cấp Báo cáo ngày</h3>
+    <p>Khi đóng bản nâng cấp, dùng lại khóa công khai HAK đang có. Khi chạy Setup để nâng cấp, bộ cài vẫn tạo mã yêu cầu mới theo quy trình cài đặt. Dùng cùng HTML và khóa HAK hiện tại để cấp phản hồi cho mã mới.</p>
+    <h3>Khi chuyển máy quản trị</h3>
+    <p>Bấm <strong>Tạo bản sao phục hồi cấp phép</strong> trên máy cũ. Trên máy mới, chọn file <code>HAK-PhucHoiCapPhep.hakkey</code> vừa tải, nhập mật khẩu rồi bấm <strong>Phục hồi cấp phép</strong>. Nếu cần chuyển hồ sơ công ty, dùng <strong>Sao lưu và nạp danh sách công ty</strong> để tải trên máy cũ và nạp trên máy mới. File danh sách chứa thông tin công ty và link Google Sheets dưới dạng văn bản, nên lưu nội bộ.</p>
+  </details>
+
+  <details class="help" id="integrationGuide">
+    <summary>Hướng dẫn tích hợp một app khác trên GitHub</summary>
+    <p>Hiện Báo cáo ngày đã tích hợp. Mỗi app khác cần được tích hợp một lần trong repo của chính app đó. Các app đã tích hợp dùng chung một khóa HAK và cùng trang HTML offline. Mỗi phản hồi vẫn gắn với một app, một máy và một mã yêu cầu.</p>
+    <ol>
+      <li><strong>Xác định ứng dụng từ repo.</strong> Bắt đầu bằng URL GitHub đầy đủ của app cần tích hợp. Đọc tên hiển thị từ cấu hình đóng gói của repo, chẳng hạn <code>build.productName</code> với Electron. Dùng tên đó trong Setup và trong màn kích hoạt của app. Chốt một mã định danh duy nhất dạng <code>com.hakgroup.&lt;ma-app&gt;</code>, lưu trong repo của app, dùng cùng giá trị ở bộ cài và app chính qua các lần nâng cấp. Báo cáo ngày dùng <code>com.hakgroup.baocaongay</code>.</li>
+      <li><strong>Đưa khóa công khai HAK vào bộ cài.</strong> Tải đúng file <code>HAK-PublicKey.jwk</code> và lưu trong repo app mới. Khi đóng gói, nhúng khóa vào cả bộ xác thực của Setup và bộ xác thực khi mở app. Bản sao <code>.hakkey</code> và mật khẩu chỉ dùng trên máy quản trị. Setup và app xác thực offline bằng khóa công khai đã nhúng. Dùng cùng file khóa công khai HAK khi tích hợp app mới hoặc đóng các bản nâng cấp. Nguồn khóa công khai dùng chung là repo HAK_AI_AGENT_CONTROL_CENTER. <a href="https://raw.githubusercontent.com/saoluucvhak-pixel/HAK_AI_AGENT_CONTROL_CENTER/main/config/licensing/HAK-PublicKey.jwk">Tải HAK-PublicKey.jwk chính thức</a>.</li>
+      <li><strong>Tích hợp tạo yêu cầu và đọc phản hồi.</strong> Setup tạo mã <code>HAK4.</code> bằng mã app, mã máy ổn định, nonce ngẫu nhiên 16 byte và khóa công khai X25519 của lần cài. Giữ trạng thái yêu cầu và khóa X25519 bí mật ở máy cài. Nhận và xác minh mã <code>HAKA4.</code> cùng file <code>.haksetup</code>. Giữ nguyên định dạng, chuỗi được ký và cách giải mã đã dùng trong giao thức v4. Phần đọc file phải xác minh chữ ký Ed25519, đối chiếu đúng yêu cầu đang chờ, mã app, mã máy và thời hạn trước khi cho phép sử dụng. <a href="https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/LicenseProtocol.cs">Xem mã giao thức v4</a>.</li>
+      <li><strong>Khóa app chính.</strong> Sau khi duyệt, lưu trạng thái đã xác minh trong vùng lưu trữ được bảo vệ của máy. Mỗi lần mở app, kiểm tra lại chữ ký, hạn dùng, mã app và mã máy thực tế trước khi mở màn hình làm việc. Mỗi lượt cài yêu cầu phê duyệt mới phải tạo nonce và khóa X25519 mới. <a href="https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/Program.cs">Xem cách Báo cáo ngày gọi bộ xác thực ở Setup và app chính</a>.</li>
+      <li><strong>Hiện đúng tên trong HTML và xác định dữ liệu riêng.</strong> Người tích hợp thêm cặp mã ứng dụng và tên lấy từ repo vào mục <code>productNames</code> trong mã nguồn HTML quản trị. HTML vẫn đọc được yêu cầu hợp lệ trước khi thêm tên và sẽ hiện mã app để đối chiếu. App chỉ cần kích hoạt thì đọc dữ liệu cấu hình rỗng <code>{}</code>. Nếu app cần nhận cấu hình riêng, bổ sung đúng trường nhập trong HTML và phần đọc, kiểm tra các trường đó ở app. Hai nguồn CSV của Báo cáo ngày chỉ áp dụng cho Báo cáo ngày. Cập nhật bản HTML quản trị đang dùng khi thêm tên hoặc trường cấu hình. Nếu trình duyệt chưa có khóa HAK, nạp file phục hồi cấp phép đã lưu. <a href="https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/tree/main/desktop-app/licensing">Mở thư mục cấp phép trên GitHub</a>.</li>
+      <li><strong>Nghiệm thu trước khi phát hành.</strong> Dùng cùng một HTML để cấp cho Báo cáo ngày và app mới. Xác nhận HTML hiện đúng tên từ repo, mỗi bộ cài nhận phản hồi của mình, app mở lại được sau kích hoạt và phản hồi bị từ chối khi dùng chéo app, chéo máy, sau khi tạo mã yêu cầu mới, khi hết hạn hoặc khi file bị sửa. Thử chạy app chính trên máy chưa được cấp phép và xác nhận màn hình làm việc vẫn bị khóa. Ghi lại URL repo, tên hiển thị, mã định danh và commit đã kiểm thử. Phát hành bộ cài tại GitHub Releases của chính app đó.</li>
+    </ol>
+    <details id="agentPromptDetails">
+      <summary>Prompt cho agent tích hợp app mới</summary>
+      <p class="file-help">Sao chép toàn bộ prompt, thay <code>[URL_GITHUB_APP_MUC_TIEU]</code> bằng link GitHub của app cần làm, rồi gửi cho agent có quyền sửa repo đó.</p>
+      <p class="file-help">Nút sao chép chép cả hai link sau trong prompt. <a id="promptPublicKeyLink" href="https://raw.githubusercontent.com/saoluucvhak-pixel/HAK_AI_AGENT_CONTROL_CENTER/main/config/licensing/HAK-PublicKey.jwk">Khóa công khai HAK trên Control Center</a> · <a id="promptProtocolLink" href="https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/LicenseProtocol.cs">Mã giao thức cấp phép v4</a>.</p>
+      <label for="agentPrompt">Prompt tích hợp cấp phép HAK v4</label>
+      <textarea id="agentPrompt" readonly spellcheck="false">Hãy triển khai từ đầu chức năng khóa cấp phép offline HAK v4 trong repo GitHub này.
+Repo app cần sửa: [URL_GITHUB_APP_MUC_TIEU]
+
+App mục tiêu có thể chưa có chức năng cấp phép. Hãy đọc mã nguồn, xác định hệ điều hành, ngôn ngữ, màn hình khởi động và cách đóng bộ cài. Với repo chưa có cấp phép, hãy tự viết bộ tạo yêu cầu, màn nhập phản hồi và bộ xác minh, rồi tích hợp chúng vào luồng khởi động thật. Báo cáo ngày là nguồn tham chiếu giao thức. Mọi thay đổi trên repo HTML quản trị dùng chung cần được báo rõ để HAK cập nhật.
+
+Nguồn chính thức của HAK
+Lấy khóa công khai từ HAK_AI_AGENT_CONTROL_CENTER và dùng lại qua các phiên bản của app mục tiêu. Các link Báo cáo ngày bên dưới là mã tham chiếu giao thức v4.
+- Khóa công khai Ed25519 dùng chung: https://raw.githubusercontent.com/saoluucvhak-pixel/HAK_AI_AGENT_CONTROL_CENTER/main/config/licensing/HAK-PublicKey.jwk
+- Đối chiếu SHA-256 của 32 byte giải mã Base64URL từ trường x của JWK: d30874bfa60984599b21222284e9b1a14bcd41146f947771531b99b3cf07b34a.
+- Mã giao thức v4: https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/LicenseProtocol.cs
+- Cách lưu và xác minh khi cài hoặc mở app: https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/Program.cs
+- HTML quản trị tạo mã và file: https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/HAK-CapPhep.html
+
+Các việc phải triển khai
+1. Lấy tên hiển thị từ cấu hình đóng gói repo mục tiêu, ví dụ build.productName của Electron. Chốt và lưu mã app riêng, ổn định theo dạng com.hakgroup.&lt;ma-app&gt;. Dành com.hakgroup.baocaongay cho Báo cáo ngày. Gửi HAK đúng cặp mã app và tên để thêm vào productNames của HTML dùng chung.
+2. Tích hợp màn kích hoạt vào Setup nếu app có bộ cài, và vào app chính trước khi mở chức năng làm việc. Mỗi phiên yêu cầu mới tạo nonce 16 byte bằng bộ sinh số ngẫu nhiên mật mã và cặp X25519 mới. Tính lại mã máy từ định danh ổn định của hệ điều hành và phần cứng, theo cách phù hợp với nền tảng đích. Hiện tên app và nút sao chép mã cho người cài. Giữ mã yêu cầu của phiên và khóa riêng X25519 trên chính máy đó.
+3. Tạo mã HAK4. theo mã tham chiếu: tiền tố HAK4. + Base64URL không đệm của JSON UTF-8 gồm product, machine, nonce và key. Các trường machine và nonce mã hóa 16 byte, key mã hóa 32 byte khóa công khai X25519. Dùng nguyên chuỗi HAK4. đầy đủ làm đầu vào ký và đối chiếu.
+4. Yêu cầu cả mã HAKA4. và file .haksetup hợp lệ trước khi mở khóa. Nhúng đúng khóa công khai Ed25519 HAK vào bộ xác minh của Setup và app chính. Xác minh chữ ký mã phản hồi trên UTF-8 ("hak-unlock-v4\n" + mã HAK4. đầy đủ) và chữ ký file trên UTF-8 ("hak-setup-v4\n" + body Base64URL gốc). Dùng đúng định dạng haksetup-ed25519-v4. Đối chiếu chính xác mã yêu cầu còn chờ, mã app, mã máy và hạn dùng. Giải mã theo mã tham chiếu bằng X25519, HKDF-SHA256 với salt là mã HAK4. đầy đủ và info là hak-company-v4, rồi AES-256-GCM với AAD là mã HAK4. đầy đủ. Dùng thư viện mật mã chuẩn của nền tảng. Giữ file phục hồi .hakkey và mật khẩu trên máy quản trị HAK.
+5. Với app chỉ cần kích hoạt, chấp nhận tải trọng cấu hình {} sau khi xác minh và giải mã. Nếu app có cấu hình riêng, xác định trường theo nhu cầu app và gửi HAK phần cần bổ sung trong HTML dùng chung. Các trường công ty và Google Sheets của Báo cáo ngày dành cho Báo cáo ngày.
+6. Sau khi chấp nhận, lưu bằng vùng lưu trữ được bảo vệ phù hợp với hệ điều hành. Kiểm tra lại chữ ký, mã app, mã máy hiện tại và hạn dùng trước mỗi lần chạy. Các lối mở app trực tiếp vẫn phải đi qua kiểm tra. Cài lại cần phê duyệt phải tạo yêu cầu mới. Giữ nguyên chức năng hiện có của app ngoài bước kiểm tra cấp phép.
+7. Dựng bộ cài trên nền tảng đích. Thử cùng HTML quản trị cấp cho app mục tiêu, kiểm tra mở app sau khi duyệt và mở lại sau khởi động. Kiểm tra từ chối với máy khác, mã app khác, yêu cầu cũ, phản hồi hết hạn, chữ ký hoặc file bị sửa và app chạy trực tiếp khi chưa kích hoạt. Dùng khóa thử cho kiểm thử tự động. Bản phát hành dùng khóa công khai chính thức ở trên. Ghi rõ các bước đã chạy, kết quả và phần còn cần HAK xác nhận trên máy thật.
+8. Bàn giao URL repo, tên hiển thị, mã app, đường dẫn các file sửa, cách chạy kiểm thử, commit hoặc PR và cặp mã app → tên cần thêm vào HTML quản trị.</textarea>
+      <button class="secondary" id="copyAgentPrompt" type="button">Sao chép prompt</button>
+      <p class="status" id="agentPromptStatus" role="status"></p>
+    </details>
+  </details>
 </main>
 <script>
 'use strict';
@@ -124,9 +196,20 @@ const companyFields = ['TenCty', 'DiaChi', 'MST', 'SDT', 'DiaChiThuMua', 'MaHS',
 const profilesFormat = 'hak-company-profiles-v1';
 const setupFormat = 'haksetup-ed25519-v4';
 const reportingProduct = 'com.hakgroup.baocaongay';
+const productNames = new Map([[reportingProduct, 'Báo cáo ngày']]);
+const expectedIssuer = document.querySelector('meta[name="hak-issuer-key"]').content;
+const issuerMismatch = 'Khóa đang chọn không khớp với bộ cài. Khôi phục bản sao khóa HAK đã dùng để đóng bộ cài.';
 const vaultFormat = 'hak-ed25519-issuer-v1';
 const encoder = new TextEncoder();
+const idleTimeoutMs = 15 * 60 * 1000;
 let issuerKey;
+let sessionRevision = 0;
+let idleDeadline = 0;
+let idleTimer;
+let lockMessage = '';
+let pendingSetup;
+let issueRevision = 0;
+let issuing = false;
 $('expiry').value = new Date(Date.now() + 90 * 86400000 + 7 * 3600000).toISOString().slice(0, 10);
 
 function toBase64Url(bytes) {
@@ -169,74 +252,103 @@ function readVault() {
 }
 function showVault() {
   const vault = readVault();
-  $('initializeIssuer').hidden = Boolean(vault);
-  $('restoreIssuerForm').hidden = Boolean(vault);
-  $('exportIssuer').hidden = !vault;
-  $('exportVerificationKey').hidden = !vault;
-  $('unlockIssuerLabel').hidden = !vault || Boolean(issuerKey);
-  report($('issuerStatus'), vault
-    ? (issuerKey ? 'Khóa HAK đã mở cho phiên này.' : 'Đã lưu khóa chung HAK trên máy này.')
-    : 'Tạo khóa một lần hoặc nạp bản sao để cấp phép cho các app HAK.');
+  const matches = vault?.publicKey.x === expectedIssuer;
+  $('restoreIssuerForm').hidden = matches;
+  $('recoveryExport').hidden = !matches;
+  $('verificationExport').hidden = !matches;
+  $('unlockIssuerLabel').hidden = !matches || Boolean(issuerKey);
+  $('issueButton').disabled = !matches || issuing;
+  report($('issuerStatus'), matches
+    ? (issuerKey ? 'Khóa HAK đã mở cho phiên này.' : lockMessage || 'Nhập mật khẩu khóa HAK để cấp phép.')
+    : (vault ? issuerMismatch : 'Chưa có khóa HAK. Mở mục quản lý khóa để khôi phục bản sao.'), Boolean(vault && !matches));
 }
+function showVaultStatus() {
+  try { showVault(); }
+  catch (error) {
+    $('issueButton').disabled = true;
+    report($('issuerStatus'), error.message, true);
+  }
+}
+
+function lockIssuer(message) {
+  sessionRevision++;
+  issuerKey = undefined;
+  clearTimeout(idleTimer);
+  idleDeadline = 0;
+  lockMessage = message;
+  $('unlockIssuerPassword').value = '';
+  $('restoreIssuerPassword').value = '';
+  clearResponse();
+  report($('issueStatus'), '');
+  showVaultStatus();
+}
+
+function expireIssuer() {
+  if (!issuerKey || Date.now() < idleDeadline) return;
+  lockIssuer('Phiên đã tự khóa sau 15 phút không thao tác. Nhập mật khẩu để cấp tiếp.');
+}
+
+function checkIdleDeadline() {
+  expireIssuer();
+  if (issuerKey) idleTimer = setTimeout(checkIdleDeadline, Math.max(0, idleDeadline - Date.now()));
+}
+
+function setIssuerKey(key) {
+  issuerKey = key;
+  lockMessage = '';
+  idleDeadline = Date.now() + idleTimeoutMs;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(checkIdleDeadline, idleTimeoutMs);
+  showVaultStatus();
+}
+
+for (const event of ['pointermove', 'pointerdown', 'keydown']) {
+  document.addEventListener(event, () => {
+    expireIssuer();
+    if (issuerKey) idleDeadline = Date.now() + idleTimeoutMs;
+  });
+}
+document.addEventListener('visibilitychange', expireIssuer);
+window.addEventListener('focus', expireIssuer);
+window.addEventListener('pageshow', expireIssuer);
+$('lockIssuer').addEventListener('click', () => lockIssuer('Phiên đã khóa. Nhập mật khẩu để cấp tiếp.'));
+
 function issuerAction(handler) {
   return async (event) => {
     try { await handler(event); }
-    catch (error) { report($('issuerStatus'), error.message, true); }
+    catch (error) { report($('restoreStatus'), error.message, true); }
   };
 }
-$('initializeIssuer').addEventListener('submit', issuerAction(async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const button = form.querySelector('button');
-  button.disabled = true;
-  try {
-    if (readVault()) throw new Error('Máy đã lưu khóa HAK.');
-    const password = $('newIssuerPassword').value;
-    if (password.length < 12 || password !== $('repeatIssuerPassword').value)
-      throw new Error('Mật khẩu cần ít nhất 12 ký tự và hai ô phải khớp.');
-    const pair = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
-    const { kty, crv, x } = await crypto.subtle.exportKey('jwk', pair.publicKey);
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const privateBytes = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
-    try {
-      const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode(x) },
-        await passwordKey(password, salt), privateBytes);
-      if (readVault()) throw new Error('Máy đã lưu khóa HAK.');
-      const vault = { format: vaultFormat, publicKey: { kty, crv, x },
-        salt: toBase64Url(salt), iv: toBase64Url(iv), encrypted: toBase64Url(encrypted) };
-      localStorage.setItem(vaultFormat, JSON.stringify(vault));
-      issuerKey = pair.privateKey;
-      form.reset();
-      showVault();
-      download('HAK-KhoaChung.hakkey', vault);
-    } finally {
-      privateBytes.fill(0);
-    }
-  } finally {
-    button.disabled = false;
-  }
-}));
 $('restoreIssuerForm').addEventListener('submit', issuerAction(async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   const button = form.querySelector('button');
+  const revision = sessionRevision;
   button.disabled = true;
   try {
     const file = $('restoreIssuer').files[0];
-    if (!file || file.size > 8192 || readVault()) throw new Error('Chỉ nạp bản sao hợp lệ trên máy chưa lưu khóa HAK.');
+    if (!file || file.size > 8192) throw new Error('Chọn bản sao khóa HAK hợp lệ.');
+    if (readVault()?.publicKey.x === expectedIssuer) throw new Error('Trang đã lưu đúng khóa HAK.');
     const vault = validateVault(JSON.parse(await file.text()));
-    const key = await decryptVault(vault, $('restoreIssuerPassword').value);
-    if (readVault()) throw new Error('Máy đã lưu khóa HAK.');
+    if (revision !== sessionRevision) return;
+    if (vault.publicKey.x !== expectedIssuer) throw new Error(issuerMismatch);
+    let key;
+    try { key = await decryptVault(vault, $('restoreIssuerPassword').value); }
+    catch (error) {
+      if (revision !== sessionRevision) return;
+      throw error;
+    }
+    if (revision !== sessionRevision) return;
+    if (readVault()?.publicKey.x === expectedIssuer) throw new Error('Trang đã lưu đúng khóa HAK.');
     localStorage.setItem(vaultFormat, JSON.stringify(vault));
-    issuerKey = key;
     form.reset();
-    showVault();
+    setIssuerKey(key);
+    report($('restoreStatus'), 'Đã khôi phục và mở đúng khóa HAK.');
   } finally {
     button.disabled = false;
   }
 }));
-$('exportIssuer').addEventListener('click', issuerAction(() => download('HAK-KhoaChung.hakkey', readVault())));
+$('exportIssuer').addEventListener('click', issuerAction(() => download('HAK-PhucHoiCapPhep.hakkey', readVault())));
 $('exportVerificationKey').addEventListener('click', issuerAction(() => download('HAK-PublicKey.jwk', readVault().publicKey)));
 
 async function decryptVault(vault, password) {
@@ -259,23 +371,40 @@ async function decryptVault(vault, password) {
 }
 
 async function unlockIssuer() {
-  if (issuerKey) return issuerKey;
+  expireIssuer();
   const vault = readVault();
-  if (!vault) throw new Error('Tạo khóa chung HAK hoặc nạp bản sao trước khi cấp phép.');
+  if (!vault) throw new Error('Khôi phục bản sao khóa HAK trước khi cấp phép.');
+  if (vault.publicKey.x !== expectedIssuer) throw new Error(issuerMismatch);
+  if (issuerKey) return issuerKey;
   const password = $('unlockIssuerPassword').value;
   if (!password) throw new Error('Nhập mật khẩu mở khóa HAK.');
-  issuerKey = await decryptVault(vault, password);
+  const revision = sessionRevision;
   $('unlockIssuerPassword').value = '';
-  showVault();
-  return issuerKey;
+  const key = await decryptVault(vault, password);
+  if (revision !== sessionRevision || readVault()?.publicKey.x !== expectedIssuer) return;
+  setIssuerKey(key);
+  return key;
 }
+
+function clearResponse() {
+  issueRevision++;
+  pendingSetup = undefined;
+  $('replyPanel').hidden = true;
+  $('replyCode').value = '';
+}
+
+$('issueForm').addEventListener('input', () => {
+  if (pendingSetup) report($('issueStatus'), '');
+  clearResponse();
+});
 
 $('requestCode').addEventListener('input', () => {
   const summary = $('requestSummary');
   let needsProfile = true;
   try {
     const request = parseRequest($('requestCode').value.replace(/\s+/g, ''));
-    summary.textContent = 'Ứng dụng ' + request.product + ' · Máy ' + request.machine;
+    const name = productNames.get(request.product);
+    summary.textContent = (name || 'Ứng dụng chưa có tên hiển thị') + ' · Mã app ' + request.product + ' · Máy ' + request.machine;
     summary.hidden = false;
     needsProfile = request.product === reportingProduct;
   } catch {
@@ -308,11 +437,10 @@ async function createSetup(wire, request, company, issuedAt, expiresAt, key) {
     shared.fill(0);
   }
 }
-try { showVault(); }
-catch (error) { report($('issuerStatus'), error.message, true); }
+showVaultStatus();
 
-function download(filename, value) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(value)], { type: 'application/json' }));
+function download(filename, value, indent) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, indent)], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
@@ -388,31 +516,33 @@ function showCompanyList(companies, selected = '') {
 }
 
 function companyBackup(companies) {
-  return { format: profilesFormat, companies: [...companies.values()] };
+  return { format: profilesFormat, companies: [...companies] };
 }
 
 function saveCompanies(companies) {
-  localStorage.setItem(profilesFormat, JSON.stringify(companyBackup(companies)));
+  localStorage.setItem(profilesFormat, JSON.stringify(companyBackup(companies.values())));
 }
 
-function companyAction(action) {
+function companyAction(action, status = $('issueStatus')) {
   return async (event) => {
     try {
       const message = await action(event);
-      if (message) report($('issueStatus'), message);
+      if (message) report(status, message);
     } catch (error) {
-      report($('issueStatus'), error.message, true);
+      report(status, error.message, true);
     }
   };
 }
 
 $('newCompany').addEventListener('click', companyAction(() => {
+  clearResponse();
   $('savedCompany').value = '';
   showCompany();
   $('TenCty').focus();
   return 'Điền thông tin rồi bấm Lưu công ty.';
 }));
 $('savedCompany').addEventListener('change', companyAction(() => {
+  clearResponse();
   const key = $('savedCompany').value;
   if (!key) {
     showCompany();
@@ -437,18 +567,30 @@ $('saveCompany').addEventListener('click', companyAction(() => {
   showCompanyList(companies, key);
   return 'Đã lưu ' + company.TenCty + '.';
 }));
+const companyTemplate = companyBackup([Object.fromEntries(companyFields.map((field) => [field, '']))]);
+$('companyTemplatePreview').textContent = JSON.stringify(companyTemplate, null, 2);
+$('exportCompanyTemplate').addEventListener('click', () => {
+  download('HAK-MauDanhSachCongTy.json', companyTemplate, 2);
+});
 $('exportCompanies').addEventListener('click', companyAction(() => {
   const companies = readCompanies();
   if (!companies.size) throw new Error('Chưa có công ty nào để tải.');
-  download('HAK-DanhSachCongTy.json', companyBackup(companies));
-}));
+  download('HAK-DanhSachCongTy.json', companyBackup(companies.values()), 2);
+  return 'Đã tải HAK-DanhSachCongTy.json.';
+}, $('companyBackupStatus')));
 $('importCompanies').addEventListener('change', companyAction(async (event) => {
   const input = event.currentTarget;
   const file = input.files[0];
   input.value = '';
   if (!file) return;
   if (file.size > 5 * 1024 * 1024) throw new Error('File danh sách công ty vượt quá 5 MB.');
-  const incoming = decodeCompanies(JSON.parse(await file.text()));
+  const revision = sessionRevision;
+  const contents = await file.text();
+  if (revision !== sessionRevision) return;
+  let data;
+  try { data = JSON.parse(contents); }
+  catch { throw new Error('File chưa đúng cú pháp JSON. Kiểm tra dấu ngoặc kép và dấu phẩy theo mẫu.'); }
+  const incoming = decodeCompanies(data);
   const companies = readCompanies();
   let added = 0;
   for (const [key, company] of incoming) {
@@ -459,7 +601,7 @@ $('importCompanies').addEventListener('change', companyAction(async (event) => {
   saveCompanies(companies);
   showCompanyList(companies, $('savedCompany').value);
   return 'Đã thêm ' + added + ' công ty. Các công ty trùng tên giữ dữ liệu đang lưu.';
-}));
+}, $('companyBackupStatus')));
 try {
   showCompanyList(readCompanies());
 } catch {
@@ -467,13 +609,45 @@ try {
   report($('issueStatus'), 'Chưa đọc được danh sách công ty đã lưu trong trình duyệt.', true);
 }
 
+function clearLocalProfileView() {
+  $('restoreIssuerForm').reset();
+  $('importCompanies').value = '';
+  $('requestCode').value = '';
+  $('requestCode').dispatchEvent(new Event('input'));
+  $('requestSummary').textContent = '';
+  showCompanyList(new Map());
+  showCompany();
+  $('companyDetails').open = false;
+  report($('companyBackupStatus'), '');
+}
+
+$('wipeIssuerData').addEventListener('click', issuerAction(() => {
+  lockIssuer('Phiên đã khóa. Nhập mật khẩu để cấp tiếp.');
+  localStorage.removeItem(vaultFormat);
+  localStorage.removeItem(profilesFormat);
+  clearLocalProfileView();
+  showVaultStatus();
+  report($('restoreStatus'), 'Đã xóa khóa HAK và toàn bộ hồ sơ công ty khỏi trình duyệt này.');
+}));
+
+window.addEventListener('storage', (event) => {
+  if (event.storageArea !== localStorage || event.newValue !== null) return;
+  if (event.key !== vaultFormat && event.key !== profilesFormat && event.key !== null) return;
+  lockIssuer('Phiên đã khóa. Nhập mật khẩu để cấp tiếp.');
+  if (event.key !== vaultFormat) clearLocalProfileView();
+});
+
 $('issueForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const status = $('issueStatus');
-  const buttons = [...event.currentTarget.querySelectorAll('button[type="submit"]')];
-  buttons.forEach((button) => { button.disabled = true; });
-  $('replyPanel').hidden = true;
-  $('replyCode').value = '';
+  const button = $('issueButton');
+  if (button.disabled) return;
+  expireIssuer();
+  issuing = true;
+  button.disabled = true;
+  clearResponse();
+  const revision = issueRevision;
+  report(status, '');
   try {
     if (!crypto.subtle) throw new Error('Mở công cụ bằng Chrome hoặc Edge đã cập nhật.');
     const wire = $('requestCode').value.replace(/\s+/g, '');
@@ -485,29 +659,55 @@ $('issueForm').addEventListener('submit', async (event) => {
     const company = request.product === reportingProduct ? companyFromForm() : {};
     if (request.product === reportingProduct) validateCompanyProfile(company);
     const key = await unlockIssuer();
+    if (!key || revision !== issueRevision) return;
     const kit = await createSetup(wire, request, company, issuedAt, expiresAt, key);
+    expireIssuer();
+    if (revision !== issueRevision) return;
     if (encoder.encode(JSON.stringify(kit)).length > 32768)
       throw new Error('File cài đặt vượt quá 32 KB. Hãy rút gọn thông tin trước khi tạo lại.');
     const response = await crypto.subtle.sign('Ed25519', key, encoder.encode('hak-unlock-v4\n' + wire));
+    expireIssuer();
+    if (revision !== issueRevision) return;
+    pendingSetup = kit;
     $('replyCode').value = 'HAKA4.' + toBase64Url(response);
     $('replyPanel').hidden = false;
-    download('HAK-CaiDat.haksetup', kit);
-    report(status, 'Gửi mã trả lời và file HAK-CaiDat.haksetup cho người cài.');
+    report(status, 'Sao chép mã phản hồi và tải file .haksetup để gửi cho người cài.');
   } catch (error) {
-    report(status, error.message, true);
+    if (revision === issueRevision) report(status, error.message, true);
   } finally {
-    buttons.forEach((button) => { button.disabled = false; });
+    issuing = false;
+    showVaultStatus();
   }
 });
+$('downloadSetup').addEventListener('click', () => {
+  expireIssuer();
+  if (pendingSetup) download('HAK-CaiDat.haksetup', pendingSetup);
+});
 $('copyReply').addEventListener('click', async () => {
+  expireIssuer();
+  if (!pendingSetup) return;
   const reply = $('replyCode');
+  const revision = issueRevision;
   try {
     await navigator.clipboard.writeText(reply.value);
-    report($('issueStatus'), 'Đã sao chép mã trả lời.');
+    if (revision === issueRevision) report($('issueStatus'), 'Đã sao chép mã phản hồi.');
   } catch {
+    if (revision !== issueRevision) return;
     reply.focus();
     reply.select();
     report($('issueStatus'), 'Bấm Ctrl+C để sao chép mã trả lời.');
+  }
+});
+$('copyAgentPrompt').addEventListener('click', async () => {
+  const prompt = $('agentPrompt');
+  const status = $('agentPromptStatus');
+  try {
+    await navigator.clipboard.writeText(prompt.value);
+    report(status, 'Đã sao chép prompt.');
+  } catch {
+    prompt.focus();
+    prompt.select();
+    report(status, 'Bấm Ctrl+C để sao chép prompt đã được chọn.');
   }
 });
 </script>

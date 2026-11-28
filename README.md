@@ -66,11 +66,11 @@ npm run test:dashboard-fit
 Lần đầu cần Chromium cho Playwright: `npx playwright install chromium`.
 Nếu cố ý thay đổi file xuất: `node tests/test-export-golden.mjs --update` (ghi lại mẫu chuẩn) — chỉ làm khi đã kiểm tra bằng mắt.
 
-## Cấp phép Windows bằng một khóa chung HAK
+## Cấp phép Báo cáo ngày cho từng máy Windows
 
-1. Trên máy quản trị, mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html) bằng Chrome hoặc Edge cập nhật. Mở **Tạo hoặc khôi phục khóa**, đặt mật khẩu rồi bấm **Tạo khóa chung**. Giữ bản sao mã hóa `HAK-KhoaChung.hakkey` và mật khẩu ở nơi an toàn. Trên máy quản trị mới, chọn **Khôi phục khóa** với bản sao đó.
-2. Tải **HAK-PublicKey.jwk** một lần để dùng cho công cụ đóng gói. Dùng cùng file công khai qua các bản nâng cấp và các ứng dụng HAK đã tích hợp giao thức. HTML cấp giấy phép theo mã sản phẩm trong yêu cầu. Riêng Báo cáo ngày, file còn có cấu hình công ty và Google Sheets.
-3. Người cài sao chép mã yêu cầu `HAK4.…`. HTML hiển thị mã ứng dụng và mã máy. Chọn hoặc nhập công ty rồi bấm **Tạo mã và file HAK**. Gửi lại mã và file `.haksetup`. Người dùng giữ cửa sổ mở, kiểm tra mã rồi nạp file.
+1. Trên máy quản trị, mở [HAK-CapPhep.html](desktop-app/licensing/HAK-CapPhep.html) bằng Chrome hoặc Edge cập nhật. Dùng khóa HAK đã tạo lúc phát hành bản 2.6.0. Nếu trang chưa hiện khóa đã lưu, mở **Quản lý khóa và hồ sơ công ty**, rồi chọn **Phục hồi cấp phép** với file `HAK-PhucHoiCapPhep.hakkey` (hoặc `HAK-KhoaChung.hakkey` từ bản trước) và mật khẩu đã đặt.
+2. Dùng cùng bộ cài Báo cáo ngày cho các máy cần cài. Bộ cài 2.6.0 đã có khóa công khai HAK. Mỗi máy được cấp phản hồi riêng theo mã yêu cầu của lần cài.
+3. Người cài sao chép mã yêu cầu `HAK4.…`. HTML hiển thị mã ứng dụng và mã máy. Chọn hoặc nhập công ty rồi bấm **Tạo mã và file HAK**. Bấm **Sao chép mã phản hồi** và **Tải file .haksetup**, rồi gửi cả hai cho người cài. Người dùng giữ cửa sổ mở, kiểm tra mã rồi nạp file.
 
 Mỗi lần cài lại hoặc đổi cấu hình có mã ngẫu nhiên mới. HAK ký bằng Ed25519. App xác minh chữ ký, hạn dùng, mã ứng dụng và mã máy trước khi mở. Mã máy dùng `MachineGuid` và serial mainboard nếu đọc được. Dự phòng lần lượt dùng UUID phần cứng, serial ổ đĩa đầu tiên rồi `MachineGuid` nếu Windows không cung cấp thông tin phần cứng. Cài lại Windows hoặc thay phần cứng ảnh hưởng đến mã định danh có thể cần HAK cấp lại.
 
@@ -88,7 +88,7 @@ Tài khoản dùng cục bộ trong hồ sơ Windows hiện tại. Ứng dụng 
 
 ### Phát hành bản nâng cấp
 
-Chạy `desktop-app/Dong-Bo-Cai-HAK.cmd` trên Windows có Node.js 22.12+ và .NET SDK. Công cụ dùng `desktop-app/licensing/HAK-PublicKey.jwk` đã lưu trong kho. Nếu khóa công khai chưa có trong kho, công cụ cho chọn file và lưu tại `%LOCALAPPDATA%\HAK\Issuer` để dùng lại.
+Chạy `desktop-app/Dong-Bo-Cai-HAK.cmd` trên Windows có Node.js 22.12+ và .NET SDK. Công cụ dùng bản khóa công khai đã lưu tại `desktop-app/licensing/HAK-PublicKey.jwk` để đóng gói. Nguồn khóa dùng chung cho các app HAK là [HAK_AI_AGENT_CONTROL_CENTER](https://raw.githubusercontent.com/saoluucvhak-pixel/HAK_AI_AGENT_CONTROL_CENTER/main/config/licensing/HAK-PublicKey.jwk). Nếu khóa công khai chưa có trong kho, công cụ cho chọn file và lưu tại `%LOCALAPPDATA%\HAK\Issuer` để dùng lại.
 
 GitHub Actions dùng khóa công khai đã lưu trong kho khi chạy **Release installer**. Tham số `issuer_public_key` hoặc biến kho `HAK_LICENSE_PUBLIC_KEY` có thể chỉ định khóa công khai khác. Chọn `publish=true` trên nhánh `main` để phát hành Setup. Khóa riêng và mật khẩu bảo vệ khóa ở lại HAK. Bộ cài chưa ký Authenticode và phát hành kèm SHA-256.
 

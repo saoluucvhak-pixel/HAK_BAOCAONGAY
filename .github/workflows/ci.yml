@@ -29,6 +29,7 @@ jobs:
       - run: npm run lint -- --max-warnings 0
       - run: npm test
       - run: npm run test:ui
+      - run: node tests/test-license-admin.mjs
       - run: npm audit --audit-level=high
       - name: Audit Electron and packaging dependencies
         working-directory: desktop-app
