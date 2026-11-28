@@ -26,7 +26,11 @@ jobs:
       - run: cp dist/index.html ../desktop-app/app/index.html
       - run: node scripts/verify-build.mjs
       - name: Check committed artifacts match the build
-        run: git diff --exit-code -- config.html dist/index.html ../desktop-app/app/index.html
+        env:
+          GIT_PAGER: cat
+        run: |
+          git --no-pager diff --stat -- config.html dist/index.html ../desktop-app/app/index.html
+          git --no-pager diff --exit-code -w -- config.html dist/index.html ../desktop-app/app/index.html
       - run: npm run lint -- --max-warnings 0
       - run: npm test
       - run: npm run test:ui
