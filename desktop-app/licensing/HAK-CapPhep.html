@@ -26,6 +26,7 @@
   button.secondary { background: #e5f0f2; color: #17424a; margin: .8rem .4rem 0 0; }
   .company-json { overflow: auto; padding: .85rem; background: #f3f6f7; border-radius: 5px; }
   #agentPrompt { box-sizing: border-box; width: 100%; min-height: 16rem; resize: vertical; padding: .75rem; font: .9rem/1.5 monospace; }
+  .danger { background: #962c3f; }
   .file-help { margin: .35rem 0 .85rem; }
   .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .85rem; }
   .actions button.secondary { margin: 0; }
@@ -43,6 +44,7 @@
   <section aria-labelledby="issue-title">
     <h2 id="issue-title">Cấp phép cho một máy</h2>
     <p id="issuerStatus" class="status" role="status"></p>
+    <button class="secondary" id="lockIssuer" type="button">🔒 Khóa phiên làm việc</button>
     <form id="issueForm">
       <label>Mã yêu cầu từ máy cần cài <input id="requestCode" type="text" spellcheck="false" autocomplete="off" placeholder="HAK4.…" maxlength="1024"></label>
       <p id="requestSummary" class="status" hidden></p>
@@ -119,6 +121,9 @@
       <p class="file-help" id="companyImportHelp">HTML thêm hồ sơ mới và giữ dữ liệu của công ty đã lưu trùng tên. File chứa thông tin công ty và link Google Sheets dưới dạng văn bản.</p>
       <p class="status" id="companyBackupStatus" role="status"></p>
     </details>
+    <h3>Dữ liệu trên máy đang dùng</h3>
+    <p id="wipeHelp">Nút dưới đây xóa ngay khóa cấp phép đã lưu và toàn bộ hồ sơ công ty khỏi trình duyệt này. Để dùng tiếp, nạp lại file phục hồi và danh sách công ty. Các file đã tải xuống cần được xử lý riêng.</p>
+    <button class="danger" id="wipeIssuerData" type="button" aria-describedby="wipeHelp">Xóa sạch dữ liệu trên máy này</button>
   </details>
 
   <details class="help" id="issuerGuide">
@@ -133,6 +138,8 @@
       <li>Bấm <strong>Tạo mã và file HAK</strong>. Bấm <strong>Sao chép mã phản hồi</strong> và <strong>Tải file .haksetup</strong>. Gửi cả hai cho người đã gửi mã yêu cầu.</li>
       <li>Người cài dán mã phản hồi, bấm <strong>Kiểm tra mã</strong>, chọn <strong>Nạp file HAK…</strong>, rồi tiếp tục cài. Nếu đã đóng và mở lại bộ cài hoặc đang cài cho máy khác, bắt đầu từ mã yêu cầu mới.</li>
     </ol>
+    <h3>Khi rời máy hoặc dùng máy khác</h3>
+    <p>Bấm <strong>Khóa phiên làm việc</strong> sau khi cấp xong. HTML tự khóa sau 15 phút không dùng chuột hoặc bàn phím. Muốn cấp tiếp, nhập lại mật khẩu. Trên máy mượn, bấm <strong>Xóa sạch dữ liệu trên máy này</strong> trong mục quản lý khóa để xóa dữ liệu HAK lưu trong trình duyệt.</p>
     <h3>Khi nâng cấp Báo cáo ngày</h3>
     <p>Khi đóng bản nâng cấp, dùng lại khóa công khai HAK đang có. Khi chạy Setup để nâng cấp, bộ cài vẫn tạo mã yêu cầu mới theo quy trình cài đặt. Dùng cùng HTML và khóa HAK hiện tại để cấp phản hồi cho mã mới.</p>
     <h3>Khi chuyển máy quản trị</h3>
@@ -153,6 +160,7 @@
     <details id="agentPromptDetails">
       <summary>Prompt cho agent tích hợp app mới</summary>
       <p class="file-help">Sao chép toàn bộ prompt, thay <code>[URL_GITHUB_APP_MUC_TIEU]</code> bằng link GitHub của app cần làm, rồi gửi cho agent có quyền sửa repo đó.</p>
+      <p class="file-help">Nút sao chép chép cả hai link sau trong prompt. <a id="promptPublicKeyLink" href="https://raw.githubusercontent.com/saoluucvhak-pixel/HAK_AI_AGENT_CONTROL_CENTER/main/config/licensing/HAK-PublicKey.jwk">Khóa công khai HAK trên Control Center</a> · <a id="promptProtocolLink" href="https://github.com/saoluucvhak-pixel/HAK_BAOCAONGAY/blob/installer-v2.6.0-16.1/desktop-app/licensing/LicenseProtocol.cs">Mã giao thức cấp phép v4</a>.</p>
       <label for="agentPrompt">Prompt tích hợp cấp phép HAK v4</label>
       <textarea id="agentPrompt" readonly spellcheck="false">Hãy triển khai từ đầu chức năng khóa cấp phép offline HAK v4 trong repo GitHub này.
 Repo app cần sửa: [URL_GITHUB_APP_MUC_TIEU]
@@ -193,7 +201,12 @@ const expectedIssuer = document.querySelector('meta[name="hak-issuer-key"]').con
 const issuerMismatch = 'Khóa đang chọn không khớp với bộ cài. Khôi phục bản sao khóa HAK đã dùng để đóng bộ cài.';
 const vaultFormat = 'hak-ed25519-issuer-v1';
 const encoder = new TextEncoder();
+const idleTimeoutMs = 15 * 60 * 1000;
 let issuerKey;
+let sessionRevision = 0;
+let idleDeadline = 0;
+let idleTimer;
+let lockMessage = '';
 let pendingSetup;
 let issueRevision = 0;
 let issuing = false;
@@ -246,9 +259,60 @@ function showVault() {
   $('unlockIssuerLabel').hidden = !matches || Boolean(issuerKey);
   $('issueButton').disabled = !matches || issuing;
   report($('issuerStatus'), matches
-    ? (issuerKey ? 'Khóa HAK đã mở cho phiên này.' : 'Nhập mật khẩu khóa HAK để cấp phép.')
+    ? (issuerKey ? 'Khóa HAK đã mở cho phiên này.' : lockMessage || 'Nhập mật khẩu khóa HAK để cấp phép.')
     : (vault ? issuerMismatch : 'Chưa có khóa HAK. Mở mục quản lý khóa để khôi phục bản sao.'), Boolean(vault && !matches));
 }
+function showVaultStatus() {
+  try { showVault(); }
+  catch (error) {
+    $('issueButton').disabled = true;
+    report($('issuerStatus'), error.message, true);
+  }
+}
+
+function lockIssuer(message) {
+  sessionRevision++;
+  issuerKey = undefined;
+  clearTimeout(idleTimer);
+  idleDeadline = 0;
+  lockMessage = message;
+  $('unlockIssuerPassword').value = '';
+  $('restoreIssuerPassword').value = '';
+  clearResponse();
+  report($('issueStatus'), '');
+  showVaultStatus();
+}
+
+function expireIssuer() {
+  if (!issuerKey || Date.now() < idleDeadline) return;
+  lockIssuer('Phiên đã tự khóa sau 15 phút không thao tác. Nhập mật khẩu để cấp tiếp.');
+}
+
+function checkIdleDeadline() {
+  expireIssuer();
+  if (issuerKey) idleTimer = setTimeout(checkIdleDeadline, Math.max(0, idleDeadline - Date.now()));
+}
+
+function setIssuerKey(key) {
+  issuerKey = key;
+  lockMessage = '';
+  idleDeadline = Date.now() + idleTimeoutMs;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(checkIdleDeadline, idleTimeoutMs);
+  showVaultStatus();
+}
+
+for (const event of ['pointermove', 'pointerdown', 'keydown']) {
+  document.addEventListener(event, () => {
+    expireIssuer();
+    if (issuerKey) idleDeadline = Date.now() + idleTimeoutMs;
+  });
+}
+document.addEventListener('visibilitychange', expireIssuer);
+window.addEventListener('focus', expireIssuer);
+window.addEventListener('pageshow', expireIssuer);
+$('lockIssuer').addEventListener('click', () => lockIssuer('Phiên đã khóa. Nhập mật khẩu để cấp tiếp.'));
+
 function issuerAction(handler) {
   return async (event) => {
     try { await handler(event); }
@@ -259,19 +323,26 @@ $('restoreIssuerForm').addEventListener('submit', issuerAction(async (event) => 
   event.preventDefault();
   const form = event.currentTarget;
   const button = form.querySelector('button');
+  const revision = sessionRevision;
   button.disabled = true;
   try {
     const file = $('restoreIssuer').files[0];
     if (!file || file.size > 8192) throw new Error('Chọn bản sao khóa HAK hợp lệ.');
     if (readVault()?.publicKey.x === expectedIssuer) throw new Error('Trang đã lưu đúng khóa HAK.');
     const vault = validateVault(JSON.parse(await file.text()));
+    if (revision !== sessionRevision) return;
     if (vault.publicKey.x !== expectedIssuer) throw new Error(issuerMismatch);
-    const key = await decryptVault(vault, $('restoreIssuerPassword').value);
+    let key;
+    try { key = await decryptVault(vault, $('restoreIssuerPassword').value); }
+    catch (error) {
+      if (revision !== sessionRevision) return;
+      throw error;
+    }
+    if (revision !== sessionRevision) return;
     if (readVault()?.publicKey.x === expectedIssuer) throw new Error('Trang đã lưu đúng khóa HAK.');
     localStorage.setItem(vaultFormat, JSON.stringify(vault));
-    issuerKey = key;
     form.reset();
-    showVault();
+    setIssuerKey(key);
     report($('restoreStatus'), 'Đã khôi phục và mở đúng khóa HAK.');
   } finally {
     button.disabled = false;
@@ -300,16 +371,19 @@ async function decryptVault(vault, password) {
 }
 
 async function unlockIssuer() {
+  expireIssuer();
   const vault = readVault();
   if (!vault) throw new Error('Khôi phục bản sao khóa HAK trước khi cấp phép.');
   if (vault.publicKey.x !== expectedIssuer) throw new Error(issuerMismatch);
   if (issuerKey) return issuerKey;
   const password = $('unlockIssuerPassword').value;
   if (!password) throw new Error('Nhập mật khẩu mở khóa HAK.');
-  issuerKey = await decryptVault(vault, password);
+  const revision = sessionRevision;
   $('unlockIssuerPassword').value = '';
-  showVault();
-  return issuerKey;
+  const key = await decryptVault(vault, password);
+  if (revision !== sessionRevision || readVault()?.publicKey.x !== expectedIssuer) return;
+  setIssuerKey(key);
+  return key;
 }
 
 function clearResponse() {
@@ -363,8 +437,7 @@ async function createSetup(wire, request, company, issuedAt, expiresAt, key) {
     shared.fill(0);
   }
 }
-try { showVault(); }
-catch (error) { report($('issuerStatus'), error.message, true); }
+showVaultStatus();
 
 function download(filename, value, indent) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, indent)], { type: 'application/json' }));
@@ -511,7 +584,9 @@ $('importCompanies').addEventListener('change', companyAction(async (event) => {
   input.value = '';
   if (!file) return;
   if (file.size > 5 * 1024 * 1024) throw new Error('File danh sách công ty vượt quá 5 MB.');
+  const revision = sessionRevision;
   const contents = await file.text();
+  if (revision !== sessionRevision) return;
   let data;
   try { data = JSON.parse(contents); }
   catch { throw new Error('File chưa đúng cú pháp JSON. Kiểm tra dấu ngoặc kép và dấu phẩy theo mẫu.'); }
@@ -534,11 +609,40 @@ try {
   report($('issueStatus'), 'Chưa đọc được danh sách công ty đã lưu trong trình duyệt.', true);
 }
 
+function clearLocalProfileView() {
+  $('restoreIssuerForm').reset();
+  $('importCompanies').value = '';
+  $('requestCode').value = '';
+  $('requestCode').dispatchEvent(new Event('input'));
+  $('requestSummary').textContent = '';
+  showCompanyList(new Map());
+  showCompany();
+  $('companyDetails').open = false;
+  report($('companyBackupStatus'), '');
+}
+
+$('wipeIssuerData').addEventListener('click', issuerAction(() => {
+  lockIssuer('Phiên đã khóa. Nhập mật khẩu để cấp tiếp.');
+  localStorage.removeItem(vaultFormat);
+  localStorage.removeItem(profilesFormat);
+  clearLocalProfileView();
+  showVaultStatus();
+  report($('restoreStatus'), 'Đã xóa khóa HAK và toàn bộ hồ sơ công ty khỏi trình duyệt này.');
+}));
+
+window.addEventListener('storage', (event) => {
+  if (event.storageArea !== localStorage || event.newValue !== null) return;
+  if (event.key !== vaultFormat && event.key !== profilesFormat && event.key !== null) return;
+  lockIssuer('Phiên đã khóa. Nhập mật khẩu để cấp tiếp.');
+  if (event.key !== vaultFormat) clearLocalProfileView();
+});
+
 $('issueForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const status = $('issueStatus');
   const button = $('issueButton');
   if (button.disabled) return;
+  expireIssuer();
   issuing = true;
   button.disabled = true;
   clearResponse();
@@ -555,10 +659,14 @@ $('issueForm').addEventListener('submit', async (event) => {
     const company = request.product === reportingProduct ? companyFromForm() : {};
     if (request.product === reportingProduct) validateCompanyProfile(company);
     const key = await unlockIssuer();
+    if (!key || revision !== issueRevision) return;
     const kit = await createSetup(wire, request, company, issuedAt, expiresAt, key);
+    expireIssuer();
+    if (revision !== issueRevision) return;
     if (encoder.encode(JSON.stringify(kit)).length > 32768)
       throw new Error('File cài đặt vượt quá 32 KB. Hãy rút gọn thông tin trước khi tạo lại.');
     const response = await crypto.subtle.sign('Ed25519', key, encoder.encode('hak-unlock-v4\n' + wire));
+    expireIssuer();
     if (revision !== issueRevision) return;
     pendingSetup = kit;
     $('replyCode').value = 'HAKA4.' + toBase64Url(response);
@@ -568,14 +676,15 @@ $('issueForm').addEventListener('submit', async (event) => {
     if (revision === issueRevision) report(status, error.message, true);
   } finally {
     issuing = false;
-    try { showVault(); }
-    catch (error) { report($('issuerStatus'), error.message, true); }
+    showVaultStatus();
   }
 });
 $('downloadSetup').addEventListener('click', () => {
+  expireIssuer();
   if (pendingSetup) download('HAK-CaiDat.haksetup', pendingSetup);
 });
 $('copyReply').addEventListener('click', async () => {
+  expireIssuer();
   if (!pendingSetup) return;
   const reply = $('replyCode');
   const revision = issueRevision;

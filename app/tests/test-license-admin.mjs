@@ -84,6 +84,8 @@ try {
   const agentPrompt = await page.getByLabel('Prompt tích hợp cấp phép HAK v4').inputValue();
   assert(agentPrompt.includes('[URL_GITHUB_APP_MUC_TIEU]'));
   assert(agentPrompt.includes(sharedPublicKeyUrl));
+  assert.equal(await page.locator('#promptPublicKeyLink').getAttribute('href'), sharedPublicKeyUrl);
+  assert(agentPrompt.includes(await page.locator('#promptProtocolLink').getAttribute('href')));
   assert(agentPrompt.includes('tự viết bộ tạo yêu cầu'));
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.getByRole('button', { name: 'Sao chép prompt', exact: true }).click();
@@ -135,6 +137,7 @@ try {
 
   // Restore the single HAK key and the company list in a fresh offline browser.
   const recovered = await (await browser.newContext({ offline: true, acceptDownloads: true })).newPage();
+  await recovered.clock.install();
   await recovered.goto(location);
   await recovered.locator('#issuerDetails > summary').click();
   await selectBackup(recovered, 'wrong-password');
@@ -178,6 +181,66 @@ try {
   assert(!(await recovered.locator('#companyChooser').isVisible()));
   assert.deepEqual(openCompany(newFile, publicKey, anotherApp), {});
   assert.throws(() => openCompany(newFile, publicKey, recipient), /Wrong recipient/);
+  await recovered.getByRole('button', { name: 'Khóa phiên làm việc' }).click();
+  assert(!(await recovered.locator('#replyPanel').isVisible()));
+  assert(await recovered.locator('#unlockIssuerPassword').isVisible());
+  await recovered.locator('#issueButton').click();
+  await recovered.waitForFunction(() => document.querySelector('#issueStatus').textContent.includes('Nhập mật khẩu'));
+  await recovered.locator('#unlockIssuerPassword').fill(password);
+  await issue(recovered, anotherApp, publicKey);
+
+  await recovered.clock.fastForward(14 * 60_000);
+  await recovered.keyboard.press('Shift');
+  await recovered.clock.fastForward(14 * 60_000);
+  assert(await recovered.locator('#replyPanel').isVisible());
+  await recovered.clock.fastForward(60_000);
+  assert(!(await recovered.locator('#replyPanel').isVisible()));
+  assert(await recovered.locator('#unlockIssuerPassword').isVisible());
+  assert.match(await recovered.locator('#issuerStatus').textContent(), /tự khóa sau 15 phút/);
+
+  // A lock during decryption must prevent the old operation from reopening the session.
+  await recovered.evaluate(() => {
+    const original = SubtleCrypto.prototype.decrypt;
+    SubtleCrypto.prototype.decrypt = async function (...args) {
+      SubtleCrypto.prototype.decrypt = original;
+      await new Promise((resolve) => { window.hakReleaseDecrypt = resolve; });
+      return original.apply(this, args);
+    };
+  });
+  await recovered.locator('#unlockIssuerPassword').fill(password);
+  await recovered.locator('#issueButton').click();
+  await recovered.waitForFunction(() => typeof window.hakReleaseDecrypt === 'function');
+  await recovered.getByRole('button', { name: 'Khóa phiên làm việc' }).click();
+  await recovered.evaluate(() => window.hakReleaseDecrypt());
+  await recovered.waitForFunction(() => !document.querySelector('#issueButton').disabled);
+  assert(!(await recovered.locator('#replyPanel').isVisible()));
+  assert(await recovered.locator('#unlockIssuerPassword').isVisible());
+
+  await recovered.locator('#unlockIssuerPassword').fill(password);
+  await issue(recovered, anotherApp, publicKey);
+  await recovered.evaluate(() => {
+    localStorage.setItem('unrelated-storage', 'keep');
+    const original = File.prototype.text;
+    File.prototype.text = async function (...args) {
+      File.prototype.text = original;
+      await new Promise((resolve) => { window.hakReleaseImport = resolve; });
+      return original.apply(this, args);
+    };
+  });
+  await companyInput.setInputFiles({ name: templateName, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(template)) });
+  await recovered.waitForFunction(() => typeof window.hakReleaseImport === 'function');
+  await recovered.getByRole('button', { name: 'Xóa sạch dữ liệu trên máy này' }).click();
+  await recovered.evaluate(() => window.hakReleaseImport());
+  await recovered.waitForFunction(() => document.querySelector('#restoreStatus').textContent.includes('Đã xóa khóa HAK'));
+  assert.deepEqual(await recovered.evaluate(() => [localStorage.getItem('hak-ed25519-issuer-v1'),
+    localStorage.getItem('hak-company-profiles-v1'), localStorage.getItem('unrelated-storage')]), [null, null, 'keep']);
+  assert(await recovered.locator('#issueButton').isDisabled());
+  assert(!(await recovered.locator('#replyPanel').isVisible()));
+  assert.equal(await recovered.locator('#savedCompany option').count(), 1);
+  await recovered.reload();
+  assert(await recovered.locator('#issueButton').isDisabled());
+  assert.equal(await recovered.locator('#savedCompany option').count(), 1);
+
   console.log('PASS: one offline issuer, encrypted key recovery, multiple apps and device-specific encrypted profiles.');
 } finally {
   await browser.close();
