@@ -31,6 +31,8 @@ import { setStatus, loadAllData } from './services/data-service.js';
 import { renderReportTable } from './components/report-table.js';
 import { initDashboardTheme, renderDashboard } from './components/dashboard.js';
 import { initLoanEditor, getLoanView, refreshLoanFormatting } from './components/loan-editor.js';
+import { initForestrySettings } from './components/forestry-settings.js';
+import { initForestryReports } from './components/forestry-reports.js';
 import { initThemePicker } from './components/theme-picker.js';
 import { initPrecisionSettings } from './components/precision-settings.js';
 import { initToast } from './components/toast.js';
@@ -425,6 +427,8 @@ function boot(){
   loadDM();
   renderDMTables();
   initEvents();
+  initForestrySettings();
+  initForestryReports();
   initLoanEditor(refreshReport);
   initLuyKeMode(refreshReport); // lũy kế trong kỳ báo cáo (mặc định) / từ đầu sổ
   initOpeningBalance(refreshReport); // số dư đầu kỳ nhập tay của Sổ chi tiết tiền vay

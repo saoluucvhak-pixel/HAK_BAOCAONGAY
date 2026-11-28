@@ -12,7 +12,7 @@
     { key: 'Hosokeo', label: 'Hồ sơ keo', required: false, columns: ['Mã hợp đồng', 'Ngày nhập', 'Số BKLS', 'Họ và tên chủ rừng', 'Khối lượng (Tấn)', 'Đơn giá', 'Thanh toán'] }
   ];
   const HEADER_LIMIT = 65536;
-  function validateUrl(value) {
+  function validateUrl(value, isWholeSheet = false) {
     // URL sẽ được chèn vào JavaScript của báo cáo HTML; ký tự thoát chuỗi phải bị chặn.
     if (typeof value !== 'string' || /['"`<>\\\r\n]/.test(value)) {
       return 'Đường dẫn chứa ký tự không được phép.';
@@ -21,6 +21,11 @@
     try { url = new URL(value); } catch (e) { return 'Đường dẫn không hợp lệ.'; }
     if (url.protocol !== 'https:' || url.hostname !== 'docs.google.com' || url.username || url.password || url.port) {
       return 'Chỉ nhận liên kết Google Sheets HTTPS tại docs.google.com.';
+    }
+    if (isWholeSheet) {
+      const id = url.pathname.match(/^\/spreadsheets\/d\/([\w-]+)(?:\/|$)/)?.[1];
+      if (!id || id === 'e') return 'Nhập link của cả file Google Sheet XUATHANG dạng /spreadsheets/d/…/edit.';
+      return '';
     }
     const published = /^\/spreadsheets\/d\/e\/[^/]+\/pub\/?$/.test(url.pathname) && url.searchParams.get('output') === 'csv';
     const exported = /^\/spreadsheets\/d\/[^/]+\/export\/?$/.test(url.pathname) && url.searchParams.get('format') === 'csv';

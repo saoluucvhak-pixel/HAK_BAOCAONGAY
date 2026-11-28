@@ -128,6 +128,7 @@ function validateCompanyConfig(data) {
     DNTT: String(data.DNTT || '').trim(),
     HDNCC: String(data.HDNCC || '').trim(),
     Hosokeo: String(data.Hosokeo || '').trim(),
+    XuatHang: String(data.XuatHang || data.XUATHANG || '').trim(),
     MST: String(data.MST || '').trim(),
     SDT: String(data.SDT || '').trim(),
     DiaChi: String(data.DiaChi || '').trim(),
@@ -141,6 +142,10 @@ function validateCompanyConfig(data) {
     if (!cfg[key]) continue; // Các nguồn tùy chọn được phép để trống.
     const error = validateUrl(cfg[key]);
     if (error) return { ok: false, error: key + ': ' + error };
+  }
+  if (cfg.XuatHang) {
+    const error = validateUrl(cfg.XuatHang, true);
+    if (error) return { ok: false, error: 'XuatHang: ' + error };
   }
 
   return { ok: true, config: cfg };

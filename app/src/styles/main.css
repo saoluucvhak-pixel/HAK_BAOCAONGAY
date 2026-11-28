@@ -397,3 +397,27 @@ table.dataTbl th.chk,table.dataTbl td.chk{width:34px;text-align:center}
 .precisionDialog select{display:block;width:100%;margin-top:4px;padding:7px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
 .precisionDialog p{color:var(--err)}
 @media print{.toastStack,.exportProgress,.precisionDialog{display:none!important}}
+
+/* Báo cáo kiểm lâm */
+#forestryForm fieldset, #forestrySettings fieldset { margin: 12px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.forestry-delete-warning { margin: 12px 0; padding: 12px; background: var(--head); border: 1px solid var(--err); border-radius: 8px; color: var(--err); }
+.forestry-delete-warning p { margin: 0 0 8px; }
+#forestrySettings input:read-only, #forestrySettings select:disabled { color: var(--ink); background: var(--head); opacity: 1; }
+#forestryUpdatedLabel { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+#forestryUpdated { font-variant-numeric: tabular-nums; }
+#forestryForm fieldset > label { display: inline-block; margin: 4px 12px 4px 0; }
+#forestryForm .modalGrid label { display: grid; gap: 4px; min-width: 0; }
+.forestry-action-row { margin-top: 12px; align-items: center; }
+.forestry-action-row .btn { min-height: 40px; }
+.forestry-action-row .loanSourceNote { margin: 0; min-height: 40px; display: flex; align-items: center; overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
+#forestryForm input { min-width: 0; }
+#forestryForm label[hidden] { display: none; }
+#forestryForm .modalGrid select { min-width: 0; font: inherit; }
+#forestryForm .forestryPeriodGrid:has([name="customFrom"]:enabled) > label:first-child { grid-column: 1 / -1; }
+#forestryPeriodRange:empty { display: none; }
+#forestryPeriodRange { display: block; margin-top: 10px; }
+#forestryResults .panel, .forestryHistory { margin-top: 12px; }
+#forestryForm .modalGrid :is(input, select) { min-height: 36px; }
+.modalGrid input, #forestryForm .modalGrid select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+.modalGrid input:focus, #forestryForm .modalGrid select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 .2rem var(--accent-soft); }
+

@@ -5,6 +5,12 @@
 > PERF-01/02/03, BUG-01/02/03, sửa tên công ty — nằm trong `package/CHANGELOG.md`, không lặp
 > lại ở đây.
 
+## [2.7.0] — 28/11/2026 — Tích hợp Báo cáo kiểm lâm & nguồn xuất hàng XUATHANG
+
+- Tích hợp trọn vẹn nghiệp vụ Báo cáo kiểm lâm (Mẫu 04, Mẫu 14, Mẫu 29 định kỳ) và quản lý quy định kiểm lâm từ nhánh feature/bao-cao-kiem-lam vào hệ thống chính.
+- Thêm trường nguồn xuất hàng Google Sheet `XUATHANG` vào `CONFIG`, cấu hình công ty và công cụ cấp phép `HAK-CapPhep.html`.
+- Đồng bộ hóa toàn diện giữa công cụ cấp phép Ed25519, bản web offline (Vite singlefile) và ứng dụng desktop Electron.
+
 ## [2.1.0] — 27/11/2026
 
 - Playwright chọn Chromium theo `CHROMIUM_PATH`, đường dẫn CI cũ nếu có, rồi đến Chromium đã cài bởi Playwright. ESLint sạch cảnh báo.

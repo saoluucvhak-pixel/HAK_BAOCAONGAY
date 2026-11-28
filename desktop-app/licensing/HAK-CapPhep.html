@@ -99,6 +99,7 @@
         <label>Link CSV đề nghị thanh toán <input id="DNTT" maxlength="2000" inputmode="url"></label>
         <label>Link CSV hợp đồng NCC (tùy chọn) <input id="HDNCC" maxlength="2000" inputmode="url"></label>
         <label>Link CSV hồ sơ keo (tùy chọn) <input id="Hosokeo" maxlength="2000" inputmode="url"></label>
+        <label>Link Google Sheet xuất hàng (XUATHANG, tùy chọn) <input id="XuatHang" maxlength="2000" inputmode="url" placeholder="https://docs.google.com/spreadsheets/d/…/edit"></label>
         <button class="secondary" id="saveCompany" type="button">Lưu công ty</button>
       </details>
       <button type="submit" value="kit">Tạo mã và file HAK</button>
@@ -120,7 +121,7 @@
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
-const companyFields = ['TenCty', 'DiaChi', 'MST', 'SDT', 'DiaChiThuMua', 'MaHS', 'NhaMay', 'PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo'];
+const companyFields = ['TenCty', 'DiaChi', 'MST', 'SDT', 'DiaChiThuMua', 'MaHS', 'NhaMay', 'PhieuCan', 'DNTT', 'HDNCC', 'Hosokeo', 'XuatHang'];
 const profilesFormat = 'hak-company-profiles-v1';
 const setupFormat = 'haksetup-ed25519-v4';
 const reportingProduct = 'com.hakgroup.baocaongay';
@@ -331,15 +332,21 @@ function validateCompanyProfile(company) {
   }
   if (!company.TenCty) throw new Error('Nhập tên công ty.');
   const required = ['PhieuCan', 'DNTT'];
-  for (const field of [...required, 'HDNCC', 'Hosokeo']) {
+  for (const field of [...required, 'HDNCC', 'Hosokeo', 'XuatHang']) {
     const address = company[field];
     if (!address && !required.includes(field)) continue;
     let url;
-    try { url = new URL(address); } catch { throw new Error('Nhập liên kết Google Sheets CSV cho ' + $(field).parentElement.firstChild.textContent.trim() + '.'); }
+    try { url = new URL(address); } catch { throw new Error('Nhập liên kết Google Sheets cho ' + $(field).parentElement.firstChild.textContent.trim() + '.'); }
+    if (url.origin !== 'https://docs.google.com' || url.username || url.password || /['"`<>\\\r\n]/.test(address))
+      throw new Error('Chỉ dùng liên kết Google Sheets.');
+    if (field === 'XuatHang') {
+      const id = url.pathname.match(/^\/spreadsheets\/d\/([\w-]+)(?:\/|$)/)?.[1];
+      if (!id || id === 'e') throw new Error('Nhập link của cả file Google Sheet XUATHANG dạng /spreadsheets/d/…/edit.');
+      continue;
+    }
     const published = /^\/spreadsheets\/d\/e\/[^/]+\/pub\/?$/.test(url.pathname) && url.searchParams.get('output') === 'csv';
     const exported = /^\/spreadsheets\/d\/[^/]+\/export\/?$/.test(url.pathname) && url.searchParams.get('format') === 'csv';
-    if (url.origin !== 'https://docs.google.com' || url.username || url.password ||
-        /['"`<>\\\r\n]/.test(address) || (!published && !exported))
+    if (!published && !exported)
       throw new Error('Chỉ dùng liên kết Google Sheets đã xuất CSV.');
   }
 }
