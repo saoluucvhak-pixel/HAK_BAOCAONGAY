@@ -122,6 +122,9 @@ jobs:
       - name: Sign and verify the QA installer
         timeout-minutes: 2
         run: ./desktop-app/tests/sign-for-test.ps1 -Installer $env:HAK_QA_NEW
+      - name: Verify interactive installer shows the activation window
+        timeout-minutes: 2
+        run: ./desktop-app/tests/test-installer-activation-window.ps1 -Installer $env:HAK_QA_NEW
       - name: Install both versions and verify upgrade and restore
         timeout-minutes: 8
         run: |
