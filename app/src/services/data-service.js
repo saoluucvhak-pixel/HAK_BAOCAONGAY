@@ -14,6 +14,7 @@ import { STATE } from '../store/state.js';
 import { $, esc } from '../utils/dom-utils.js';
 import { dateKey, pad2 } from '../utils/date-utils.js';
 import { parseCSV, csvToObjects } from '../utils/csv-utils.js';
+import { summarizeDuplicateKeys } from '../utils/data-integrity.js';
 import { runReport } from '../store/report-runtime.js';
 import { logger } from './logger.js';
 import { saveSheetText, loadSheetText } from './offline-cache.js';
@@ -109,8 +110,13 @@ function fmtStamp(d) {
  */
 function loadSheet(name, url, offlineUsed) {
   return fetchCSVText(url).then(function (text) {
+    const parsed = parseCSV(text);
+    // Một phản hồi HTTP 200 nhưng CSV rỗng không được ghi đè cache hợp lệ.
+    if (!parsed.length || parsed[0].every(function (value) { return !value.trim(); })) {
+      throw new Error('CSV trống hoặc thiếu hàng tiêu đề — kiểm tra nguồn Google Sheets.');
+    }
     if (url) saveSheetText(url, name, text);
-    return csvToObjects(parseCSV(text));
+    return csvToObjects(parsed);
   }, function (err) {
     return loadSheetText(url).then(function (cached) {
       if (!cached) throw err;
@@ -157,6 +163,10 @@ export async function loadAllData() {
       var miss = missingColumns(p[1], REQUIRED_COLUMNS[p[0]]);
       if (miss.length) warnings.push('Sheet ' + p[0] + ' thiếu cột: ' + miss.join(', ') + ' (có thể đã bị đổi tên — báo cáo liên quan sẽ trống/sai)');
     });
+    // So_CT trùng làm phép tra cứu dạng map ghi đè âm thầm một phiếu cân.
+    // Giữ nguyên tất cả dòng gốc, nhưng cảnh báo rõ để kế toán đối chiếu trước khi xuất.
+    const duplicatePc = summarizeDuplicateKeys(results[0], 'So_CT');
+    if (duplicatePc.count) warnings.push('PHIEUCAN có ' + duplicatePc.count + ' số phiếu cân trùng (' + duplicatePc.extraRows + ' dòng lặp): ' + duplicatePc.samples.join(', ') + (duplicatePc.count > duplicatePc.samples.length ? '…' : '') + ' — cần đối chiếu dữ liệu trước khi sử dụng báo cáo ghép theo Số CT.');
     STATE.phieucan = results[0];
     STATE.dntt = results[1];
     STATE.hdncc = results[2];
