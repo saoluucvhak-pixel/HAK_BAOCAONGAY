@@ -47,8 +47,10 @@ try {
   await page.getByRole('button', { name: 'Thêm công ty' }).click();
   await page.locator('#TenCty').fill('Công ty Thử nghiệm');
   await page.locator('#DiaChi').fill('Đắk Lắk');
-  await page.locator('#PhieuCan').fill(url);
+  await page.locator('#PhieuCan').fill('https://docs.google.com/spreadsheets/d/HAK_TEST/edit?resourcekey=KEY_TEST#gid=123');
   await page.locator('#DNTT').fill(url);
+  const shipping = 'https://docs.google.com/spreadsheets/d/HAK_SHIPPING/edit';
+  await page.locator('#XuatHang').fill(shipping);
   await page.getByRole('button', { name: 'Lưu công ty' }).click();
   await page.getByRole('button', { name: 'Thêm công ty' }).click();
   await page.locator('#TenCty').fill('Công ty thứ hai');
@@ -61,7 +63,10 @@ try {
   const company = openCompany(file, publicKey, recipient);
   assert.equal(company.TenCty, 'Công ty Thử nghiệm');
   assert.equal(company.DiaChi, 'Đắk Lắk');
-  assert.equal(company.PhieuCan, url);
+  const exported = 'https://docs.google.com/spreadsheets/d/HAK_TEST/export?format=csv&gid=123&resourcekey=KEY_TEST';
+  assert.equal(company.PhieuCan, exported);
+  assert.equal(company.XuatHang, shipping);
+  assert(!file.includes(Buffer.from(exported)));
   assert(!file.includes(Buffer.from(url)));
   assert.throws(() => openCompany(file, publicKey, newRequest()), /Wrong recipient/);
   const envelope = JSON.parse(file);

@@ -281,6 +281,7 @@ try {
   assert.equal(config.PhieuCan, Object.keys(sheets)[0]);
   assert.equal(config.DNTT, Object.keys(sheets)[1]);
   assert.equal(config.HDNCC, '');
+  assert.equal(config.XuatHang, 'https://docs.google.com/spreadsheets/d/hak-windows-qa-XuatHang/edit');
   assert(configured.page.url().endsWith('/report.html'));
   await configured.page.locator('[data-target="cauhinh"]').click();
   await configured.page.getByRole('tab', { name: 'Thông tin công ty' }).click();

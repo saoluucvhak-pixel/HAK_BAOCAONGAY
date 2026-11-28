@@ -24,13 +24,7 @@ jobs:
       # config.html lưu bản base64 của dist: phải đồng bộ sau build để tránh phát hành mẫu cũ.
       - run: npm run build:config
       - run: cp dist/index.html ../desktop-app/app/index.html
-      - run: node scripts/verify-build.mjs
-      - name: Check committed artifacts match the build
-        env:
-          GIT_PAGER: cat
-        run: |
-          git --no-pager diff --stat -- config.html dist/index.html ../desktop-app/app/index.html
-          git --no-pager diff --exit-code -w -- config.html dist/index.html ../desktop-app/app/index.html
+      - run: node scripts/verify-build.mjs --committed
       - run: npm run lint -- --max-warnings 0
       - run: npm test
       - run: npm run test:ui
