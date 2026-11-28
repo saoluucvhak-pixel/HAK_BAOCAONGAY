@@ -19,7 +19,8 @@ writeFileSync(path.join(dir, 'approved-response.txt'), response(issuer, device))
 const company = {
   TenCty: 'Công ty HAK QA', DiaChi: 'Đắk Lắk',
   PhieuCan: 'https://docs.google.com/spreadsheets/d/e/hak-windows-qa-PhieuCan/pub?output=csv',
-  DNTT: 'https://docs.google.com/spreadsheets/d/e/hak-windows-qa-DNTT/pub?output=csv'
+  DNTT: 'https://docs.google.com/spreadsheets/d/e/hak-windows-qa-DNTT/pub?output=csv',
+  XuatHang: 'https://docs.google.com/spreadsheets/d/hak-windows-qa-XuatHang/edit'
 };
 function fixture(filename, setup) {
   writeFileSync(path.join(dir, filename), JSON.stringify(setup));

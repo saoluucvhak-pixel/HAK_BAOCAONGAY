@@ -223,9 +223,10 @@ internal static class Program
         ValidateSource(profile.DNTT, "Đề nghị thanh toán", true);
         ValidateSource(profile.HDNCC, "Hợp đồng NCC", false);
         ValidateSource(profile.Hosokeo, "Hồ sơ keo", false);
+        ValidateSource(profile.XuatHang, "Xuất hàng", false, true);
     }
 
-    private static void ValidateSource(string address, string label, bool required)
+    private static void ValidateSource(string address, string label, bool required, bool wholeSheet = false)
     {
         address = (address ?? "").Trim();
         if (!required && address.Length == 0) return;
@@ -233,7 +234,14 @@ internal static class Program
         if (address.Length > 2000 || address.IndexOfAny(new[] { '\'', '"', '`', '<', '>', '\\', '\r', '\n' }) >= 0 ||
             !Uri.TryCreate(address, UriKind.Absolute, out url) || url.Scheme != "https" ||
             url.Host != "docs.google.com" || !url.IsDefaultPort || !string.IsNullOrEmpty(url.UserInfo))
-            throw new InvalidDataException(label + " cần liên kết Google Sheets CSV hợp lệ.");
+            throw new InvalidDataException(label + " cần liên kết Google Sheets HTTPS hợp lệ.");
+        if (wholeSheet)
+        {
+            var sheet = Regex.Match(url.AbsolutePath, @"^/spreadsheets/d/([A-Za-z0-9_-]+)(?:/|$)");
+            if (!sheet.Success || sheet.Groups[1].Value == "e")
+                throw new InvalidDataException(label + " cần liên kết của cả file Google Sheets.");
+            return;
+        }
         var query = System.Web.HttpUtility.ParseQueryString(url.Query);
         bool published = Regex.IsMatch(url.AbsolutePath, @"^/spreadsheets/d/e/[^/]+/pub/?$") && query.GetValues("output")?[0] == "csv";
         bool exported = Regex.IsMatch(url.AbsolutePath, @"^/spreadsheets/d/[^/]+/export/?$") && query.GetValues("format")?[0] == "csv";
@@ -300,6 +308,7 @@ internal static class Program
         public string DNTT { get; set; }
         public string HDNCC { get; set; }
         public string Hosokeo { get; set; }
+        public string XuatHang { get; set; }
     }
     public sealed class License
     {

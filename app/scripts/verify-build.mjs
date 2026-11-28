@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { appendFileSync, readFileSync, readdirSync } from 'node:fs';
 
@@ -39,3 +40,16 @@ if (!electronHtml.equals(html)) {
   throw new Error(`Mẫu Electron đang chứa bản web cũ (offset ${offset})`);
 }
 console.log('PASS: Một file HTML. Mẫu cấu hình và Electron khớp từng byte.');
+
+if (process.argv.includes('--committed')) {
+  for (const relative of ['app/config.html', 'app/dist/index.html', 'desktop-app/app/index.html']) {
+    const file = new URL('../' + relative, app);
+    const tracked = execFileSync('git', ['show', 'HEAD:' + relative], { cwd: app, maxBuffer: 16 * 1024 * 1024 });
+    const normalize = bytes => bytes.toString('utf8').replace(/\r\n/g, '\n');
+    const actual = readFileSync(file);
+    if (normalize(tracked) !== normalize(actual)) {
+      throw new Error(relative + ' khác bản dựng từ commit hiện tại. Hãy đồng bộ lại các tệp build.');
+    }
+  }
+  console.log('PASS: Các tệp HTML đã commit khớp bản dựng.');
+}

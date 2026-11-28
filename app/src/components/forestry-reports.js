@@ -12,10 +12,12 @@ import { FORESTRY_SOURCES, buildForestryReports, forestryPeriodRange, normalizeF
 import { csvToObjects, parseCSV } from '../utils/csv-utils.js';
 import { downloadBlob } from '../utils/dom-utils.js';
 
-function dispatchSheetUrl(id, sheet) {
+function dispatchSheetUrl(id, sheet, spreadsheetUrl) {
   const url = new URL('https://docs.google.com/spreadsheets/d/' + id + '/gviz/tq');
   url.searchParams.set('tqx', 'out:csv');
   url.searchParams.set('sheet', sheet);
+  const resourceKey = new URL(spreadsheetUrl).searchParams.get('resourcekey');
+  if (resourceKey) url.searchParams.set('resourcekey', resourceKey);
   return url.href;
 }
 
@@ -25,7 +27,10 @@ async function loadSource(source, value) {
     const headers = (rows[0] ?? []).map(value => value.trim());
     return normalizeForestrySheet(source, headers, csvToObjects(rows));
   } catch (error) {
-    throw new Error(source.label + ' — ' + error.message);
+    const hint = [401, 403].includes(error.httpStatus)
+      ? 'Google từ chối quyền đọc (HTTP ' + error.httpStatus + '). Kiểm tra link khi chưa đăng nhập và liên hệ quản trị nguồn.'
+      : error.message;
+    throw new Error(source.label + ' — ' + hint);
   }
 }
 
@@ -295,11 +300,12 @@ export function initForestryReports() {
       if (!Number.isFinite(opening)) throw new Error('Nhập tồn đầu kỳ hợp lệ.');
       if (!selected.length) throw new Error('Chọn ít nhất một mẫu báo cáo.');
       const config = readForestrySettings(from, to);
-      const source = dispatchSheetId(CONFIG.XUATHANG || CONFIG.XUATHANG_DN);
+      const spreadsheetUrl = CONFIG.XUATHANG || CONFIG.XUATHANG_DN;
+      const source = dispatchSheetId(spreadsheetUrl);
       const urls = {
         intake: CONFIG.HOSOKEO,
-        dispatch: dispatchSheetUrl(source, FORESTRY_SOURCES.dispatch.label),
-        orders: dispatchSheetUrl(source, FORESTRY_SOURCES.orders.label),
+        dispatch: dispatchSheetUrl(source, FORESTRY_SOURCES.dispatch.label, spreadsheetUrl),
+        orders: dispatchSheetUrl(source, FORESTRY_SOURCES.orders.label, spreadsheetUrl),
       };
       const data = Object.fromEntries(await Promise.all(sources.map(async ([key, source]) =>
         [key, await loadSource(source, urls[key])])));

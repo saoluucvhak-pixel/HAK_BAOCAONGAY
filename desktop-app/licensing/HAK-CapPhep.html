@@ -95,10 +95,10 @@
         <label>Địa chỉ thu mua <input id="DiaChiThuMua" maxlength="300"></label>
         <label>Mã HS <input id="MaHS" maxlength="32"></label>
         <label>Nhà máy <input id="NhaMay" maxlength="80"></label>
-        <label>Link CSV phiếu cân <input id="PhieuCan" maxlength="2000" inputmode="url"></label>
-        <label>Link CSV đề nghị thanh toán <input id="DNTT" maxlength="2000" inputmode="url"></label>
-        <label>Link CSV hợp đồng NCC (tùy chọn) <input id="HDNCC" maxlength="2000" inputmode="url"></label>
-        <label>Link CSV hồ sơ keo (tùy chọn) <input id="Hosokeo" maxlength="2000" inputmode="url"></label>
+        <label>Link Google Sheets phiếu cân <input id="PhieuCan" maxlength="2000" inputmode="url"></label>
+        <label>Link Google Sheets đề nghị thanh toán <input id="DNTT" maxlength="2000" inputmode="url"></label>
+        <label>Link Google Sheets hợp đồng NCC (tùy chọn) <input id="HDNCC" maxlength="2000" inputmode="url"></label>
+        <label>Link Google Sheets hồ sơ keo (tùy chọn) <input id="Hosokeo" maxlength="2000" inputmode="url"></label>
         <label>Link Google Sheet xuất hàng (XUATHANG, tùy chọn) <input id="XuatHang" maxlength="2000" inputmode="url" placeholder="https://docs.google.com/spreadsheets/d/…/edit"></label>
         <button class="secondary" id="saveCompany" type="button">Lưu công ty</button>
       </details>
@@ -346,8 +346,20 @@ function validateCompanyProfile(company) {
     }
     const published = /^\/spreadsheets\/d\/e\/[^/]+\/pub\/?$/.test(url.pathname) && url.searchParams.get('output') === 'csv';
     const exported = /^\/spreadsheets\/d\/[^/]+\/export\/?$/.test(url.pathname) && url.searchParams.get('format') === 'csv';
-    if (!published && !exported)
-      throw new Error('Chỉ dùng liên kết Google Sheets đã xuất CSV.');
+    if (published || exported) continue;
+    const sheet = url.pathname.match(/^\/spreadsheets\/d\/([\w-]+)\/edit\/?$/);
+    if (!sheet || sheet[1] === 'e') throw new Error('Dùng link Google Sheets /edit hoặc link xuất CSV.');
+    const gid = new URLSearchParams(url.hash.slice(1)).get('gid') ?? url.searchParams.get('gid');
+    if (gid === null || !/^\d+$/.test(gid)) {
+      throw new Error($(field).parentElement.firstChild.textContent.trim() + ': mở đúng tab rồi sao chép link có gid, hoặc dùng link CSV.');
+    }
+    const csv = new URL('/spreadsheets/d/' + sheet[1] + '/export', url.origin);
+    csv.searchParams.set('format', 'csv');
+    csv.searchParams.set('gid', gid);
+    const resourceKey = url.searchParams.get('resourcekey');
+    if (resourceKey) csv.searchParams.set('resourcekey', resourceKey);
+    if (csv.href.length > $(field).maxLength) throw new Error('Link Google Sheets quá dài.');
+    company[field] = csv.href;
   }
 }
 
