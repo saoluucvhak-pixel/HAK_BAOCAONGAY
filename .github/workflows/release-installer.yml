@@ -1,4 +1,4 @@
-name: Update the device approval guide in the 2.6.0 admin draft
+name: Update HAK-CapPhep.html in the 2.6.0 admin draft
 
 on:
   workflow_dispatch:
@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: bf8b2d318e7a33dc9c58095a9a77f0156e9f88eb
       - name: Update the HTML in the existing 2.6.0 admin draft
         env:
           GH_TOKEN: ${{ github.token }}
@@ -23,9 +25,9 @@ jobs:
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
           gh release download "$tag" --pattern HAK-CapPhep.html --dir "$work"
-          printf '%s  %s\n' f7037acd95aba2fdd492e735970a9677581abb2c061dbb977b106f6a00cf21c1 "$work/HAK-CapPhep.html" | sha256sum -c -
+          printf '%s  %s\n' e78cb84efeb0035112800ec7481d877580be6ccabd6261a9fa4e56ca20ac728a "$work/HAK-CapPhep.html" | sha256sum -c -
           file=desktop-app/licensing/HAK-CapPhep.html
-          grep -Fq 'Hướng dẫn cấp phép Báo cáo ngày cho từng máy' "$file"
+          printf '%s  %s\n' 58a91a068203028ae5bd0d957f6f8771a38d495f0ef376f30cc01bfd05df3847 "$file" | sha256sum -c -
           test "$(gh api "$api" --jq '.draft')" = true
           if ! gh release upload "$tag" "$file" --clobber; then
             gh release upload "$tag" "$work/HAK-CapPhep.html" --clobber
