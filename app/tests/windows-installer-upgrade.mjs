@@ -12,6 +12,11 @@ const [legacy, candidate] = process.argv.slice(2);
 const { version: expectedVersion } = JSON.parse(await readFile(new URL('../../desktop-app/package.json', import.meta.url), 'utf8'));
 assert(process.env.GITHUB_ACTIONS === 'true' && process.platform === 'win32' && legacy && candidate,
   'Chạy trên runner Windows tạm thời với hai đường dẫn bộ cài.');
+// Keep the failure available in GitHub's check annotations as well as the runner log.
+process.on('uncaughtExceptionMonitor', (error) => {
+  const details = (error.stack || String(error)).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+  console.error('::error::' + details);
+});
 const legacyHash = '0a01f0fac4613f9522fc221da255b2b989be29ba8375c4bc359ef7c53d508d05';
 assert.equal(createHash('sha256').update(await readFile(legacy)).digest('hex'), legacyHash);
 
