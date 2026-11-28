@@ -73,6 +73,22 @@ const count = (p, k) => p.evaluate((key) => document.querySelector('[data-count=
   check('Đổi tên cột: cảnh báo đúng Sheet + đúng tên cột bị thiếu', s.dot.includes('warn') && /PHIEUCAN thiếu cột: Ngày cân 1/.test(s.text), s.text);
   await p.close();
 }
+// 5a) Google trả HTTP 200 nhưng CSV rỗng → không được báo tải thành công.
+{
+  const p = await open((r, k) => fulfill(r, k === 'PC' ? '' : OK[k]));
+  const s = await status(p);
+  check('CSV phiếu cân rỗng: báo lỗi thay vì hiển thị báo cáo trống', s.dot.includes('err') && /CSV trống/.test(s.text), s.text);
+  await p.close();
+}
+// 5b) Hai phiếu có cùng So_CT → cảnh báo rõ, vẫn giữ đủ dòng gốc.
+{
+  const duplicate = [...pc, { ...pc[0] }];
+  const p = await open((r, k) => fulfill(r, k === 'PC' ? toCSV(duplicate) : OK[k]));
+  const s = await status(p);
+  check('Phiếu cân trùng: trạng thái cảnh báo và nêu mã phiếu', s.dot.includes('warn') && /PHIEUCAN có 1 số phiếu cân trùng/.test(s.text), s.text);
+  check('Phiếu cân trùng: không âm thầm loại dòng', /Đã tải 41 phiếu cân/.test(s.text), s.text);
+  await p.close();
+}
 // 6) Dữ liệu chuẩn → KHÔNG có cảnh báo giả
 {
   const p = await open((r, k) => fulfill(r, OK[k]));
